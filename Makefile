@@ -1,0 +1,125 @@
+MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
+PROJECT_DIR := $(dir $(MKFILE_PATH))
+
+# Set additional build args for docker image build using make arguments
+IMAGE_NAME := pycon_backend
+ifeq (docker-build,$(firstword $(MAKECMDGOALS)))
+  TAG_NAME := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+  $(eval $(TAG_NAME):;@:)
+endif
+TAG_NAME := $(if $(TAG_NAME),$(TAG_NAME),local)
+CONTAINER_NAME = $(IMAGE_NAME)_$(TAG_NAME)_container
+
+ifeq ($(DOCKER_DEBUG),true)
+	DOCKER_MID_BUILD_OPTIONS = --progress=plain --no-cache
+	DOCKER_END_BUILD_OPTIONS = 2>&1 | tee docker-build.log
+else
+	DOCKER_MID_BUILD_OPTIONS =
+	DOCKER_END_BUILD_OPTIONS =
+endif
+
+AWS_LAMBDA_READYZ_PAYLOAD = '{\
+  "resource": "/readyz/",\
+  "path": "/readyz/",\
+  "httpMethod": "GET",\
+  "requestContext": {\
+    "resourcePath": "/readyz/",\
+    "httpMethod": "GET",\
+    "path": "/readyz/"\
+  },\
+  "headers": {"accept": "application/json"},\
+  "multiValueHeaders": {"accept": ["application/json"]},\
+  "queryStringParameters": null,\
+  "multiValueQueryStringParameters": null,\
+  "pathParameters": null,\
+  "stageVariables": null,\
+  "body": null,\
+  "isBase64Encoded": false\
+}'
+
+# =============================================================================
+# Local development commands
+
+# Setup local environments
+local-setup:
+	@uv sync
+
+# Run local development server
+local-api: local-collectstatic
+	@ENV_PATH=envfile/.env.local uv run python app/manage.py runserver 8000
+
+# Run django collectstatic
+local-collectstatic:
+	@ENV_PATH=envfile/.env.local uv run python app/manage.py collectstatic --noinput
+
+# Run django shell
+local-shell:
+	@ENV_PATH=envfile/.env.local uv run python app/manage.py shell
+
+# Run django migrations
+local-migrate:
+	@ENV_PATH=envfile/.env.local uv run python app/manage.py migrate
+
+# Devtools
+hooks-install: local-setup
+	uv run pre-commit install
+
+hooks-upgrade:
+	uv run pre-commit autoupdate
+
+hooks-lint:
+	uv run pre-commit run --all-files
+
+lint: hooks-lint  # alias
+
+
+# =============================================================================
+# Zappa related commands
+zappa-export:
+	uv run zappa save-python-settings-file
+
+# =============================================================================
+# Docker related commands
+
+# Docker image build
+# Usage: make docker-build <tag-name:=local>
+# if you want to build with debug mode, set DOCKER_DEBUG=true
+# ex) make docker-build or make docker-build some_TAG_NAME DOCKER_DEBUG=true
+docker-build:
+	@docker build \
+		-f ./infra/Dockerfile -t $(IMAGE_NAME):$(TAG_NAME) \
+		--build-arg GIT_HASH=$(shell git rev-parse HEAD) \
+		--build-arg IMAGE_BUILD_DATETIME=$(shell date +%Y-%m-%d_%H:%M:%S) \
+		$(DOCKER_MID_BUILD_OPTIONS) $(PROJECT_DIR) $(DOCKER_END_BUILD_OPTIONS)
+
+docker-run: docker-compose-up
+	@(docker stop $(CONTAINER_NAME) || true && docker rm $(CONTAINER_NAME) || true) > /dev/null 2>&1
+	@docker run -d --rm \
+		-p 58000:8080 \
+		--env-file envfile/.env.local --env-file envfile/.env.docker \
+		--name $(CONTAINER_NAME) \
+		$(IMAGE_NAME):$(TAG_NAME)
+
+docker-readyz:
+	curl -X POST http://localhost:58000/2015-03-31/functions/function/invocations -d $(AWS_LAMBDA_READYZ_PAYLOAD) | jq '.body | fromjson'
+
+docker-test: docker-run docker-readyz
+
+docker-build-and-test: docker-build docker-test
+
+docker-stop:
+	docker stop $(CONTAINER_NAME) || true
+
+docker-rm: docker-stop
+	docker rm $(CONTAINER_NAME) || true
+
+# Docker compose setup
+# Below commands are for local development only
+docker-compose-up:
+	docker compose --env-file envfile/.env.local -f ./infra/docker-compose.dev.yaml up -d
+
+docker-compose-down:
+	docker compose --env-file envfile/.env.local -f ./infra/docker-compose.dev.yaml down
+
+docker-compose-rm: docker-compose-down
+	docker compose --env-file envfile/.env.local -f ./infra/docker-compose.dev.yaml rm
