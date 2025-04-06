@@ -169,6 +169,7 @@ INSTALLED_APPS = [
     # For Shell Plus
     "django_extensions",
     # django-app
+    "user",
     # django-constance
     "constance",
 ]
@@ -283,8 +284,9 @@ STORAGES = {
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = 'core.fields.UUIDAutoField'
 
+AUTH_USER_MODEL = "user.UserExt"
 
 # Cookies
 # https://docs.djangoproject.com/en/5.2/ref/settings/#cookies
