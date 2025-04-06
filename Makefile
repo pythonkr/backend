@@ -95,13 +95,13 @@ docker-build:
 docker-run: docker-compose-up
 	@(docker stop $(CONTAINER_NAME) || true && docker rm $(CONTAINER_NAME) || true) > /dev/null 2>&1
 	@docker run -d --rm \
-		-p 58000:8080 \
+		-p 48000:8080 \
 		--env-file envfile/.env.local --env-file envfile/.env.docker \
 		--name $(CONTAINER_NAME) \
 		$(IMAGE_NAME):$(TAG_NAME)
 
 docker-readyz:
-	curl -X POST http://localhost:58000/2015-03-31/functions/function/invocations -d $(AWS_LAMBDA_READYZ_PAYLOAD) | jq '.body | fromjson'
+	curl -X POST http://localhost:48000/2015-03-31/functions/function/invocations -d $(AWS_LAMBDA_READYZ_PAYLOAD) | jq '.body | fromjson'
 
 docker-test: docker-run docker-readyz
 

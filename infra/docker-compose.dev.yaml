@@ -1,11 +1,11 @@
-name: pyconkr-payment-local
+name: pyconkr-backend-local
 
 volumes:
   postgres-data:
     driver: local
 
 services:
-  pyconkr-payment-postgres:
+  pyconkr-backend-postgres:
     image: postgres:17.2
     restart: unless-stopped
     volumes:
