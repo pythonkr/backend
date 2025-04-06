@@ -61,3 +61,10 @@ known_third_party = ["rest_framework"]
 
 [tool.django-stubs]
 django_settings_module = "core.settings"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+fixable = ["ALL"]
