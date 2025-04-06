@@ -36,11 +36,14 @@ class CloudWatchJsonFormatter(logging.Formatter):
         self,
         fmt: str = DEFAULT_CLOUDWATCH_LOG_FORMAT,
         datefmt: str = DEFAULT_CLOUDWATCH_DATE_FORMAT,
-        **kwargs,
+        style: typing.Literal["%", "{", "$"] = "%",
+        validate: bool = True,
+        *,
+        defaults: typing.Any | None = None,
     ):
-        super().__init__(fmt=fmt, datefmt=datefmt, **kwargs)
+        super().__init__(fmt=fmt, datefmt=datefmt, style=style, validate=validate, defaults=defaults)
 
-    def formatException(self, exc_info: ExcInfoType) -> dict:
+    def formatException(self, exc_info: ExcInfoType) -> dict:  # type: ignore[override]
         exc_type, exc_value, _ = exc_info
         return {
             "type": exc_type.__name__,
@@ -48,13 +51,13 @@ class CloudWatchJsonFormatter(logging.Formatter):
             "traceback_msg": "\n".join(traceback.format_exception(exc_value)),
         }
 
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
         record.message = record.getMessage()
         if self.usesTime():
             record.asctime = self.formatTime(record, self.datefmt)
         if record.exc_info:
             if not record.exc_text:
-                record.exc_text = self.formatException(record.exc_info)
+                record.exc_text = self.formatException(record.exc_info)  # type: ignore[assignment]
 
         return default_json_dumps(
             {

@@ -94,12 +94,12 @@ LOGGING = {
 API_STAGE = env("API_STAGE", default="prod")
 ADDITIONAL_TEXT_MIMETYPES: list[str] = []
 ASYNC_RESPONSE_TABLE = ""
-AWS_BOT_EVENT_MAPPING = {}
-AWS_EVENT_MAPPING = {}
+AWS_BOT_EVENT_MAPPING: dict[str, str] = {}
+AWS_EVENT_MAPPING: dict[str, str] = {}
 BASE_PATH = None
 BINARY_SUPPORT = True
-COGNITO_TRIGGER_MAPPING = {}
-CONTEXT_HEADER_MAPPINGS = {}
+COGNITO_TRIGGER_MAPPING: dict[str, str] = {}
+CONTEXT_HEADER_MAPPINGS: dict[str, str] = {}
 DJANGO_SETTINGS = "core.settings"
 DOMAIN = None
 ENVIRONMENT_VARIABLES: dict[str, str] = {}
@@ -147,12 +147,12 @@ CORS_ALLOW_HEADERS = [
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
     # CORS
     "corsheaders",
     # django-rest-framework
@@ -176,13 +176,13 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     # Django default middlewares
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
     # CORS
     "corsheaders.middleware.CorsMiddleware",
     # simple-history
@@ -191,7 +191,7 @@ MIDDLEWARE = [
     "core.middleware.request_response_logger.RequestResponseLogger",
 ]
 
-ROOT_URLCONF = 'core.urls'
+ROOT_URLCONF = "core.urls"
 
 TEMPLATES = [
     {
@@ -210,7 +210,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'core.wsgi.application'
+WSGI_APPLICATION = "core.wsgi.application"
 
 
 # Database
@@ -239,19 +239,19 @@ CONSTANCE_CONFIG: dict[str, tuple[int, str]] = {
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
-    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'ko-kr'
+LANGUAGE_CODE = "ko-kr"
 
-TIME_ZONE = 'Asia/Seoul'
+TIME_ZONE = "Asia/Seoul"
 
 USE_I18N = True
 
@@ -284,7 +284,7 @@ STORAGES = {
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'core.fields.UUIDAutoField'
+DEFAULT_AUTO_FIELD = "core.fields.UUIDAutoField"
 
 AUTH_USER_MODEL = "user.UserExt"
 

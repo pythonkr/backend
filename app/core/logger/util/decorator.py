@@ -12,9 +12,9 @@ slack_logger = logging.getLogger("slack_logger")
 ViewFuncType = collections.abc.Callable[[HttpRequest, typing.Any, typing.Any], HttpResponseBase]
 
 
-def bad_response_slack_logger(tag: str):
+def bad_response_slack_logger(tag: str) -> collections.abc.Callable[[ViewFuncType], ViewFuncType]:
     def wrapper(view_func: ViewFuncType) -> ViewFuncType:
-        def inner_wrapper(*args, **kwargs):
+        def inner_wrapper(*args: typing.Any, **kwargs: typing.Any) -> HttpResponseBase:
             try:
                 request: Request | HttpRequest = args[1]
                 request.META["bad_response_slack_logger_tag"] = tag

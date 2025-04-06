@@ -1,40 +1,60 @@
+import collections.abc
+import datetime
+import typing
 import uuid
 
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.db.models.functions import Now
 
+if typing.TYPE_CHECKING:
+    from user.models import UserExt  # noqa: F401
+
 User = get_user_model()
 
 
 class BaseAbstractModelQuerySet(models.QuerySet):
-    def delete(self, *args, **kwargs):
-        return super().update(*args, **kwargs, deleted_at=Now(), updated_at=Now())
+    def delete(self) -> int:  # type: ignore[override]
+        return super().update(deleted_at=Now(), updated_at=Now())
 
-    def hard_delete(self):
+    def hard_delete(self) -> tuple[int, dict[str, int]]:
         return super().delete()
 
-    def filter_active(self):
+    def filter_active(self) -> typing.Self:
         return self.filter(deleted_at__isnull=True)
 
 
 class BaseAbstractModel(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.UUIDField[uuid.UUID, uuid.UUID](primary_key=True, default=uuid.uuid4, editable=False)
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    deleted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField[datetime.datetime, datetime.datetime](auto_now_add=True)
+    updated_at = models.DateTimeField[datetime.datetime, datetime.datetime](auto_now=True)
+    deleted_at = models.DateTimeField[datetime.datetime, datetime.datetime](null=True, blank=True)
 
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT, null=True, related_name="%(class)s_created_by")
-    updated_by = models.ForeignKey(User, on_delete=models.PROTECT, null=True, related_name="%(class)s_updated_by")
-    deleted_by = models.ForeignKey(User, on_delete=models.PROTECT, null=True, related_name="%(class)s_deleted_by")
+    created_by = models.ForeignKey["UserExt", "UserExt"](
+        User, on_delete=models.PROTECT, null=True, related_name="%(class)s_created_by"
+    )
+    updated_by = models.ForeignKey["UserExt", "UserExt"](
+        User, on_delete=models.PROTECT, null=True, related_name="%(class)s_updated_by"
+    )
+    deleted_by = models.ForeignKey["UserExt", "UserExt"](
+        User, on_delete=models.PROTECT, null=True, related_name="%(class)s_deleted_by"
+    )
 
-    objects: BaseAbstractModelQuerySet = BaseAbstractModelQuerySet.as_manager()
+    objects: BaseAbstractModelQuerySet = BaseAbstractModelQuerySet.as_manager()  # type: ignore[misc, assignment]
 
     class Meta:
         abstract = True
 
-    def save(self, *args, **kwargs):
-        if update_fields := kwargs.get("update_fields"):
-            kwargs["update_fields"] = set(update_fields) | {"updated_at"}
-        super().save(*args, **kwargs)
+    def save(  # type: ignore[override]
+        self,
+        *,
+        force_insert: bool = False,
+        force_update: bool = False,
+        using: str | None = None,
+        update_fields: collections.abc.Iterable[str] | None = None,
+    ) -> None:
+        if update_fields:
+            update_fields = set(update_fields) | {"updated_at"}
+
+        super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)

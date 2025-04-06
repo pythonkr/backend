@@ -35,10 +35,18 @@ class SlackJsonFormatter(logging.Formatter):
     }
     """
 
-    def __init__(self, fmt: str = DEFAULT_SLACK_LOG_FORMAT, datefmt: str = DEFAULT_SLACK_DATE_FORMAT, **kwargs):
-        super().__init__(fmt=fmt, datefmt=datefmt, **kwargs)
+    def __init__(
+        self,
+        fmt: str = DEFAULT_SLACK_LOG_FORMAT,
+        datefmt: str = DEFAULT_SLACK_DATE_FORMAT,
+        style: typing.Literal["%", "{", "$"] = "%",
+        validate: bool = True,
+        *,
+        defaults: typing.Any | None = None,
+    ):
+        super().__init__(fmt=fmt, datefmt=datefmt, style=style, validate=validate, defaults=defaults)
 
-    def formatException(self, exc_info: ExcInfoType) -> blocks.SlackCodeChildBlock:
+    def formatException(self, exc_info: ExcInfoType) -> blocks.SlackSectionParentBlock:  # type: ignore[override]
         exc_type, exc_value, _ = exc_info
         return blocks.SlackSectionParentBlock(
             text=blocks.SlackCodeChildBlock(
@@ -47,7 +55,7 @@ class SlackJsonFormatter(logging.Formatter):
             )
         )
 
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> list[blocks.SlackParentBlockType]:  # type: ignore[override]
         record.message = record.getMessage()
         if self.usesTime():
             record.asctime = self.formatTime(record, self.datefmt)
@@ -74,14 +82,9 @@ class SlackJsonFormatter(logging.Formatter):
         )
         if extra_data := record.__dict__.get("data"):
             for key, value in extra_data.items():
-                slack_block.blocks.append(
-                    blocks.SlackSectionParentBlock(
-                        text=blocks.SlackCodeChildBlock(
-                            title=key,
-                            text=value if isinstance(value, (str, int, float, bool)) else default_json_dumps(value),
-                        )
-                    )
-                )
+                text = str(value) if isinstance(value, (str, int, float, bool)) else default_json_dumps(value)
+                block = blocks.SlackSectionParentBlock(text=blocks.SlackCodeChildBlock(title=key, text=text))
+                slack_block.blocks.append(block)
         if record.exc_info:
             slack_block.blocks.append(self.formatException(record.exc_info))
 

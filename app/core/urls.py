@@ -15,16 +15,14 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
+import core.health_check
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import path
+from django.urls import include, path, re_path, resolvers
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
-import core.health_check
-
-v1_apis = [
-]
+v1_apis: list[resolvers.URLPattern | resolvers.URLResolver] = []  # type: ignore[assignment]
 
 urlpatterns = [
     # Health Check
@@ -32,6 +30,8 @@ urlpatterns = [
     path("livez/", core.health_check.livez),
     # Admin
     path("admin/", admin.site.urls),
+    # V1 API
+    re_path("^v1/", include((v1_apis, "v1"), namespace="v1")),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 if settings.DEBUG:

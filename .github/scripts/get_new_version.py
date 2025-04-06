@@ -60,16 +60,17 @@ def increment_version_count(version: packaging.version.Version, is_stage: bool) 
     today: datetime.date = datetime.date.today()
 
     # Calculate the new version
+    new_count: int = 0
     if version.major == today.year and version.minor == today.month:
         if current_pre:
             # If the current version is a pre-release, do not increment the count
-            new_count: int = version.micro
+            new_count = version.micro
         else:
             # Same month, increment the count
-            new_count: int = version.micro + 1
+            new_count = version.micro + 1
     else:
         # Different month, reset the count
-        new_count: int = 1
+        new_count = 1
         current_pre = None
 
     new_pre: PreType = ((current_pre[0], current_pre[1] + 1) if current_pre else ("a", 0)) if is_stage else None

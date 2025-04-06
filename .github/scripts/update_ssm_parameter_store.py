@@ -11,11 +11,12 @@ if typing.TYPE_CHECKING:
 ssm_client: "mypy_boto3_ssm.SSMClient" = boto3.client("ssm")
 
 
-class ParameterDiffCollection(typing.NamedTuple):
-    class ValueDiff(typing.NamedTuple):
-        old: str | None
-        new: str | None
+class ValueDiff(typing.NamedTuple):
+    old: str | None
+    new: str | None
 
+
+class ParameterDiffCollection(typing.NamedTuple):
     updated: dict[str, ValueDiff]
     created: dict[str, ValueDiff]
     deleted: dict[str, ValueDiff]
@@ -53,7 +54,7 @@ def get_parameter_diff(old_parameters: dict[str, str], new_parameters: dict[str,
     created, updated, deleted = {}, {}, {}
 
     for fields in old_parameters.keys() | new_parameters.keys():
-        value = ParameterDiffCollection.ValueDiff(old=old_parameters.get(fields), new=new_parameters.get(fields))
+        value = ValueDiff(old=old_parameters.get(fields), new=new_parameters.get(fields))
         if value.old != value.new:
             if value.old is None:
                 created[fields] = value
@@ -65,7 +66,7 @@ def get_parameter_diff(old_parameters: dict[str, str], new_parameters: dict[str,
     return ParameterDiffCollection(updated=updated, created=created, deleted=deleted)
 
 
-def update_parameter_store(project_name: str, stage: str, diff: ParameterDiffCollection):
+def update_parameter_store(project_name: str, stage: str, diff: ParameterDiffCollection) -> None:
     for field, values in {**diff.created, **diff.updated}.items():
         ssm_client.put_parameter(
             Name=f"/{project_name}/{stage}/{field}",
@@ -78,7 +79,7 @@ def update_parameter_store(project_name: str, stage: str, diff: ParameterDiffCol
         ssm_client.delete_parameters(Names=[f"/{project_name}/{stage}/{field}" for field in diff.deleted.keys()])
 
 
-def main(project_name: str, stage: str, json_file: pathlib.Path):
+def main(project_name: str, stage: str, json_file: pathlib.Path) -> None:
     if not all([json_file.is_file(), project_name, stage]):
         raise ValueError("인자를 확인해주세요.")
 

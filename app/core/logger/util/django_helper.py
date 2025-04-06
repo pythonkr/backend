@@ -1,4 +1,5 @@
 import contextlib
+import functools
 import json
 import types
 
@@ -9,15 +10,12 @@ from rest_framework.request import Request
 PLACEHOLDER_AWS_REQUEST_ID = "00000000-0000-0000-0000-000000000000"
 PLACEHOLDER_AWS_LAMBDA_CONTEXT = types.SimpleNamespace(AWS_REQUEST_ID=PLACEHOLDER_AWS_REQUEST_ID)
 
-
-def default_json_dumps(obj: object, **kwargs) -> str:
-    return json.dumps(
-        obj=obj,
-        skipkeys=True,
-        ensure_ascii=False,
-        default=lambda o: o.__dict__ if hasattr(o, "__dict__") else str(o),
-        **kwargs,
-    )
+default_json_dumps = functools.partial(
+    json.dumps,
+    skipkeys=True,
+    ensure_ascii=False,
+    default=lambda o: o.__dict__ if hasattr(o, "__dict__") else str(o),
+)
 
 
 def get_request_log_data(request: HttpRequest | Request) -> dict[str, str | dict]:
@@ -27,10 +25,14 @@ def get_request_log_data(request: HttpRequest | Request) -> dict[str, str | dict
     except RawPostDataException:
         body = "Request body is not readable."
 
+    user = None
+    if request.user.is_authenticated:
+        user = getattr(request.user, "username", None)
+
     request_data = {
         "method": request.method,
         "path": request.path,
-        "user": request.user.username if request.user.is_authenticated else None,
+        "user": user,
         "query_params": request.GET,
         "headers": dict(request.headers),
         "body": body,
@@ -44,7 +46,7 @@ def get_request_log_data(request: HttpRequest | Request) -> dict[str, str | dict
     return request_data
 
 
-def get_response_log_data(response: HttpResponseBase) -> dict[str, str | dict]:
+def get_response_log_data(response: HttpResponseBase) -> dict[str, int | str | dict]:
     response_body = getattr(response, "content", getattr(response, "streaming_content", "Couldn't get response body"))
     with contextlib.suppress(json.JSONDecodeError, TypeError):
         response_body = response_body and json.loads(response_body)
