@@ -3,14 +3,16 @@ import contextlib
 import typing
 import uuid
 
-from django.core.validators import _ValidatorCallable
 from django.db.backends.base.operations import BaseDatabaseOperations
 from django.db.models import AutoField, UUIDField, expressions, fields
 from django.db.models.fields.reverse_related import ForeignObjectRel
-from django.utils.choices import _Choices
-from django.utils.functional import _StrOrPromise
 
 BaseDatabaseOperations.integer_field_ranges["UUIDField"] = (0, 0)
+
+_ValidatorCallable: typing.TypeAlias = collections.abc.Callable[[typing.Any], None]
+_Choice: typing.TypeAlias = tuple[typing.Any, typing.Any]
+_ChoiceNamedGroup: typing.TypeAlias = tuple[str, collections.abc.Iterable[_Choice]]
+_Choices: typing.TypeAlias = collections.abc.Iterable[_Choice | _ChoiceNamedGroup]
 
 
 class UUIDFieidInitKwargs(typing.TypedDict):
@@ -30,7 +32,7 @@ class UUIDFieidInitKwargs(typing.TypedDict):
     unique_for_month: typing.NotRequired[str | None]
     unique_for_year: typing.NotRequired[str | None]
     choices: typing.NotRequired[_Choices | None]
-    help_text: typing.NotRequired[_StrOrPromise]
+    help_text: typing.NotRequired[str]
     db_column: typing.NotRequired[str | None]
     db_comment: typing.NotRequired[str | None]
     db_tablespace: typing.NotRequired[str | None]
@@ -44,7 +46,7 @@ class UUIDAutoField(UUIDField, AutoField):
     _pyi_private_get_type: uuid.UUID  # type: ignore[assignment]
     _pyi_lookup_exact_type: uuid.UUID  # type: ignore[assignment]
 
-    def __init__(self, verbose_name: _StrOrPromise | None = None, **kwargs: typing.Unpack[UUIDFieidInitKwargs]) -> None:
+    def __init__(self, verbose_name: str | None = None, **kwargs: typing.Unpack[UUIDFieidInitKwargs]) -> None:
         kwargs.setdefault("default", uuid.uuid4)
         kwargs.setdefault("editable", False)
         super().__init__(verbose_name, **kwargs)
