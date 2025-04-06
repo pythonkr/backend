@@ -65,27 +65,27 @@ repos:
         - drf-standardized-errors
         - djangorestframework-stubs[compatible-mypy]
         - zappa-django-utils
-- repo: https://github.com/pre-commit/mirrors-mypy
-  rev: 'v1.15.0'
-  hooks:
-    - id: mypy
-      additional_dependencies:
-        - boto3
-        - django-constance
-        - django-cors-headers
-        - django-environ
-        - django-extensions
-        - django-filter
-        - django-simple-history
-        - django-stubs[compatible-mypy]
-        - drf-spectacular
-        - drf-standardized-errors
-        - djangorestframework-stubs[compatible-mypy]
-        - zappa-django-utils
-      args:
-        - --no-strict-optional
-        - --ignore-missing-imports
-        - --check-untyped-defs
-        - --disallow-untyped-defs
-        - --disallow-incomplete-defs
-        - --disallow-untyped-calls
+# - repo: https://github.com/pre-commit/mirrors-mypy
+#   rev: 'v1.15.0'
+#   hooks:
+#     - id: mypy
+#       additional_dependencies:
+#         - boto3
+#         - django-constance
+#         - django-cors-headers
+#         - django-environ
+#         - django-extensions
+#         - django-filter
+#         - django-simple-history
+#         - django-stubs[compatible-mypy]
+#         - drf-spectacular
+#         - drf-standardized-errors
+#         - djangorestframework-stubs[compatible-mypy]
+#         - zappa-django-utils
+#       args:
+#         - --no-strict-optional
+#         - --ignore-missing-imports
+#         - --check-untyped-defs
+#         - --disallow-untyped-defs
+#         - --disallow-incomplete-defs
+#         - --disallow-untyped-calls
