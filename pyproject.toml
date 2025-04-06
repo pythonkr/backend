@@ -3,7 +3,7 @@ name = "backend"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = "==3.12.*"
 dependencies = [
     "argon2-cffi>=23.1.0",
     "django>=5.2",
@@ -29,7 +29,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "boto3-stubs[essential,s3]>=1.37.28",
+    "boto3-stubs[essential,s3,ssm]>=1.37.28",
     "django-stubs[compatible-mypy]>=5.1.3",
     "djangorestframework-stubs[compatible-mypy]>=3.15.3",
     "ipython>=9.0.2",
@@ -44,3 +44,19 @@ deployment = [
     "setuptools>=78.1.0",
     "zappa>=0.59.0",
 ]
+
+[tool.uv]
+package = false
+default-groups = ["dev", "deployment"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.isort]
+profile = "black"
+line_length = 120
+known_third_party = ["rest_framework"]
+
+[tool.django-stubs]
+django_settings_module = "core.settings"
