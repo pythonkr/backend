@@ -366,6 +366,7 @@ if SENTRY_DSN := env("SENTRY_DSN", default=""):
         release=DEPLOYMENT_RELEASE_VERSION,
         traces_sampler=traces_sampler,
         profiles_sample_rate=SENTRY_PROFILES_SAMPLE_RATE,
+        send_default_pii=True,
         integrations=[
             sentry_sdk.integrations.aws_lambda.AwsLambdaIntegration(),
             sentry_sdk.integrations.django.DjangoIntegration(),
