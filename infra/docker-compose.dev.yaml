@@ -1,0 +1,21 @@
+name: pyconkr-backend-local
+
+volumes:
+  postgres-data:
+    driver: local
+
+services:
+  pyconkr-backend-postgres:
+    image: postgres:17.2
+    restart: unless-stopped
+    volumes:
+      - postgres-data:/var/lib/postgresql/data:rw
+
+    environment:
+      TZ: Asia/Seoul
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: ${DATABASE_NAME}
+
+    ports:
+    - ${DATABASE_PORT}:5432
