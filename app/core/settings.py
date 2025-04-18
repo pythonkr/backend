@@ -170,6 +170,8 @@ INSTALLED_APPS = [
     "django_extensions",
     # django-app
     "user",
+    "cms.page",
+    "cms.sitemap",
     # django-constance
     "constance",
 ]
