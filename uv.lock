@@ -1,4 +1,5 @@
 version = 1
+revision = 1
 requires-python = "==3.12.*"
 
 [[package]]
@@ -111,6 +112,7 @@ dependencies = [
     { name = "django-environ" },
     { name = "django-extensions" },
     { name = "django-filter" },
+    { name = "django-modeltranslation" },
     { name = "django-picklefield" },
     { name = "django-simple-history" },
     { name = "django-storages", extra = ["s3"] },
@@ -154,6 +156,7 @@ requires-dist = [
     { name = "django-environ", specifier = ">=0.12.0" },
     { name = "django-extensions", specifier = ">=3.2.3" },
     { name = "django-filter", specifier = ">=25.1" },
+    { name = "django-modeltranslation", specifier = ">=0.19.13" },
     { name = "django-picklefield", specifier = ">=3.3" },
     { name = "django-simple-history", specifier = ">=3.8.0" },
     { name = "django-storages", extras = ["s3"], specifier = ">=1.14.6" },
@@ -439,6 +442,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/b5/40/c702a6fe8cccac9bf426b55724ebdf57d10a132bae80a17691d0cf0b9bac/django_filter-25.1.tar.gz", hash = "sha256:1ec9eef48fa8da1c0ac9b411744b16c3f4c31176c867886e4c48da369c407153", size = 143021 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/07/a6/70dcd68537c434ba7cb9277d403c5c829caf04f35baf5eb9458be251e382/django_filter-25.1-py3-none-any.whl", hash = "sha256:4fa48677cf5857b9b1347fed23e355ea792464e0fe07244d1fdfb8a806215b80", size = 94114 },
+]
+
+[[package]]
+name = "django-modeltranslation"
+version = "0.19.13"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/44/e1/54a2f2cff0bf6c5798a0185f4b962d680999a8f0207a61f8aebb75ff8226/django_modeltranslation-0.19.13.tar.gz", hash = "sha256:df2516fdfb6a865fd1dfdda74e549d437d8ca148c1d435663db36edb6863f34e", size = 76720 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/10/a9/87ddfca789c95e8aaa7d5481d00184046cad925f943aeaee31dd21e62f0b/django_modeltranslation-0.19.13-py3-none-any.whl", hash = "sha256:69b7dc9a8bae152ab84caf969a5ad478f588f4d9f8345545d4f20f66eeb51ef6", size = 53996 },
 ]
 
 [[package]]
