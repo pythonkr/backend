@@ -115,12 +115,16 @@ jobs:
       - name: Zappa Update
         run: uv run zappa update ${{ env.API_STAGE }} --docker-image-uri ${{ env.AWS_ECR_REGISTRY }}:${{ steps.info.outputs.TAG }}
 
+      - name: Django collect staticfiles
+        run: uv run zappa manage ${{ env.API_STAGE }} "collectstatic --no-input"
+
+      # Django migrate
+      - name: Django migrate
+        run: uv run zappa manage ${{ env.API_STAGE }} "migrate --noinput"
+
       # Zappa certify
       - name: Zappa Certify
         run: uv run zappa certify ${{ env.API_STAGE }} --yes
-
-      - name: Collect staticfiles
-        run: uv run zappa manage ${{ env.API_STAGE }} "collectstatic --no-input"
 
       # Notify to Slack (Success)
       - name: Notify deployment to Slack
