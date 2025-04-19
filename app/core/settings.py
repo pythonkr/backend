@@ -147,6 +147,10 @@ CORS_ALLOW_HEADERS = [
 # Application definition
 
 INSTALLED_APPS = [
+    # django model translation
+    # https://django-modeltranslation.readthedocs.io/en/latest/installation.html#installed-apps
+    "modeltranslation",
+    # django default apps
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -170,6 +174,7 @@ INSTALLED_APPS = [
     "django_extensions",
     # django-app
     "user",
+    "cms",
     # django-constance
     "constance",
 ]
@@ -257,6 +262,9 @@ USE_I18N = True
 
 USE_TZ = True
 
+MODELTRANSLATION_DEFAULT_LANGUAGE = "ko"
+
+MODELTRANSLATION_LANGUAGES = ("ko", "en")
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
