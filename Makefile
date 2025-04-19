@@ -56,7 +56,11 @@ local-collectstatic:
 local-shell:
 	@ENV_PATH=envfile/.env.local uv run python app/manage.py shell
 
-# Run django migrations
+# Run django makemigrations
+local-makemigrations:
+	@ENV_PATH=envfile/.env.local uv run python app/manage.py makemigrations
+
+# Run django migrate
 local-migrate:
 	@ENV_PATH=envfile/.env.local uv run python app/manage.py migrate
 
