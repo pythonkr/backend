@@ -147,6 +147,9 @@ CORS_ALLOW_HEADERS = [
 # Application definition
 
 INSTALLED_APPS = [
+    # django model translation: https://django-modeltranslation.readthedocs.io/en/latest/installation.html#installed-apps
+    "modeltranslation",
+    # django default apps
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -229,7 +232,6 @@ DATABASES = {
     },
 }
 
-
 # Constance Settings
 CONSTANCE_BACKEND = "constance.backends.database.DatabaseBackend"
 CONSTANCE_CONFIG: dict[str, tuple[int, str]] = {
@@ -259,6 +261,8 @@ USE_I18N = True
 
 USE_TZ = True
 
+MODELTRANSLATION_DEFAULT_LANGUAGE = 'ko'
+MODELTRANSLATION_LANGUAGES = ("ko", "en")
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
