@@ -32,6 +32,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     # V1 API
     re_path("^v1/", include((v1_apis, "v1"), namespace="v1")),
+    path("cms/", include("cms.urls")),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 if settings.DEBUG:
