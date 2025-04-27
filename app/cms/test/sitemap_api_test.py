@@ -15,7 +15,6 @@ def test_list_view(api_client, create_sitemap):
 @pytest.mark.django_db
 def test_retrieve_view(api_client, create_sitemap):
     url = reverse(CMS_SITEMAP)
-    print("create_sitemap_id", create_sitemap.id)
     response = api_client.get(url, kwargs={"pk": create_sitemap.id})
     if response.status_code != 200:
         raise Exception("cms Sitemap retrieve API raised error")
