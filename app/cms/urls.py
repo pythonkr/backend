@@ -16,9 +16,11 @@ Including another URLconf
 """
 
 from cms import views
-from django.urls import path
+from django.urls import include, path
+from rest_framework import routers
 
-urlpatterns = [
-    path("sitemap/", views.SitemapListRetrieveViewSet.as_view({"get": "list"}), name="cms-sitemap"),
-    path("page/", views.PageListRetrieveViewSet.as_view({"get": "list"}), name="cms-page"),
-]
+cms_router = routers.SimpleRouter()
+cms_router.register("sitemap/", views.SitemapListRetrieveViewSet, base_name="cms-sitemap")
+cms_router.register("page/", views.PageListRetrieveViewSet, base_name="cms-page")
+
+urlpatterns = [path("", include(cms_router.urls))]
