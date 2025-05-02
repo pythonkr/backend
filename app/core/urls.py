@@ -22,7 +22,8 @@ from django.contrib import admin
 from django.urls import include, path, re_path, resolvers
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
-v1_apis: list[resolvers.URLPattern | resolvers.URLResolver] = []  # type: ignore[assignment]
+# type: ignore[assignment]
+v1_apis: list[resolvers.URLPattern | resolvers.URLResolver] = [path("cms/", include("cms.urls"))]
 
 urlpatterns = [
     # Health Check
@@ -32,7 +33,6 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     # V1 API
     re_path("^v1/", include((v1_apis, "v1"), namespace="v1")),
-    path("cms/", include("cms.urls")),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 if settings.DEBUG:
