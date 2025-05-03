@@ -1,5 +1,6 @@
 import uuid
 
+from django.core.validators import MinValueValidator
 from django.db import models
 
 
@@ -21,7 +22,7 @@ class Sitemap(models.Model):
         "self", null=True, blank=True, default=None, on_delete=models.SET_NULL, related_name="children"
     )
     name = models.CharField(max_length=256)
-    order = models.IntegerField(default=0)
+    order = models.IntegerField(default=0, validators=MinValueValidator(0))
     page = models.ForeignKey(Page, on_delete=models.PROTECT)
     display_start_at = models.DateTimeField(null=True, blank=True)
     display_end_at = models.DateTimeField(null=True, blank=True)
