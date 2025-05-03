@@ -22,7 +22,8 @@ from django.contrib import admin
 from django.urls import include, path, re_path, resolvers
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
-v1_apis: list[resolvers.URLPattern | resolvers.URLResolver] = []  # type: ignore[assignment]
+# type: ignore[assignment]
+v1_apis: list[resolvers.URLPattern | resolvers.URLResolver] = [path("cms/", include("cms.urls"))]
 
 urlpatterns = [
     # Health Check
