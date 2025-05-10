@@ -64,6 +64,10 @@ local-makemigrations:
 local-migrate:
 	@ENV_PATH=envfile/.env.local uv run python app/manage.py migrate
 
+# Create admin superuser
+local-createsuperuser:
+	@ENV_PATH=envfile/.env.local uv run python app/manage.py createsuperuser
+
 # Devtools
 hooks-install: local-setup
 	uv run pre-commit install
