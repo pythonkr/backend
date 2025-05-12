@@ -25,7 +25,7 @@ jobs:
 
     env:
       API_STAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.WORKFLOW_PHASE || 'dev' }}
-      BUMP_RULE: ${{ github.event_name == 'workflow_dispatch' && '' || '--stage' }}
+      BUMP_RULE: ${{ (github.event_name == 'workflow_dispatch' && inputs.WORKFLOW_PHASE || 'dev') == 'dev' && '--stage' || '' }}
       AWS_ECR_REGISTRY: ${{ github.event_name == 'workflow_dispatch' && secrets.AWS_ECR_PROD_URL || secrets.AWS_ECR_DEV_URL }}
 
     steps:
@@ -62,7 +62,7 @@ jobs:
       - name: Get current date, repo name and release tag version
         id: info
         run: |
-          LATEST_TAG=$(git tag -l --sort=-version:refname | head -n 1)
+          LATEST_TAG=$(git tag -l --sort=-creatordate | head -n 1)
           echo "::set-output name=TAG::$(python ./.github/scripts/get_new_version.py --current=$LATEST_TAG ${{ env.BUMP_RULE }})"
           echo "::set-output name=date::$(date +'%Y-%m-%d_%H:%M:%S')"
           echo "::set-output name=repository_name::$(echo ${{ github.repository }} | sed -e 's/${{ github.repository_owner }}\///')"
@@ -139,7 +139,7 @@ jobs:
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "${{ steps.info.outputs.TAG }} 버전 배포 실패 :rotating_light: (${{ job.status }})",
+                    "text": "${{ steps.info.outputs.repository_name }} ${{ steps.info.outputs.TAG }} 버전 배포 실패 :rotating_light: (${{ job.status }})",
                     "emoji": true
                   }
                 },
@@ -171,7 +171,7 @@ jobs:
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "${{ steps.info.outputs.TAG }} 버전 배포 성공 :tada:",
+                    "text": "${{ steps.info.outputs.repository_name }} ${{ steps.info.outputs.TAG }} 버전 배포 성공 :tada:",
                     "emoji": true
                   }
                 },
