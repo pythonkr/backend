@@ -269,12 +269,18 @@ MODELTRANSLATION_LANGUAGES = ("ko", "en")
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 STATIC_ROOT = BASE_DIR / "static"
-STATIC_URL = "static/"
 
 DEFAULT_STORAGE_BACKEND = env("DJANGO_DEFAULT_STORAGE_BACKEND", default="storages.backends.s3.S3Storage")
 STATIC_STORAGE_BACKEND = env("DJANGO_STATIC_STORAGE_BACKEND", default="storages.backends.s3.S3Storage")
 
 STORAGE_BUCKET_NAME = f"pyconkr-backend-{API_STAGE}"
+
+STATIC_URL = (
+    f"https://{STORAGE_BUCKET_NAME}.s3.amazonaws.com/"
+    if STATIC_STORAGE_BACKEND == "storages.backends.s3.S3Storage"
+    else "static/"
+)
+
 STORAGE_OPTIONS = (
     {
         "bucket_name": STORAGE_BUCKET_NAME,
