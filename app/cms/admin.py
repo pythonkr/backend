@@ -135,7 +135,7 @@ class CodeEditorWidget(forms.Textarea):
             "https://unpkg.com/codemirror@5.65.5/lib/codemirror.js",
             "https://unpkg.com/codemirror@5.65.5/mode/javascript/javascript.js",
             "https://unpkg.com/@babel/standalone/babel.min.js",
-            "/static/admin/js/editor.js",
+            "admin/js/editor.js",
         )
 
     def render(self, name, value, attrs=None, renderer=None):
