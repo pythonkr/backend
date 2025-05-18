@@ -43,10 +43,11 @@ class Sitemap(BaseAbstractModel):
         ordering = ["order"]
 
     def __str__(self):
-        return str(self.name)
+        return f"{self.route} ({self.name})"
 
     @property
     def route(self) -> str:
+        """주의: 이 속성은 N+1 쿼리를 발생시킵니다. 절때 API 응답에서 사용하지 마세요."""
         if self.parent_sitemap:
             return f"{self.parent_sitemap.route}/{self.route_code}"
         return self.route_code
