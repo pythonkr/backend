@@ -56,6 +56,10 @@ local-collectstatic:
 local-shell:
 	@ENV_PATH=envfile/.env.local uv run python app/manage.py shell
 
+# Run django shell plus
+local-shell-plus:
+	@ENV_PATH=envfile/.env.local uv run python app/manage.py shell_plus
+
 # Run django makemigrations
 local-makemigrations:
 	@ENV_PATH=envfile/.env.local uv run python app/manage.py makemigrations
@@ -67,6 +71,10 @@ local-migrate:
 # Create admin superuser
 local-createsuperuser:
 	@ENV_PATH=envfile/.env.local uv run python app/manage.py createsuperuser
+
+# Run pytest
+local-test:
+	@ENV_PATH=envfile/.env.local cd app && uv run pytest -v
 
 # Devtools
 hooks-install: local-setup
