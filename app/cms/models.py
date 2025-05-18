@@ -29,6 +29,7 @@ class Sitemap(BaseAbstractModel):
         "self", null=True, default=None, on_delete=models.SET_NULL, related_name="children"
     )
 
+    route_code = models.CharField(max_length=256)
     name = models.CharField(max_length=256)
     order = models.IntegerField(default=0, validators=[MinValueValidator(0)])
     page = models.ForeignKey(Page, on_delete=models.PROTECT)
@@ -43,6 +44,12 @@ class Sitemap(BaseAbstractModel):
 
     def __str__(self):
         return str(self.name)
+
+    @property
+    def route(self) -> str:
+        if self.parent_sitemap:
+            return f"{self.parent_sitemap.route}/{self.route_code}"
+        return self.route_code
 
 
 class Section(BaseAbstractModel):
