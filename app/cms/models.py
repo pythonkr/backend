@@ -17,10 +17,10 @@ class Page(BaseAbstractModel):
 
 class SitemapQuerySet(BaseAbstractModelQuerySet):
     def filter_by_today(self) -> typing.Self:
-        today = datetime.date.today()
+        now = datetime.datetime.now()
         return self.filter(
-            models.Q(display_start_at__isnull=True) | models.Q(display_start_at__lte=today),
-            models.Q(display_end_at__isnull=True) | models.Q(display_end_at__gte=today),
+            models.Q(display_start_at__isnull=True) | models.Q(display_start_at__lte=now),
+            models.Q(display_end_at__isnull=True) | models.Q(display_end_at__gte=now),
         )
 
 
