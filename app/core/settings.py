@@ -5,6 +5,7 @@ import types
 import typing
 
 import boto3
+import corsheaders.defaults
 import environ
 import sentry_sdk
 import sentry_sdk.integrations.aws_lambda
@@ -111,38 +112,18 @@ ALLOWED_HOSTS = ["*"]
 # CORS Settings
 # pycon domain regex pattern
 CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://\w+\.pycon\.kr$",
-    r"^http://\w+\.pycon\.kr$",
-    r"^https://\w+\.dev.pycon\.kr$",
-    r"^http://\w+\.dev.pycon\.kr$",
-    r"http://localhost:\d+$",
-    r"https://localhost:\d+$",
-    r"http://127.0.0.1:\d+$",
-    r"https://127.0.0.1:\d+$",
+    r"^(http|https):\/\/([a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.pycon\.kr)$",  # pycon.kr 하위 도메인
+    r"^(http|https):\/\/(localhost|127\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d{1,5})?$",  # 로컬 환경
 ]
-
 CORS_ALLOWED_ORIGINS = [
-    "https://pycon.kr",
-    "https://2025.pycon.kr",
-    "http://pycon.kr",
-    "http://2025.pycon.kr",
+    f"{protocol}://{domain}{port}"
+    for protocol in ("http", "https")
+    for domain in ("localhost", "127.0.0.1", "pycon.kr", "local.dev.pycon.kr")
+    for port in ("", ":3000", ":5173")
 ]
-
-if DEBUG:
-    CORS_ALLOWED_ORIGIN_REGEXES += []
-
 CORS_ALLOW_CREDENTIALS = True
-
-CORS_ALLOW_HEADERS = [
-    "authorization",
-    "content-type",
-    "x-csrftoken",
-    "accept",
-    "accept-encoding",
-    "origin",
-    "user-agent",
-    "x-requested-with",
-]
+CORS_ALLOW_HEADERS = [*corsheaders.defaults.default_headers, "accept-encoding", "origin", "x-csrftoken"]
+SECURE_CROSS_ORIGIN_OPENER_POLICY = None if DEBUG else "same-origin"
 
 # Application definition
 
