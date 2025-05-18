@@ -1,5 +1,4 @@
 import collections.abc
-import datetime
 import typing
 import uuid
 
@@ -25,11 +24,11 @@ class BaseAbstractModelQuerySet(models.QuerySet):
 
 
 class BaseAbstractModel(models.Model):
-    id = models.UUIDField[uuid.UUID, uuid.UUID](primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
-    created_at = models.DateTimeField[datetime.datetime, datetime.datetime](auto_now_add=True)
-    updated_at = models.DateTimeField[datetime.datetime, datetime.datetime](auto_now=True)
-    deleted_at = models.DateTimeField[datetime.datetime, datetime.datetime](null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
 
     created_by = models.ForeignKey["UserExt", "UserExt"](
         User, on_delete=models.PROTECT, null=True, related_name="%(class)s_created_by"
