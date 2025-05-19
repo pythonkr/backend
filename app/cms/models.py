@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import re
 import typing
 
 from core.models import BaseAbstractModel, BaseAbstractModelQuerySet
@@ -91,6 +92,10 @@ class Sitemap(BaseAbstractModel):
         return self.route_code
 
     def clean(self) -> None:
+        # route_code는 URL-Safe하도록 알파벳, 숫자, 언더바(_)로만 구성되어야 함
+        if not re.match(r"^[a-zA-Z0-9_-]*$", self.route_code):
+            raise ValidationError("route_code는 알파벳, 숫자, 언더바(_)로만 구성되어야 합니다.")
+
         # Parent Sitemap과 Page가 같을 경우 ValidationError 발생
         if self.parent_sitemap_id and self.parent_sitemap_id == self.id:
             raise ValidationError("자기 자신을 부모로 설정할 수 없습니다.")

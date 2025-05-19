@@ -80,6 +80,36 @@ def test_get_all_routes():
     }
 
 
+@pytest.mark.parametrize(
+    argnames=["route_code", "should_raise"],
+    argvalues=[
+        ("valid_route", False),
+        ("", False),
+        ("/invalid_route", True),  # 슬래시로 시작
+        ("valid_route_123", False),
+        ("valid-route", False),
+        ("valid_route_123!", True),  # 특수문자 포함
+        ("valid_route_123@", True),  # 특수문자 포함
+    ],
+)
+@pytest.mark.django_db
+def test_route_code_validation(route_code: str, should_raise: bool):
+    # Given: Sitemap 객체 생성
+    sitemap = Sitemap(
+        route_code=route_code,
+        name="Test Sitemap",
+        page=Page.objects.create(title="Test Page", subtitle="Test Subtitle"),
+    )
+
+    # When: Validation을 수행
+    if should_raise:
+        with pytest.raises(ValidationError) as excinfo:
+            sitemap.clean()
+            assert excinfo.value == "route_code는 알파벳, 숫자, 언더바(_)로만 구성되어야 합니다."
+    else:
+        sitemap.clean()
+
+
 @pytest.mark.django_db
 def test_clean_should_check_for_self_reference():
     # Given: Sitemap 객체 생성
@@ -95,7 +125,7 @@ def test_clean_should_check_for_self_reference():
     # Then: ValidationError가 발생해야 한다.
     with pytest.raises(ValidationError) as excinfo:
         sitemap.clean()
-        assert str(excinfo.value) == "자기 자신을 부모로 설정할 수 없습니다."
+        assert excinfo.value == "자기 자신을 부모로 설정할 수 없습니다."
 
 
 @pytest.mark.django_db
@@ -127,7 +157,7 @@ def test_clean_should_check_for_circular_reference():
     # Then: ValidationError가 발생해야 한다.
     with pytest.raises(ValidationError) as excinfo:
         root_sitemap.clean()
-        assert str(excinfo.value) == "Parent Sitemap이 자식 Sitemap을 가리킬 수 없습니다."
+        assert excinfo.value == "Parent Sitemap이 자식 Sitemap을 가리킬 수 없습니다."
 
 
 @pytest.mark.django_db
@@ -149,4 +179,4 @@ def test_clean_should_check_for_existing_route():
     # Then: ValidationError가 발생해야 한다.
     with pytest.raises(ValidationError) as excinfo:
         new_sitemap.clean()
-        assert str(excinfo.value) == "`existing`라우트는 이미 존재하는 route입니다."
+        assert excinfo.value == "`existing`라우트는 이미 존재하는 route입니다."
