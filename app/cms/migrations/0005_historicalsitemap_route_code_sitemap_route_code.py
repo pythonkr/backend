@@ -12,13 +12,13 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="historicalsitemap",
             name="route_code",
-            field=models.CharField(default="", max_length=256),
+            field=models.CharField(default="", max_length=256, blank=True),
             preserve_default=False,
         ),
         migrations.AddField(
             model_name="sitemap",
             name="route_code",
-            field=models.CharField(default="", max_length=256),
+            field=models.CharField(default="", max_length=256, blank=True),
             preserve_default=False,
         ),
     ]

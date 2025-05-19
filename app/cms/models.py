@@ -67,7 +67,7 @@ class Sitemap(BaseAbstractModel):
         "self", null=True, blank=True, default=None, on_delete=models.SET_NULL, related_name="children"
     )
 
-    route_code = models.CharField(max_length=256)
+    route_code = models.CharField(max_length=256, blank=True)
     name = models.CharField(max_length=256)
     order = models.IntegerField(default=0, validators=[MinValueValidator(0)])
     page = models.ForeignKey(Page, on_delete=models.PROTECT)
