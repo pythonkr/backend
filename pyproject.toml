@@ -7,6 +7,7 @@ requires-python = "==3.12.*"
 dependencies = [
     "argon2-cffi>=23.1.0",
     "awslambdaric>=3.0.2",
+    "boto3 (>=1.37.37,<2.0.0)",
     "django>=5.2",
     "django-constance>=4.3.2",
     "django-cors-headers>=4.7.0",
@@ -27,7 +28,6 @@ dependencies = [
     "setuptools>=78.1.0",
     "zappa>=0.59.0",
     "zappa-django-utils>=0.4.1",
-    "boto3 (>=1.37.37,<2.0.0)",
 ]
 
 [dependency-groups]
@@ -37,6 +37,9 @@ dev = [
     "djangorestframework-stubs[compatible-mypy]>=3.15.3",
     "ipython>=9.0.2",
     "pre-commit>=4.2.0",
+    "pytest>=8.3.5",
+    "pytest-django>=4.11.1",
+    "pytest-socket>=0.7.0",
 ]
 deployment = [
     "boto3>=1.37.28",
@@ -55,6 +58,7 @@ default-groups = ["dev", "deployment"]
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.3.5,<9.0.0"
 pytest-django = "^4.11.1"
+pytest-socket = "^0.7.0"
 
 [build-system]
 requires = ["hatchling"]
@@ -74,3 +78,9 @@ target-version = "py312"
 
 [tool.ruff.lint]
 fixable = ["ALL"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "core.settings"
+norecursedirs = ".git migrations static template"
+python_files = "*_test.py"
+addopts = "--reuse-db --disable-socket -v"

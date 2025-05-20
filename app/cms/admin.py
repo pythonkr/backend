@@ -152,8 +152,18 @@ class SectionAdminForm(forms.ModelForm):
 
 @admin.register(Sitemap)
 class SitemapAdmin(RelatedReadonlyFieldsMixin, admin.ModelAdmin):
-    fields = ["id", "parent_sitemap", "page", "name", "order", "display_start_at", "display_end_at"]
-    readonly_fields = ["id"]
+    fields = [
+        "id",
+        "parent_sitemap",
+        "route_code",
+        "route",
+        "page",
+        "name",
+        "order",
+        "display_start_at",
+        "display_end_at",
+    ]
+    readonly_fields = ["id", "route"]
     related_readonly_config = {
         "page": ["id", "is_active", "css", "title", "subtitle"],
         "parent_sitemap": ["id", "name", "order", "display_start_at", "display_end_at"],
