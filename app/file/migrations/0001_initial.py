@@ -25,9 +25,9 @@ class Migration(migrations.Migration):
                 ("updated_at", models.DateTimeField(blank=True, editable=False)),
                 ("deleted_at", models.DateTimeField(blank=True, null=True)),
                 ("file", models.TextField(db_index=True, max_length=100)),
-                ("alternate_text", models.TextField(blank=True, default=None, null=True)),
-                ("alternate_text_ko", models.TextField(blank=True, default=None, null=True)),
-                ("alternate_text_en", models.TextField(blank=True, default=None, null=True)),
+                ("mimetype", models.CharField(max_length=256, null=True)),
+                ("hash", models.CharField(max_length=256)),
+                ("size", models.BigIntegerField()),
                 ("history_id", models.AutoField(primary_key=True, serialize=False)),
                 ("history_date", models.DateTimeField(db_index=True)),
                 ("history_change_reason", models.CharField(max_length=100, null=True)),
@@ -99,9 +99,9 @@ class Migration(migrations.Migration):
                         storage=django.core.files.storage.FileSystemStorage(), unique=True, upload_to="public/"
                     ),
                 ),
-                ("alternate_text", models.TextField(blank=True, default=None, null=True)),
-                ("alternate_text_ko", models.TextField(blank=True, default=None, null=True)),
-                ("alternate_text_en", models.TextField(blank=True, default=None, null=True)),
+                ("mimetype", models.CharField(max_length=256, null=True)),
+                ("hash", models.CharField(max_length=256)),
+                ("size", models.BigIntegerField()),
                 (
                     "created_by",
                     models.ForeignKey(
@@ -133,5 +133,17 @@ class Migration(migrations.Migration):
             options={
                 "ordering": ["-created_at"],
             },
+        ),
+        migrations.AddIndex(
+            model_name="publicfile",
+            index=models.Index(fields=["file"], name="file_public_file_3d3996_idx"),
+        ),
+        migrations.AddIndex(
+            model_name="publicfile",
+            index=models.Index(fields=["mimetype"], name="file_public_mimetyp_da163f_idx"),
+        ),
+        migrations.AddIndex(
+            model_name="publicfile",
+            index=models.Index(fields=["hash"], name="file_public_hash_669533_idx"),
         ),
     ]

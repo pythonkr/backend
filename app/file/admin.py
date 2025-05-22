@@ -8,8 +8,11 @@ from file.models import PublicFile
 
 @admin.register(PublicFile)
 class PublicFileAdmin(admin.ModelAdmin):
-    fields = ["id", "file", "alternate_text", "created_at", "updated_at", "deleted_at"]
-    readonly_fields = ["id", "created_at", "updated_at", "deleted_at"]
+    fields = ["id", "file", "mimetype", "hash", "size", "created_at", "updated_at", "deleted_at"]
+    readonly_fields = ["id", "mimetype", "hash", "size", "created_at", "updated_at", "deleted_at"]
+
+    def get_readonly_fields(self, request: HttpRequest, obj: PublicFile | None = None) -> list[str]:
+        return self.readonly_fields + (["file"] if obj else [])
 
     def get_urls(self) -> list[URLPattern]:
         return [
@@ -18,5 +21,6 @@ class PublicFileAdmin(admin.ModelAdmin):
 
     def list_public_files(self, request: HttpRequest) -> JsonResponse | HttpResponseNotAllowed:
         if request.method == "GET":
-            return JsonResponse(data=PublicFile.objects.values(self.fields))
+            data = list(PublicFile.objects.filter_active().values(*self.fields))
+            return JsonResponse(data=data, safe=False, json_dumps_params={"ensure_ascii": False})
         return HttpResponseNotAllowed(permitted_methods=["GET"])
