@@ -155,6 +155,7 @@ INSTALLED_APPS = [
     "django_extensions",
     # django-app
     "user",
+    "file",
     "cms",
     # django-constance
     "constance",
@@ -251,20 +252,37 @@ MODELTRANSLATION_LANGUAGES = ("ko", "en")
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 STATIC_ROOT = BASE_DIR / "static"
+MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_STORAGE_BACKEND = env("DJANGO_DEFAULT_STORAGE_BACKEND", default="storages.backends.s3.S3Storage")
 STATIC_STORAGE_BACKEND = env("DJANGO_STATIC_STORAGE_BACKEND", default="storages.backends.s3.S3Storage")
 
-STORAGE_BUCKET_NAME = f"pyconkr-backend-{API_STAGE}"
+PRIVATE_STORAGE_BUCKET_NAME = f"pyconkr-backend-{API_STAGE}"
+PUBLIC_STORAGE_BUCKET_NAME = f"pyconkr-backend-{API_STAGE}-public"
+
 STATIC_URL = (
-    f"https://s3.ap-northeast-2.amazonaws.com/{STORAGE_BUCKET_NAME}/"
+    f"https://s3.ap-northeast-2.amazonaws.com/{PRIVATE_STORAGE_BUCKET_NAME}/"
     if STATIC_STORAGE_BACKEND == "storages.backends.s3.S3Storage"
     else "static/"
 )
+MEDIA_URL = (
+    f"https://s3.ap-northeast-2.amazonaws.com/{PUBLIC_STORAGE_BUCKET_NAME}/"
+    if DEFAULT_STORAGE_BACKEND == "storages.backends.s3.S3Storage"
+    else "media/"
+)
 
-STORAGE_OPTIONS = (
+STATIC_STORAGE_OPTIONS = (
     {
-        "bucket_name": STORAGE_BUCKET_NAME,
+        "bucket_name": PRIVATE_STORAGE_BUCKET_NAME,
+        "file_overwrite": False,
+        "addressing_style": "path",
+    }
+    if DEFAULT_STORAGE_BACKEND == "storages.backends.s3.S3Storage"
+    else {}
+)
+PUBLIC_STORAGE_OPTIONS = (
+    {
+        "bucket_name": PRIVATE_STORAGE_BUCKET_NAME,
         "file_overwrite": False,
         "addressing_style": "path",
     }
@@ -272,8 +290,9 @@ STORAGE_OPTIONS = (
     else {}
 )
 STORAGES = {
-    "default": {"BACKEND": DEFAULT_STORAGE_BACKEND, "OPTIONS": STORAGE_OPTIONS},
-    "staticfiles": {"BACKEND": STATIC_STORAGE_BACKEND, "OPTIONS": STORAGE_OPTIONS},
+    "default": {"BACKEND": DEFAULT_STORAGE_BACKEND, "OPTIONS": STATIC_STORAGE_OPTIONS},
+    "staticfiles": {"BACKEND": STATIC_STORAGE_BACKEND, "OPTIONS": STATIC_STORAGE_OPTIONS},
+    "public": {"BACKEND": DEFAULT_STORAGE_BACKEND, "OPTIONS": PUBLIC_STORAGE_OPTIONS},
 }
 
 # Default primary key field type
