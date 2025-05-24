@@ -8,17 +8,13 @@ from core.logger.util.django_helper import (
     get_request_log_data,
     get_response_log_data,
 )
+from core.middleware.type import GetResponseCallable
 from django.http.request import HttpRequest
 from django.http.response import HttpResponseBase
 from django.utils.deprecation import MiddlewareMixin
 
 cloudwatch_logger = logging.getLogger("cloudwatch_logger")
 slack_logger = logging.getLogger("slack_logger")
-
-
-# From django-stubs
-class _GetResponseCallable(typing.Protocol):
-    def __call__(self, request: HttpRequest, /) -> HttpResponseBase: ...
 
 
 class LoggerExtraDataType(typing.TypedDict):
@@ -41,10 +37,7 @@ class LoggerExtraType(typing.TypedDict):
 class RequestResponseLogger(MiddlewareMixin):
     sync_capable = True
     async_capable = False
-    get_response: _GetResponseCallable
-
-    def __init__(self, get_response: _GetResponseCallable) -> None:
-        self.get_response = get_response
+    get_response: GetResponseCallable
 
     def __call__(self, request: HttpRequest) -> HttpResponseBase:
         before_session_data = dict(request.session.items()) if config.DEBUG_COLLECT_SESSION_DATA else {}
