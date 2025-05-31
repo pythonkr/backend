@@ -16,7 +16,7 @@ class SectionSerializer(serializers.ModelSerializer):
 
 
 class PageSerializer(serializers.ModelSerializer):
-    sections = SectionSerializer(many=True, read_only=True)
+    sections = SectionSerializer(many=True, read_only=True, source="active_sections")
 
     class Meta:
         model = Page
