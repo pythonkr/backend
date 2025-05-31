@@ -122,6 +122,7 @@ dependencies = [
     { name = "httpx" },
     { name = "packaging" },
     { name = "psycopg", extra = ["binary"] },
+    { name = "py-openapi-schema-to-json-schema" },
     { name = "sentry-sdk", extra = ["django"] },
     { name = "setuptools" },
     { name = "zappa" },
@@ -170,6 +171,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "packaging", specifier = ">=24.2" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.6" },
+    { name = "py-openapi-schema-to-json-schema", specifier = ">=0.0.3" },
     { name = "sentry-sdk", extras = ["django"], specifier = ">=2.25.1" },
     { name = "setuptools", specifier = ">=78.1.0" },
     { name = "zappa", specifier = ">=0.59.0" },
@@ -1092,6 +1094,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/cd/05/0a34433a064256a578f1783a10da6df098ceaa4a57bbeaa96a6c0352786b/pure_eval-0.2.3.tar.gz", hash = "sha256:5f4e983f40564c576c7c8635ae88db5956bb2229d7e9237d03b3c0b0190eaf42", size = 19752 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8e/37/efad0257dc6e593a18957422533ff0f87ede7c9c6ea010a2177d738fb82f/pure_eval-0.2.3-py3-none-any.whl", hash = "sha256:1db8e35b67b3d218d818ae653e27f06c3aa420901fa7b081ca98cbedc874e0d0", size = 11842 },
+]
+
+[[package]]
+name = "py-openapi-schema-to-json-schema"
+version = "0.0.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/51/c5/5d6a9b08df175a886b4085eb51e0351854a96e4896a367b2373ad19d881b/py-openapi-schema-to-json-schema-0.0.3.tar.gz", hash = "sha256:d557afb6bcc45d62a1383ada0ad57515421552efa3b2e07b2264e5b9e1e9634e", size = 5964 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1c/1a/a43f73b8762512ab3358aac96c6c6d1d9ec4dbb3bbb99d82c2e90e5f3d16/py_openapi_schema_to_json_schema-0.0.3-py3-none-any.whl", hash = "sha256:456802186309257a9667fd50eca7c6ff6eaf9930ab09dcc87c54537e01066f09", size = 6954 },
 ]
 
 [[package]]
