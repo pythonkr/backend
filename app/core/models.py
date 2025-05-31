@@ -14,7 +14,7 @@ User = get_user_model()
 
 
 class BaseAbstractModelQuerySet(models.QuerySet):
-    def create(self, **kwargs: dict) -> typing.Self:
+    def create(self, **kwargs: dict) -> models.Model:
         current_user = get_current_user()
         return super().create(**(kwargs | {"created_by": current_user, "updated_by": current_user}))
 

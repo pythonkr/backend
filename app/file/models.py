@@ -16,6 +16,9 @@ class PublicFile(BaseAbstractModel):
         ordering = ["-created_at"]
         indexes = [models.Index(fields=["file"]), models.Index(fields=["mimetype"]), models.Index(fields=["hash"])]
 
+    def __str__(self) -> str:
+        return self.file.name
+
     def clean(self) -> None:
         # 파일의 해시값, 크기, mimetype을 계산하여 저장합니다.
         hash_md5 = hashlib.md5(usedforsecurity=False)
