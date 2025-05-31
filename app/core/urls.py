@@ -23,7 +23,10 @@ from django.urls import include, path, re_path, resolvers
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 # type: ignore[assignment]
-v1_apis: list[resolvers.URLPattern | resolvers.URLResolver] = [path("cms/", include("cms.urls"))]
+v1_apis: list[resolvers.URLPattern | resolvers.URLResolver] = [
+    path("admin-api/", include("admin_api.urls")),
+    path("cms/", include("cms.urls")),
+]
 
 urlpatterns = [
     # Health Check
