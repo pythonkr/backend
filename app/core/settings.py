@@ -175,6 +175,8 @@ MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     # simple-history
     "simple_history.middleware.HistoryRequestMiddleware",
+    # Thread Local Middleware
+    "core.middleware.thread_middleware.ThreadLocalMiddleware",
     # Request Response Logger
     "core.middleware.request_response_logger.RequestResponseLogger",
 ]
