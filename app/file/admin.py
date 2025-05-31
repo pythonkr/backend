@@ -1,3 +1,4 @@
+from core.admin import BaseAbstractModelAdminMixin
 from django.contrib import admin
 from django.http.request import HttpRequest
 from django.http.response import HttpResponseNotAllowed, JsonResponse
@@ -7,12 +8,12 @@ from file.models import PublicFile
 
 
 @admin.register(PublicFile)
-class PublicFileAdmin(admin.ModelAdmin):
-    fields = ["id", "file", "mimetype", "hash", "size", "created_at", "updated_at", "deleted_at"]
-    readonly_fields = ["id", "mimetype", "hash", "size", "created_at", "updated_at", "deleted_at"]
+class PublicFileAdmin(BaseAbstractModelAdminMixin, admin.ModelAdmin):
+    fields = ["file", "mimetype", "hash", "size"]
+    readonly_fields = ["mimetype", "hash", "size"]
 
-    def get_readonly_fields(self, request: HttpRequest, obj: PublicFile | None = None) -> list[str]:
-        return self.readonly_fields + (["file"] if obj else [])
+    def get_readonly_fields(self, request: HttpRequest, obj: PublicFile | None = None) -> set[str]:
+        return super().get_readonly_fields(request, obj) + (["file"] if obj else [])
 
     def get_urls(self) -> list[URLPattern]:
         return [
