@@ -119,7 +119,7 @@ CORS_ALLOWED_ORIGINS = [
     f"{protocol}://{domain}{port}"
     for protocol in ("http", "https")
     for domain in ("localhost", "127.0.0.1", "pycon.kr", "local.dev.pycon.kr")
-    for port in ("", ":3000", ":5173")
+    for port in ("", ":3000", ":5173", ":5174")
 ]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [*corsheaders.defaults.default_headers, "accept-encoding", "origin", "x-csrftoken"]
@@ -316,7 +316,7 @@ COOKIE_TRUSTED_ORIGIN_SET = {
     f"{protocol}://{domain}:{port}"
     for protocol in ("http", "https")
     for domain in ("localhost", "127.0.0.1", "local.dev.pycon.kr")
-    for port in (3000, 5173)
+    for port in (3000, 5173, 5174)
 }
 
 SESSION_COOKIE_NAME = f"{COOKIE_PREFIX}sessionid"
