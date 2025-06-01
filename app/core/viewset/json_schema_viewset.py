@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import collections
 import typing
 
 from core.const.tag import OpenAPITag
@@ -25,7 +24,7 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
         result = {
             "schema": serializer_class.get_json_schema(),
             "ui_schema": {},
-            "translation_fields": collections.defaultdict(),
+            "translation_fields": set(),
         }
 
         nullable_fields = [
@@ -64,7 +63,9 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
                     result["ui_schema"][field.name] = {"ui:field": "file"}
                 elif isinstance(field, TranslationField):
                     translated_field = field.translated_field
-                    result["translation_fields"][field.name] = translated_field.name
+                    result["translation_fields"].add(translated_field)
+
+        result["translation_fields"] = list(result["translation_fields"])
         return result
 
     @utils.extend_schema(
