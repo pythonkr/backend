@@ -62,8 +62,7 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
                 elif isinstance(field, FileField):
                     result["ui_schema"][field.name] = {"ui:field": "file"}
                 elif isinstance(field, TranslationField):
-                    translated_field = field.translated_field
-                    result["translation_fields"].add(translated_field)
+                    result["translation_fields"].add(field.translated_field.name)
 
         result["translation_fields"] = list(result["translation_fields"])
         return result
