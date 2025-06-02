@@ -285,7 +285,7 @@ STATIC_STORAGE_OPTIONS = (
 )
 PUBLIC_STORAGE_OPTIONS = (
     {
-        "bucket_name": PRIVATE_STORAGE_BUCKET_NAME,
+        "bucket_name": PUBLIC_STORAGE_BUCKET_NAME,
         "file_overwrite": False,
         "addressing_style": "path",
     }
