@@ -17,6 +17,11 @@ class Page(BaseAbstractModel):
     title = models.CharField(max_length=256)
     subtitle = models.CharField(max_length=512)
 
+    show_top_title_banner = models.BooleanField(default=False, help_text="페이지 상단에 타이틀 배너를 표시할지 여부")
+    show_bottom_sponsor_banner = models.BooleanField(
+        default=False, help_text="페이지 하단에 스폰서 배너를 표시할지 여부"
+    )
+
     def __str__(self):
         return str(self.title)
 
