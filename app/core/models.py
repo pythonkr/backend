@@ -2,6 +2,7 @@ import collections.abc
 import typing
 import uuid
 
+from core.util.thread_local import get_current_user
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.db.models.functions import Now
@@ -13,8 +14,15 @@ User = get_user_model()
 
 
 class BaseAbstractModelQuerySet(models.QuerySet):
+    def create(self, **kwargs: dict) -> models.Model:
+        current_user = get_current_user()
+        return super().create(**(kwargs | {"created_by": current_user, "updated_by": current_user}))
+
+    def update(self, **kwargs: dict) -> typing.Self:
+        return super().update(**(kwargs | {"updated_by": get_current_user()}))
+
     def delete(self) -> int:  # type: ignore[override]
-        return super().update(deleted_at=Now(), updated_at=Now())
+        return super().update(deleted_by=get_current_user(), deleted_at=Now())
 
     def hard_delete(self) -> tuple[int, dict[str, int]]:
         return super().delete()
@@ -54,6 +62,11 @@ class BaseAbstractModel(models.Model):
         update_fields: collections.abc.Iterable[str] | None = None,
     ) -> None:
         if update_fields:
-            update_fields = set(update_fields) | {"updated_at"}
-
+            update_fields = set(update_fields) | {"updated_at", "updated_by"}
+        self.updated_by = get_current_user()
         super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
+
+    def delete(self, using: str | None = None) -> None:
+        self.deleted_at = Now()
+        self.deleted_by = get_current_user()
+        super().save(using=using, update_fields={"deleted_by", "deleted_at"})

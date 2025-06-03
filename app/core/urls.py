@@ -25,6 +25,8 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 # type: ignore[assignment]
 v1_apis: list[resolvers.URLPattern | resolvers.URLResolver] = [
     path("cms/", include("cms.urls")),
+    path("admin-api/", include("admin_api.urls")),
+    path("cms/", include("cms.urls")),
     path("event/presentations/", include("event.presentation.urls")),
 ]
 

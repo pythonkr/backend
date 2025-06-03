@@ -119,7 +119,7 @@ CORS_ALLOWED_ORIGINS = [
     f"{protocol}://{domain}{port}"
     for protocol in ("http", "https")
     for domain in ("localhost", "127.0.0.1", "pycon.kr", "local.dev.pycon.kr")
-    for port in ("", ":3000", ":5173")
+    for port in ("", ":3000", ":5173", ":5174")
 ]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [*corsheaders.defaults.default_headers, "accept-encoding", "origin", "x-csrftoken"]
@@ -159,6 +159,7 @@ INSTALLED_APPS = [
     "cms",
     "event",
     "event.presentation",
+    "admin_api",
     # django-constance
     "constance",
 ]
@@ -177,6 +178,8 @@ MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     # simple-history
     "simple_history.middleware.HistoryRequestMiddleware",
+    # Thread Local Middleware
+    "core.middleware.thread_middleware.ThreadLocalMiddleware",
     # Request Response Logger
     "core.middleware.request_response_logger.RequestResponseLogger",
 ]
@@ -256,6 +259,9 @@ MODELTRANSLATION_LANGUAGES = ("ko", "en")
 STATIC_ROOT = BASE_DIR / "static"
 MEDIA_ROOT = BASE_DIR / "media"
 
+DATA_UPLOAD_MAX_MEMORY_SIZE = 30 * 1024 * 1024  # 30 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 30 * 1024 * 1024  # 30 MB
+
 DEFAULT_STORAGE_BACKEND = env("DJANGO_DEFAULT_STORAGE_BACKEND", default="storages.backends.s3.S3Storage")
 STATIC_STORAGE_BACKEND = env("DJANGO_STATIC_STORAGE_BACKEND", default="storages.backends.s3.S3Storage")
 
@@ -284,7 +290,7 @@ STATIC_STORAGE_OPTIONS = (
 )
 PUBLIC_STORAGE_OPTIONS = (
     {
-        "bucket_name": PRIVATE_STORAGE_BUCKET_NAME,
+        "bucket_name": PUBLIC_STORAGE_BUCKET_NAME,
         "file_overwrite": False,
         "addressing_style": "path",
     }
@@ -311,25 +317,27 @@ COOKIE_SAMESITE = "Lax" if IS_LOCAL else "None"
 COOKIE_SECURE = not IS_LOCAL
 COOKIE_HTTPONLY = True
 COOKIE_DOMAIN = env("COOKIE_DOMAIN", default="pycon.kr")
+COOKIE_TRUSTED_ORIGIN_SET = {
+    f"{protocol}://{domain}:{port}"
+    for protocol in ("http", "https")
+    for domain in ("localhost", "127.0.0.1", "local.dev.pycon.kr")
+    for port in (3000, 5173, 5174)
+}
 
 SESSION_COOKIE_NAME = f"{COOKIE_PREFIX}sessionid"
 SESSION_COOKIE_SAMESITE = COOKIE_SAMESITE
 SESSION_COOKIE_SECURE = COOKIE_SECURE
 SESSION_COOKIE_HTTPONLY = COOKIE_HTTPONLY
-SESSION_COOKIE_DOMAIN = None if IS_LOCAL else COOKIE_DOMAIN
+SESSION_COOKIE_DOMAIN = COOKIE_DOMAIN
 
 CSRF_COOKIE_NAME = f"{COOKIE_PREFIX}csrftoken"
 CSRF_COOKIE_SAMESITE = COOKIE_SAMESITE
 CSRF_COOKIE_SECURE = COOKIE_SECURE
-CSRF_COOKIE_HTTPONLY = COOKIE_HTTPONLY
-CSRF_COOKIE_DOMAIN = None if IS_LOCAL else COOKIE_DOMAIN
-CSRF_TRUSTED_ORIGINS = set(env.list("CSRF_TRUSTED_ORIGINS", default=["https://pycon.kr"])) | {
-    "https://local.dev.pycon.kr:3000",
-    "https://localhost:3000",
-    "http://localhost:3000",
-    "https://127.0.0.1:3000",
-    "http://127.0.0.1:3000",
-}
+CSRF_COOKIE_HTTPONLY = False  # CSRF_COOKIE_HTTPONLY must be False to allow JavaScript to read the CSRF token
+CSRF_COOKIE_DOMAIN = COOKIE_DOMAIN
+CSRF_TRUSTED_ORIGINS = (
+    set(env.list("CSRF_TRUSTED_ORIGINS", default=["https://rest-api.pycon.kr"])) | COOKIE_TRUSTED_ORIGIN_SET
+)
 
 # Django Rest Framework Settings
 REST_FRAMEWORK = {
@@ -344,6 +352,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "PyCon KR Backend API",
     "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
 }
 
 # Sentry Settings
