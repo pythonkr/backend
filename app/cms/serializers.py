@@ -20,4 +20,11 @@ class PageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Page
-        fields = COMMON_FIELDS + ("title", "subtitle", "css", "sections")
+        fields = COMMON_FIELDS + (
+            "title",
+            "subtitle",
+            "css",
+            "sections",
+            "show_top_title_banner",
+            "show_bottom_sponsor_banner",
+        )
