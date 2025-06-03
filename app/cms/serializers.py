@@ -1,22 +1,23 @@
 from cms.models import Page, Section, Sitemap
+from core.const.serializer import COMMON_FIELDS
 from rest_framework import serializers
 
 
 class SitemapSerializer(serializers.ModelSerializer):
     class Meta:
         model = Sitemap
-        fields = ("id", "parent_sitemap", "route_code", "name", "order", "page")
+        fields = COMMON_FIELDS + ("parent_sitemap", "route_code", "name", "order", "page")
 
 
 class SectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Section
-        fields = ("id", "order", "css", "body")
+        fields = COMMON_FIELDS + ("order", "css", "body")
 
 
 class PageSerializer(serializers.ModelSerializer):
-    sections = SectionSerializer(many=True, read_only=True)
+    sections = SectionSerializer(many=True, read_only=True, source="active_sections")
 
     class Meta:
         model = Page
-        fields = ("id", "title", "subtitle", "css", "sections", "created_at", "updated_at")
+        fields = COMMON_FIELDS + ("title", "subtitle", "css", "sections")

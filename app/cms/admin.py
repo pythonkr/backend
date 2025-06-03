@@ -1,5 +1,6 @@
 from cms.admin_mixins import RelatedReadonlyFieldsMixin
 from cms.models import Page, Section, Sitemap
+from core.admin import BaseAbstractModelAdminMixin
 from django import forms
 from django.contrib import admin
 from django.utils.html import format_html
@@ -151,7 +152,7 @@ class SectionAdminForm(forms.ModelForm):
 
 
 @admin.register(Sitemap)
-class SitemapAdmin(RelatedReadonlyFieldsMixin, admin.ModelAdmin):
+class SitemapAdmin(BaseAbstractModelAdminMixin, RelatedReadonlyFieldsMixin, admin.ModelAdmin):
     fields = [
         "id",
         "parent_sitemap",
@@ -194,16 +195,20 @@ class SitemapAdmin(RelatedReadonlyFieldsMixin, admin.ModelAdmin):
         return original_fieldsets
 
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related("page").select_related("parent_sitemap")
+        return super().get_queryset(request).select_related("page", "parent_sitemap")
 
 
-class PageAdmin(admin.ModelAdmin):
-    pass
+@admin.register(Page)
+class PageAdmin(BaseAbstractModelAdminMixin, admin.ModelAdmin):
+    fields = ["id", "css", "title", "subtitle"]
+    readonly_fields = ["id"]
+    queryset = Page.objects.prefetch_related("sections")
 
 
 @admin.register(Section)
-class SectionAdmin(RelatedReadonlyFieldsMixin, admin.ModelAdmin):
+class SectionAdmin(BaseAbstractModelAdminMixin, RelatedReadonlyFieldsMixin, admin.ModelAdmin):
     form = SectionAdminForm
+    queryset = Section.objects.select_related("page")
     fields = ["id", "page", "order", "css", "body"]
     readonly_fields = ["id"]
     related_readonly_config = {"page": ["id", "is_active", "css", "title", "subtitle"]}
@@ -221,9 +226,3 @@ class SectionAdmin(RelatedReadonlyFieldsMixin, admin.ModelAdmin):
                 )
             )
         return original_fieldsets
-
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related("page")
-
-
-admin.site.register(Page)

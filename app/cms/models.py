@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import datetime
 import re
@@ -18,6 +19,12 @@ class Page(BaseAbstractModel):
 
     def __str__(self):
         return str(self.title)
+
+    def active_sections(self) -> list[Section]:
+        with contextlib.suppress(AttributeError):
+            return self._prefetched_active_sections
+
+        return self.sections.filter_active().order_by("order")
 
 
 @dataclasses.dataclass
