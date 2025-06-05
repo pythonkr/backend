@@ -15,7 +15,14 @@ class SitemapAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, seria
 class PageAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
     class Meta:
         model = Page
-        fields = COMMON_ADMIN_FIELDS + ("title_ko", "title_en", "subtitle_ko", "subtitle_en")
+        fields = COMMON_ADMIN_FIELDS + (
+            "title_ko",
+            "title_en",
+            "subtitle_ko",
+            "subtitle_en",
+            "show_top_title_banner",
+            "show_bottom_sponsor_banner",
+        )
         translation_fields = ("title", "subtitle")
 
 

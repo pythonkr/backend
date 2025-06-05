@@ -21,7 +21,7 @@ def get_request() -> HttpRequest | None:
 
 
 def get_current_user() -> "UserExt" | None:
-    if request := get_request():
+    if (request := get_request()) and hasattr(request, "user") and getattr(request.user, "is_authenticated", False):
         return request.user
 
     if UserExt := getattr(importlib.import_module("user.models"), "UserExt", None):
