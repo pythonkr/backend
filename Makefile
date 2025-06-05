@@ -68,9 +68,17 @@ local-makemigrations:
 local-migrate:
 	@ENV_PATH=envfile/.env.local uv run python app/manage.py migrate
 
+# Show django makemigrations
+local-showmigrations:
+	@ENV_PATH=envfile/.env.local uv run python app/manage.py showmigrations
+
 # Create admin superuser
 local-createsuperuser:
 	@ENV_PATH=envfile/.env.local uv run python app/manage.py createsuperuser
+
+# Reverse django migrations
+local-reverse-migrations:
+	@ENV_PATH=envfile/.env.local uv run python app/manage.py migrate $(app) $(number)
 
 # Run pytest
 local-test:

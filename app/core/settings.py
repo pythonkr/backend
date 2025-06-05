@@ -157,6 +157,8 @@ INSTALLED_APPS = [
     "user",
     "file",
     "cms",
+    "event",
+    "event.presentation",
     "admin_api",
     # django-constance
     "constance",
