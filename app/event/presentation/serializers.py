@@ -22,14 +22,8 @@ class PresentationSpeakerSerializer(serializers.ModelSerializer):
 
 class PresentationSerializer(serializers.ModelSerializer):
     presentation_type = PresentationTypeSerializer(read_only=True)
-    presentation_categories = serializers.SerializerMethodField()
+    presentation_categories = PresentationCategorySerializer(many=True, read_only=True)
     presentation_speakers = PresentationSpeakerSerializer(many=True, read_only=True)
-
-    def get_presentation_categories(self, obj):
-        relations = obj.presentation_category_relation
-        return PresentationCategorySerializer(
-            instance=[rel.category for rel in relations], many=True, read_only=True
-        ).data
 
     class Meta:
         model = Presentation

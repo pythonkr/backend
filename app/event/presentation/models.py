@@ -1,7 +1,6 @@
 from core.models import BaseAbstractModel, BaseAbstractModelQuerySet
 from django.contrib.auth import get_user_model
 from django.db import models
-from django.db.models import Prefetch
 from event.models import Event
 
 User = get_user_model()
@@ -10,34 +9,9 @@ User = get_user_model()
 class PresentationQuerySet(BaseAbstractModelQuerySet):
     def get_all_nested_data(self):
         return (
-            super()
-            .all()
+            self.filter_active()
             .select_related("presentation_type")
-            .prefetch_related(
-                Prefetch(lookup="presentation_speakers"),
-                Prefetch(
-                    lookup="relations",
-                    queryset=PresentationCategoryRelation.objects.select_related("category"),
-                    to_attr="presentation_category_relation",
-                ),
-            )
-        )
-
-    def filter_by_category(self, category_name):
-        return (
-            super()
-            .all()
-            .select_related("presentation_type")
-            .prefetch_related(
-                Prefetch(lookup="presentation_speakers"),
-                Prefetch(
-                    lookup="relations",
-                    queryset=PresentationCategoryRelation.objects.select_related("category").filter(
-                        category__name=category_name
-                    ),
-                    to_attr="presentation_category_relation",
-                ),
-            )
+            .prefetch_related("presentation_speakers", "presentation_categories")
         )
 
 
@@ -55,6 +29,8 @@ class PresentationCategory(BaseAbstractModel):
 
 class Presentation(BaseAbstractModel):
     presentation_type = models.ForeignKey(PresentationType, on_delete=models.PROTECT, related_name="presentations")
+    presentation_categories = models.ManyToManyField(to="PresentationCategory", through="PresentationCategoryRelation")
+
     objects: PresentationQuerySet = PresentationQuerySet.as_manager()
 
 
