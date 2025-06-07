@@ -1,17 +1,25 @@
 from admin_api.serializers.user import UserAdminSerializer, UserAdminSignInSerializer
+from core.const.account import INITIAL_ADMIN_PASSWORD
 from core.const.tag import OpenAPITag
 from core.permissions import IsSuperUser
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from django.contrib.auth import login, logout
 from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import decorators, request, response, status, viewsets
+from rest_framework import decorators, mixins, request, response, status, viewsets
 from user.models import UserExt
 
 ADMIN_METHODS = ["list", "retrieve", "create", "partial_update", "destroy"]
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_USER]) for m in ADMIN_METHODS})
-class UserAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+class UserAdminViewSet(
+    mixins.RetrieveModelMixin,
+    mixins.ListModelMixin,
+    mixins.CreateModelMixin,
+    mixins.UpdateModelMixin,
+    JsonSchemaViewSet,
+    viewsets.GenericViewSet,
+):
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = UserAdminSerializer
     permission_classes = [IsSuperUser]
@@ -42,4 +50,12 @@ class UserAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     @decorators.action(detail=False, methods=["DELETE"], url_path="signout", permission_classes=[])
     def signout(self, request: request.Request, *args: tuple, **kwargs: dict) -> response.Response:
         logout(request=request)
+        return response.Response(status=status.HTTP_204_NO_CONTENT)
+
+    @extend_schema(tags=[OpenAPITag.ADMIN_USER], responses={status.HTTP_204_NO_CONTENT: None})
+    @decorators.action(detail=True, methods=["DELETE"], url_path="password")
+    def reset_password(self, *args: tuple, **kwargs: dict) -> response.Response:
+        user: UserExt = self.get_object()
+        user.set_password(INITIAL_ADMIN_PASSWORD)
+        user.save(update_fields=["password"])
         return response.Response(status=status.HTTP_204_NO_CONTENT)

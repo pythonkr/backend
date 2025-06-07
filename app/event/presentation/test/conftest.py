@@ -12,7 +12,8 @@ from event.presentation.models import (
 from faker import Faker
 from model_bakery import baker
 from rest_framework.test import APIClient
-from user.models import Organization, OrganizationUserRelation, UserExt
+from user.models.organization import Organization, OrganizationUserRelation
+from user.models.user import UserExt
 
 
 @dataclasses.dataclass
