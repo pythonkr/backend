@@ -7,10 +7,28 @@ from rest_framework import serializers
 from user.models import UserExt
 
 
-class UserAdminSerializer(JsonSchemaSerializer, ReadOnlyModelSerializer, serializers.ModelSerializer):
+class UserAdminSerializer(JsonSchemaSerializer, serializers.ModelSerializer):
+    str_repr = serializers.CharField(source="__str__", read_only=True)
+
     class Meta:
         model = UserExt
-        fields = ("id", "username", "email", "first_name", "last_name", "is_staff", "is_active", "date_joined")
+        fields = (
+            "id",
+            "is_active",
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "is_superuser",
+            "str_repr",
+            "date_joined",
+            "last_login",
+        )
+        extra_kwargs = {
+            "id": {"read_only": True},
+            "date_joined": {"read_only": True},
+            "last_login": {"read_only": True},
+        }
 
 
 class UserAdminSignInSerializerData(typing.TypedDict):

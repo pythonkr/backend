@@ -1,7 +1,7 @@
 from core.models import BaseAbstractModel
 from django.core.exceptions import ValidationError
 from django.db import models
-from user.models import Organization
+from user.models.organization import Organization
 
 
 class Event(BaseAbstractModel):
