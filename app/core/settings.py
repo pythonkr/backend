@@ -159,6 +159,7 @@ INSTALLED_APPS = [
     "cms",
     "event",
     "event.presentation",
+    "event.sponsor",
     "admin_api",
     # django-constance
     "constance",

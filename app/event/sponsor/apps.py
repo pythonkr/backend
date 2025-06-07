@@ -1,0 +1,16 @@
+import importlib
+
+from django.apps import AppConfig
+
+
+class SponsorConfig(AppConfig):
+    name = "event.sponsor"
+
+    def ready(self):
+        importlib.import_module("event.sponsor.translation")
+
+        from event.sponsor.models import Sponsor, SponsorTier
+        from simple_history import register
+
+        register(SponsorTier)
+        register(Sponsor)
