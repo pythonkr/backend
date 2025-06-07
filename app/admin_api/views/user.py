@@ -25,7 +25,7 @@ class UserAdminViewSet(
     permission_classes = [IsSuperUser]
     queryset = UserExt.objects.filter(is_active=True)
 
-    @extend_schema(tags=[OpenAPITag.ADMIN_USER], responses={status.HTTP_200_OK: UserAdminSerializer})
+    @extend_schema(tags=[OpenAPITag.ADMIN_ACCOUNT], responses={status.HTTP_200_OK: UserAdminSerializer})
     @decorators.action(detail=False, methods=["GET"], permission_classes=[])
     def me(self, request: request.Request, *args: tuple, **kwargs: dict) -> response.Response:
         if not request.user.is_authenticated:
@@ -34,7 +34,7 @@ class UserAdminViewSet(
         return response.Response(data=UserAdminSerializer(request.user).data)
 
     @extend_schema(
-        tags=[OpenAPITag.ADMIN_USER],
+        tags=[OpenAPITag.ADMIN_ACCOUNT],
         request=UserAdminSignInSerializer,
         responses={status.HTTP_200_OK: UserAdminSerializer},
     )
@@ -46,7 +46,7 @@ class UserAdminViewSet(
         login(request=request, user=serializer.user)
         return response.Response(data=UserAdminSerializer(serializer.user).data)
 
-    @extend_schema(tags=[OpenAPITag.ADMIN_USER], responses={status.HTTP_204_NO_CONTENT: None})
+    @extend_schema(tags=[OpenAPITag.ADMIN_ACCOUNT], responses={status.HTTP_204_NO_CONTENT: None})
     @decorators.action(detail=False, methods=["DELETE"], url_path="signout", permission_classes=[])
     def signout(self, request: request.Request, *args: tuple, **kwargs: dict) -> response.Response:
         logout(request=request)
