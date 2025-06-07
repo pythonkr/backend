@@ -7,7 +7,7 @@ class Sponsor(BaseAbstractModel):
     event = models.ForeignKey(Event, on_delete=models.PROTECT, related_name="sponsors")
     name = models.CharField(max_length=256, null=True, blank=True)
     logo = models.URLField(null=True, blank=True)
-    description = models.CharField(max_length=1000, null=True, blank=True)
+    description = models.TextField(null=True, blank=True)
     sponsor_tiers = models.ManyToManyField(to="SponsorTier", through="SponsorTierSponsorRelation")
 
 
