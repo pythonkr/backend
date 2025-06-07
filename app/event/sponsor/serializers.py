@@ -13,7 +13,7 @@ class SponsorTierSerializer(serializers.ModelSerializer):
 
 
 class SponsorSerializer(serializers.ModelSerializer):
-    sponsor_tiers = SponsorTierSerializer(many=True, read_only=True, source="sponsor_tier")
+    sponsor_tiers = SponsorTierSerializer(many=True, read_only=True)
 
     class Meta:
         model = Sponsor

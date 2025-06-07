@@ -8,7 +8,7 @@ class Sponsor(BaseAbstractModel):
     name = models.CharField(max_length=256, null=True, blank=True)
     logo = models.URLField(null=True, blank=True)
     description = models.CharField(max_length=1000, null=True, blank=True)
-    sponsor_tier = models.ManyToManyField(to="SponsorTier", through="SponsorTierSponsorRelation")
+    sponsor_tiers = models.ManyToManyField(to="SponsorTier", through="SponsorTierSponsorRelation")
 
 
 class SponsorTier(BaseAbstractModel):
