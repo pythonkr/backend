@@ -5,7 +5,10 @@ from user.models.user import UserExt
 
 
 class Organization(BaseAbstractModel):
-    name = models.CharField(max_length=256, null=True, blank=True)
+    name = models.CharField(max_length=256, unique=True)
+
+    def __str__(self):
+        return self.name
 
 
 class OrganizationUserRelation(models.Model):
