@@ -6,7 +6,7 @@ from user.models.organization import Organization
 
 class Event(BaseAbstractModel):
     organization = models.ForeignKey(Organization, on_delete=models.PROTECT, related_name="events")
-    name = models.CharField(max_length=256, unique=True)
+    name = models.CharField(max_length=256)
     banner_image = models.TextField(null=True, blank=True)
     slogan = models.CharField(max_length=1000, null=True, blank=True)
     description = models.CharField(max_length=1000, null=True, blank=True)
@@ -17,6 +17,9 @@ class Event(BaseAbstractModel):
 
     class Meta:
         ordering = ["-event_start_at", "-event_end_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["name"], name="uq__evt__name", condition=models.Q(deleted_at__isnull=True))
+        ]
 
     def __str__(self):
         return f"{self.name} by {self.organization}"

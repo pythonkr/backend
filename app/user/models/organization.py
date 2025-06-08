@@ -5,7 +5,12 @@ from user.models.user import UserExt
 
 
 class Organization(BaseAbstractModel):
-    name = models.CharField(max_length=256, unique=True)
+    name = models.CharField(max_length=256)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["name"], name="uq__org__name", condition=models.Q(deleted_at__isnull=True))
+        ]
 
     def __str__(self):
         return self.name
