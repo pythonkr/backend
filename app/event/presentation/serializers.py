@@ -1,30 +1,25 @@
-from event.presentation.models import Presentation, PresentationCategory, PresentationSpeaker, PresentationType
+from event.presentation.models import Presentation, PresentationCategory, PresentationSpeaker
 from rest_framework import serializers
-
-
-class PresentationTypeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = PresentationType
-        fields = ("id", "event", "name")
 
 
 class PresentationCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = PresentationCategory
-        fields = ("id", "presentation_type", "name")
+        fields = ("id", "name")
 
 
 class PresentationSpeakerSerializer(serializers.ModelSerializer):
+    nickname = serializers.CharField(source="user.nickname", read_only=True)
+
     class Meta:
         model = PresentationSpeaker
-        fields = ("id", "presentation", "user", "name", "biography")
+        fields = ("id", "nickname", "biography")
 
 
 class PresentationSerializer(serializers.ModelSerializer):
-    presentation_type = PresentationTypeSerializer(read_only=True)
-    presentation_categories = PresentationCategorySerializer(many=True, read_only=True)
-    presentation_speakers = PresentationSpeakerSerializer(many=True, read_only=True)
+    categories = PresentationCategorySerializer(source="active_categories", many=True, read_only=True)
+    speakers = PresentationSpeakerSerializer(source="active_speakers", many=True, read_only=True)
 
     class Meta:
         model = Presentation
-        fields = ("id", "presentation_type", "presentation_categories", "presentation_speakers")
+        fields = ("id", "title", "categories", "speakers")

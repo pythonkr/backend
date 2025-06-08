@@ -48,8 +48,8 @@ def create_presentation_set(create_event):
     fake = Faker()
     user, organization, relation, event = create_event
     presentation_type = baker.make(PresentationType, event=event)
-    presentation = baker.make(Presentation, presentation_type=presentation_type)
-    presentation_category = baker.make(PresentationCategory, presentation_type=presentation_type, name=fake.name())
+    presentation = baker.make(Presentation, type=presentation_type)
+    presentation_category = baker.make(PresentationCategory, type=presentation_type, name=fake.name())
     presentation_category_relation = baker.make(
         PresentationCategoryRelation, presentation=presentation, category=presentation_category
     )
