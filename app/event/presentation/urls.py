@@ -20,6 +20,7 @@ from event.presentation import views
 from rest_framework import routers
 
 cms_router = routers.SimpleRouter()
-cms_router.register("presentation", views.PresentationViewSet, basename="presentation")
+cms_router.register("", views.PresentationViewSet, basename="presentation")
+cms_router.register("category", views.PresentationCategoryViewSet, basename="presentation-category")
 
 urlpatterns = [path("", include(cms_router.urls))]
