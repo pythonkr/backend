@@ -16,9 +16,9 @@ class UserAdminSerializer(JsonSchemaSerializer, serializers.ModelSerializer):
             "id",
             "is_active",
             "username",
+            "nickname_ko",
+            "nickname_en",
             "email",
-            "first_name",
-            "last_name",
             "is_superuser",
             "str_repr",
             "date_joined",
@@ -52,5 +52,8 @@ class UserAdminSignInSerializer(JsonSchemaSerializer, ReadOnlyModelSerializer):
     def validate(self, attrs: UserAdminSignInSerializerData) -> UserAdminSignInSerializerData:
         if not (self.user and self.user.check_password(attrs["password"])):
             raise serializers.ValidationError("User not found or inactive or wrong password.")
+
+        if not self.user.is_superuser:
+            raise serializers.PermissionDenied("Only permissioned users can sign in using this route.")
 
         return attrs
