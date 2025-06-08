@@ -12,7 +12,7 @@ class Sponsor(BaseAbstractModel):
     name = models.CharField(max_length=256)
 
     logo = models.ForeignKey(to="file.PublicFile", on_delete=models.PROTECT)
-    sitemap = models.ForeignKey(to="cms.Sitemap", on_delete=models.PROTECT, null=True, blank=True)
+    page = models.ForeignKey(to="cms.Page", on_delete=models.PROTECT, null=True, blank=True)
 
     class Meta:
         ordering = ["name"]
