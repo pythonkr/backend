@@ -9,7 +9,6 @@ class SitemapAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, seria
     class Meta:
         model = Sitemap
         fields = COMMON_ADMIN_FIELDS + ("parent_sitemap", "route_code", "order", "page", "name_ko", "name_en")
-        translation_fields = ("name",)
 
 
 class PageAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
@@ -23,7 +22,6 @@ class PageAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializ
             "show_top_title_banner",
             "show_bottom_sponsor_banner",
         )
-        translation_fields = ("title", "subtitle")
 
 
 class SectionAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
@@ -32,4 +30,3 @@ class SectionAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, seria
     class Meta:
         model = Section
         fields = COMMON_ADMIN_FIELDS + ("page", "order", "body_ko", "body_en")
-        translation_fields = ("body",)
