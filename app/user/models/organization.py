@@ -1,20 +1,14 @@
-import uuid
-
-from django.contrib.auth.models import AbstractUser
+from core.models import BaseAbstractModel
 from django.core.exceptions import ValidationError
 from django.db import models
+from user.models.user import UserExt
 
 
-class UserExt(AbstractUser):
-    pass
+class Organization(BaseAbstractModel):
+    name = models.CharField(max_length=256, unique=True)
 
-
-class Organization(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=256, null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    deleted_at = models.DateTimeField(null=True, blank=True)
+    def __str__(self):
+        return self.name
 
 
 class OrganizationUserRelation(models.Model):
