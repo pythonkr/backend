@@ -57,3 +57,38 @@ class UserAdminSignInSerializer(JsonSchemaSerializer, ReadOnlyModelSerializer):
             raise serializers.PermissionDenied("Only permissioned users can sign in using this route.")
 
         return attrs
+
+
+class UserAdminPasswordChangeSerializerData(typing.TypedDict):
+    old_password: str
+    new_password: str
+    new_password_confirm: str
+
+
+class UserAdminPasswordChangeSerializer(JsonSchemaSerializer, ReadOnlyModelSerializer):
+    old_password = serializers.CharField(write_only=True, required=True)
+    new_password = serializers.CharField(write_only=True, required=True)
+    new_password_confirm = serializers.CharField(write_only=True, required=True)
+
+    class Meta:
+        model = UserExt
+        fields = ("old_password", "new_password", "new_password_confirm")
+
+    def validate(self, attrs: UserAdminPasswordChangeSerializerData) -> UserAdminPasswordChangeSerializerData:
+        user: UserExt = self.instance
+        if not user.check_password(attrs["old_password"]):
+            raise serializers.ValidationError("Old password is incorrect.")
+
+        if attrs["old_password"] == attrs["new_password"]:
+            raise serializers.ValidationError("New password cannot be the same as the old password.")
+
+        if attrs["new_password"] != attrs["new_password_confirm"]:
+            raise serializers.ValidationError("New password and confirmation do not match.")
+
+        return attrs
+
+    def save(self, **kwargs: typing.Any) -> UserExt:
+        user: UserExt = self.instance
+        user.set_password(self.validated_data["new_password"])
+        user.save(update_fields=["password"])
+        return user

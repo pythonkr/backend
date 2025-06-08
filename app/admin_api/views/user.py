@@ -1,4 +1,8 @@
-from admin_api.serializers.user import UserAdminSerializer, UserAdminSignInSerializer
+from admin_api.serializers.user import (
+    UserAdminPasswordChangeSerializer,
+    UserAdminSerializer,
+    UserAdminSignInSerializer,
+)
 from core.const.account import INITIAL_ADMIN_PASSWORD
 from core.const.tag import OpenAPITag
 from core.permissions import IsSuperUser
@@ -59,3 +63,15 @@ class UserAdminViewSet(
         user.set_password(INITIAL_ADMIN_PASSWORD)
         user.save(update_fields=["password"])
         return response.Response(status=status.HTTP_204_NO_CONTENT)
+
+    @extend_schema(
+        tags=[OpenAPITag.ADMIN_ACCOUNT],
+        request=UserAdminPasswordChangeSerializer,
+        responses={status.HTTP_200_OK: UserAdminSerializer},
+    )
+    @decorators.action(detail=False, methods=["POST"], url_path="password", permission_classes=[IsSuperUser])
+    def change_password(self, request: request.Request, *args: tuple, **kwargs: dict) -> response.Response:
+        serializer = UserAdminPasswordChangeSerializer(data=request.data, instance=request.user)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return response.Response(data=UserAdminSerializer(serializer.instance).data)
