@@ -12,7 +12,8 @@ from event.presentation.models import (
 from faker import Faker
 from model_bakery import baker
 from rest_framework.test import APIClient
-from user.models import Organization, OrganizationUserRelation, UserExt
+from user.models.organization import Organization, OrganizationUserRelation
+from user.models.user import UserExt
 
 
 @dataclasses.dataclass
@@ -47,8 +48,8 @@ def create_presentation_set(create_event):
     fake = Faker()
     user, organization, relation, event = create_event
     presentation_type = baker.make(PresentationType, event=event)
-    presentation = baker.make(Presentation, presentation_type=presentation_type)
-    presentation_category = baker.make(PresentationCategory, presentation_type=presentation_type, name=fake.name())
+    presentation = baker.make(Presentation, type=presentation_type)
+    presentation_category = baker.make(PresentationCategory, type=presentation_type, name=fake.name())
     presentation_category_relation = baker.make(
         PresentationCategoryRelation, presentation=presentation, category=presentation_category
     )

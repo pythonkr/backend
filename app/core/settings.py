@@ -317,7 +317,7 @@ COOKIE_PREFIX = (("LOCAL_" if IS_LOCAL else "DEBUG_") if DEBUG else "") + "PYCON
 COOKIE_SAMESITE = "Lax" if IS_LOCAL else "None"
 COOKIE_SECURE = not IS_LOCAL
 COOKIE_HTTPONLY = True
-COOKIE_DOMAIN = env("COOKIE_DOMAIN", default="pycon.kr")
+COOKIE_DOMAIN = env("COOKIE_DOMAIN", default="pycon.kr") if not IS_LOCAL else None
 COOKIE_TRUSTED_ORIGIN_SET = {
     f"{protocol}://{domain}:{port}"
     for protocol in ("http", "https")

@@ -9,4 +9,4 @@ class SponsorTierTranslationOptions(TranslationOptions):
 
 @register(Sponsor)
 class SponsorTranslationOptions(TranslationOptions):
-    fields = ("name", "description")
+    fields = ("name",)

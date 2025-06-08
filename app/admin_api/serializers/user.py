@@ -7,10 +7,28 @@ from rest_framework import serializers
 from user.models import UserExt
 
 
-class UserAdminSerializer(JsonSchemaSerializer, ReadOnlyModelSerializer, serializers.ModelSerializer):
+class UserAdminSerializer(JsonSchemaSerializer, serializers.ModelSerializer):
+    str_repr = serializers.CharField(source="__str__", read_only=True)
+
     class Meta:
         model = UserExt
-        fields = ("id", "username", "email", "first_name", "last_name", "is_staff", "is_active", "date_joined")
+        fields = (
+            "id",
+            "is_active",
+            "username",
+            "nickname_ko",
+            "nickname_en",
+            "email",
+            "is_superuser",
+            "str_repr",
+            "date_joined",
+            "last_login",
+        )
+        extra_kwargs = {
+            "id": {"read_only": True},
+            "date_joined": {"read_only": True},
+            "last_login": {"read_only": True},
+        }
 
 
 class UserAdminSignInSerializerData(typing.TypedDict):
@@ -35,4 +53,42 @@ class UserAdminSignInSerializer(JsonSchemaSerializer, ReadOnlyModelSerializer):
         if not (self.user and self.user.check_password(attrs["password"])):
             raise serializers.ValidationError("User not found or inactive or wrong password.")
 
+        if not self.user.is_superuser:
+            raise serializers.PermissionDenied("Only permissioned users can sign in using this route.")
+
         return attrs
+
+
+class UserAdminPasswordChangeSerializerData(typing.TypedDict):
+    old_password: str
+    new_password: str
+    new_password_confirm: str
+
+
+class UserAdminPasswordChangeSerializer(JsonSchemaSerializer, ReadOnlyModelSerializer):
+    old_password = serializers.CharField(write_only=True, required=True)
+    new_password = serializers.CharField(write_only=True, required=True)
+    new_password_confirm = serializers.CharField(write_only=True, required=True)
+
+    class Meta:
+        model = UserExt
+        fields = ("old_password", "new_password", "new_password_confirm")
+
+    def validate(self, attrs: UserAdminPasswordChangeSerializerData) -> UserAdminPasswordChangeSerializerData:
+        user: UserExt = self.instance
+        if not user.check_password(attrs["old_password"]):
+            raise serializers.ValidationError("Old password is incorrect.")
+
+        if attrs["old_password"] == attrs["new_password"]:
+            raise serializers.ValidationError("New password cannot be the same as the old password.")
+
+        if attrs["new_password"] != attrs["new_password_confirm"]:
+            raise serializers.ValidationError("New password and confirmation do not match.")
+
+        return attrs
+
+    def save(self, **kwargs: typing.Any) -> UserExt:
+        user: UserExt = self.instance
+        user.set_password(self.validated_data["new_password"])
+        user.save(update_fields=["password"])
+        return user

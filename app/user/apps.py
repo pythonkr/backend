@@ -11,7 +11,10 @@ class UserConfig(AppConfig):
         importlib.import_module("user.translation")
 
         from simple_history import register
-        from user.models import Organization, UserExt
+        from user.models import UserExt
 
         register(UserExt)
+
+        from user.models.organization import Organization
+
         register(Organization)
