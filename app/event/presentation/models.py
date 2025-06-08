@@ -53,7 +53,7 @@ class PresentationCategory(BaseAbstractModel):
 class Presentation(BaseAbstractModel):
     type = models.ForeignKey(PresentationType, on_delete=models.PROTECT)
     title = models.CharField(max_length=256)
-    sitemap = models.ForeignKey(to="cms.Sitemap", on_delete=models.PROTECT, null=True, blank=True)
+    page = models.ForeignKey(to="cms.Page", on_delete=models.PROTECT, null=True, blank=True)
 
     categories = models.ManyToManyField(to="PresentationCategory", through="PresentationCategoryRelation")
 
