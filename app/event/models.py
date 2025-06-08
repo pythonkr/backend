@@ -6,7 +6,7 @@ from user.models.organization import Organization
 
 class Event(BaseAbstractModel):
     organization = models.ForeignKey(Organization, on_delete=models.PROTECT, related_name="events")
-    name = models.CharField(max_length=256, null=True, blank=True)
+    name = models.CharField(max_length=256, unique=True)
     banner_image = models.TextField(null=True, blank=True)
     slogan = models.CharField(max_length=1000, null=True, blank=True)
     description = models.CharField(max_length=1000, null=True, blank=True)
@@ -14,6 +14,12 @@ class Event(BaseAbstractModel):
     event_end_at = models.DateTimeField(null=True, blank=True)
     banner_display_start_at = models.DateTimeField(null=True, blank=True)
     banner_display_end_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-event_start_at", "-event_end_at"]
+
+    def __str__(self):
+        return f"{self.name} by {self.organization}"
 
     def clean(self) -> None:
         super().clean()
