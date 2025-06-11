@@ -84,6 +84,7 @@ class Sitemap(BaseAbstractModel):
     name = models.CharField(max_length=256)
     order = models.IntegerField(default=0, validators=[MinValueValidator(0)])
     page = models.ForeignKey(Page, on_delete=models.PROTECT)
+    hide = models.BooleanField(default=False, help_text="이 Sitemap을 숨길지 여부")
 
     display_start_at = models.DateTimeField(null=True, blank=True)
     display_end_at = models.DateTimeField(null=True, blank=True)

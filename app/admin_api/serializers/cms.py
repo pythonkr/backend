@@ -8,7 +8,7 @@ from rest_framework import serializers
 class SitemapAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
     class Meta:
         model = Sitemap
-        fields = COMMON_ADMIN_FIELDS + ("parent_sitemap", "route_code", "order", "page", "name_ko", "name_en")
+        fields = COMMON_ADMIN_FIELDS + ("parent_sitemap", "route_code", "order", "page", "name_ko", "name_en", "hide")
 
 
 class PageAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
