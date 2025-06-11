@@ -6,7 +6,7 @@ from rest_framework import serializers
 class SitemapSerializer(serializers.ModelSerializer):
     class Meta:
         model = Sitemap
-        fields = COMMON_FIELDS + ("parent_sitemap", "route_code", "name", "order", "page")
+        fields = COMMON_FIELDS + ("parent_sitemap", "route_code", "name", "order", "page", "hide")
 
 
 class SectionSerializer(serializers.ModelSerializer):
