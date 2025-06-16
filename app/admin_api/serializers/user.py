@@ -1,10 +1,13 @@
 import functools
 import typing
 
+from core.const.serializer import COMMON_ADMIN_FIELDS
+from core.serializer.base_abstract_serializer import BaseAbstractSerializer
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
 from core.serializer.read_only_serializer import ReadOnlyModelSerializer
 from rest_framework import serializers
 from user.models import UserExt
+from user.models.organization import Organization
 
 
 class UserAdminSerializer(JsonSchemaSerializer, serializers.ModelSerializer):
@@ -92,3 +95,9 @@ class UserAdminPasswordChangeSerializer(JsonSchemaSerializer, ReadOnlyModelSeria
         user.set_password(self.validated_data["new_password"])
         user.save(update_fields=["password"])
         return user
+
+
+class OrganizationAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
+    class Meta:
+        model = Organization
+        fields = COMMON_ADMIN_FIELDS + ("name_ko", "name_en")
