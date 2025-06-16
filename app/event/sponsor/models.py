@@ -18,6 +18,9 @@ class Sponsor(BaseAbstractModel):
         ordering = ["name"]
         constraints = [models.UniqueConstraint(fields=["event", "name"], name="uq__spsr__name")]
 
+    def __str__(self) -> str:
+        return f"{self.event.name} - {self.name}"
+
 
 class SponsorTier(BaseAbstractModel):
     event = models.ForeignKey(Event, on_delete=models.PROTECT)
@@ -32,6 +35,9 @@ class SponsorTier(BaseAbstractModel):
             models.UniqueConstraint(fields=["event", "name"], name="uq__spsr_tier__name"),
             models.UniqueConstraint(fields=["event", "order"], name="uq__spsr_tier__order"),
         ]
+
+    def __str__(self) -> str:
+        return f"{self.event.name} - {self.name}"
 
     @functools.cached_property
     def active_sponsors(self) -> collections.abc.Iterable[Sponsor]:
