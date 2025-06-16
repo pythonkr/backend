@@ -1,4 +1,5 @@
 from admin_api.serializers.user import (
+    OrganizationAdminSerializer,
     UserAdminPasswordChangeSerializer,
     UserAdminSerializer,
     UserAdminSignInSerializer,
@@ -11,6 +12,7 @@ from django.contrib.auth import login, logout
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import decorators, mixins, request, response, status, viewsets
 from user.models import UserExt
+from user.models.organization import Organization
 
 ADMIN_METHODS = ["list", "retrieve", "create", "partial_update", "destroy"]
 
@@ -75,3 +77,11 @@ class UserAdminViewSet(
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return response.Response(data=UserAdminSerializer(serializer.instance).data)
+
+
+@extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_USER]) for m in ADMIN_METHODS})
+class OrganizationAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+    http_method_names = ["get", "post", "patch", "delete"]
+    serializer_class = OrganizationAdminSerializer
+    permission_classes = [IsSuperUser]
+    queryset = Organization.objects.filter_active()
