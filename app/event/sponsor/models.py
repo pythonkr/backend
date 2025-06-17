@@ -14,6 +14,8 @@ class Sponsor(BaseAbstractModel):
     logo = models.ForeignKey(to="file.PublicFile", on_delete=models.PROTECT)
     sitemap = models.ForeignKey(to="cms.Sitemap", on_delete=models.PROTECT, null=True, blank=True)
 
+    sponsor_tiers = models.ManyToManyField(to="SponsorTier", through="SponsorTierSponsorRelation")
+
     class Meta:
         ordering = ["name"]
         constraints = [models.UniqueConstraint(fields=["event", "name"], name="uq__spsr__name")]
