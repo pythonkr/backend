@@ -4,11 +4,10 @@ from rest_framework import serializers
 
 class SponsorSerializer(serializers.ModelSerializer):
     logo = serializers.FileField(source="logo.file", read_only=True)
-    page = serializers.UUIDField(source="page_id", read_only=True)
 
     class Meta:
         model = Sponsor
-        fields = ("id", "name", "logo", "page")
+        fields = ("id", "name", "logo", "sitemap_id")
 
 
 class SponsorTierSerializer(serializers.ModelSerializer):
