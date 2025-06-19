@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import functools
 import typing
 
 from core.const.tag import OpenAPITag
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
+from django.db.models.base import Model
 from django.db.models.fields.files import FileField
-from django.db.models.fields.related import ForeignKey
+from django.db.models.fields.related import ForeignKey, ManyToManyField
 from drf_spectacular import openapi, types, utils
 from modeltranslation.fields import TranslationField
 from rest_framework import decorators, response, status, viewsets
@@ -18,6 +20,23 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
 
         return super().__new__(cls)
 
+    @staticmethod
+    @functools.lru_cache
+    def get_enum_values(model: Model, is_nullable: bool) -> list[dict[str, str]]:
+        enum_values: list[dict[str, str]] = [{"const": None, "title": "빈 값"}] if is_nullable else []
+
+        if hasattr(model, "objects"):
+            qs = model.objects.all()
+            if hasattr(qs, "filter_active"):
+                qs = qs.filter_active()
+            elif hasattr(model, "is_active"):
+                qs = qs.filter(is_active=True)
+
+            for row in list(qs):
+                enum_values.append({"const": str(row.pk), "title": str(row)})
+
+        return enum_values
+
     def get_json_schema(self) -> dict:
         serializer_class = typing.cast(type[JsonSchemaSerializer], self.get_serializer_class())
 
@@ -27,38 +46,22 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
             "translation_fields": set(),
         }
 
-        nullable_fields = [
-            k for k, v in serializer_class.get_json_schema()["properties"].items() if "null" in v.get("type", [])
-        ]
-
         if hasattr(serializer_class.Meta, "model") and "properties" in result["schema"]:
             model_fields = serializer_class.Meta.model._meta.fields
+            model_m2m_fields = serializer_class.Meta.model._meta.many_to_many
 
-            for field in model_fields:
+            for field in model_fields + model_m2m_fields:
+                if field.name not in result["schema"]["properties"]:
+                    continue
+
                 if isinstance(field, ForeignKey):
-                    enum_values = []
-                    row_qs = field.related_model.objects
-                    if hasattr(row_qs, "filter_active"):
-                        row_qs = row_qs.filter_active()
-                    elif hasattr(field.related_model, "is_active"):
-                        row_qs = row_qs.filter(is_active=True)
-
-                    for row in row_qs:
-                        enum_values.append({"id": row.pk, "name": str(row)})
-
-                    if field.name in result["schema"]["properties"]:
-                        result["schema"]["properties"][field.name]["enum"] = [e["id"] for e in enum_values] + (
-                            [None] if field.null else []
-                        )
-
-                    result["ui_schema"][field.name] = {
-                        "ui:options": {
-                            "ui:widget": "select",
-                            "enumNames": [f"{e['name']} <{e['id']}>" for e in enum_values]
-                            + (["빈 값"] if field.name in nullable_fields else []),
-                        }
-                    }
-
+                    e_values = self.get_enum_values(field.related_model, field.null)
+                    result["schema"]["properties"][field.name]["oneOf"] = e_values
+                elif isinstance(field, ManyToManyField):
+                    e_values = self.get_enum_values(field.related_model, False)
+                    result["schema"]["properties"][field.name]["items"]["oneOf"] = e_values
+                    result["schema"]["properties"][field.name]["uniqueItems"] = True
+                    result["ui_schema"][field.name] = {"ui:field": "m2m_select"}
                 elif isinstance(field, FileField):
                     result["ui_schema"][field.name] = {"ui:field": "file"}
                 elif isinstance(field, TranslationField):
