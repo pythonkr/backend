@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import dataclasses
 import datetime
+import functools
 import re
 import typing
 
@@ -41,7 +42,7 @@ class SitemapGraph:
     parent: SitemapGraph | None = None
     children: list[SitemapGraph] = dataclasses.field(default_factory=list)
 
-    @property
+    @functools.cached_property
     def route(self) -> str:
         if self.parent:
             return f"{self.parent.route}/{self.route_code}"
@@ -97,7 +98,7 @@ class Sitemap(BaseAbstractModel):
     def __str__(self):
         return f"{self.route} ({self.name})"
 
-    @property
+    @functools.cached_property
     def route(self) -> str:
         """주의: 이 속성은 N+1 쿼리를 발생시킵니다. 절때 API 응답에서 사용하지 마세요."""
         if self.parent_sitemap:
