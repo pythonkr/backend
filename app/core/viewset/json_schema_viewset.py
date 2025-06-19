@@ -32,7 +32,7 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
             elif hasattr(model, "is_active"):
                 qs = qs.filter(is_active=True)
 
-            for row in list(qs):
+            for row in qs:
                 enum_values.append({"const": str(row.pk), "title": str(row)})
 
         return enum_values
