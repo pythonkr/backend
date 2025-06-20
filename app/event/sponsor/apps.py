@@ -9,8 +9,9 @@ class SponsorConfig(AppConfig):
     def ready(self):
         importlib.import_module("event.sponsor.translation")
 
-        from event.sponsor.models import Sponsor, SponsorTier
+        from event.sponsor.models import Sponsor, SponsorTag, SponsorTier
         from simple_history import register
 
         register(SponsorTier)
+        register(SponsorTag)
         register(Sponsor)
