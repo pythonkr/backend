@@ -5,7 +5,7 @@ from admin_api.views.event.presentation import (
     PresentationSpeakerAdminViewSet,
     PresentationTypeAdminViewSet,
 )
-from admin_api.views.event.sponsor import SponsorAdminViewSet, SponsorTierAdminViewSet
+from admin_api.views.event.sponsor import SponsorAdminViewSet, SponsorTagAdminViewSet, SponsorTierAdminViewSet
 from admin_api.views.file import PublicFileAdminViewSet
 from admin_api.views.user import OrganizationAdminViewSet, UserAdminViewSet
 from django.urls import include, path
@@ -25,6 +25,7 @@ admin_file_router.register("publicfile", PublicFileAdminViewSet, basename="admin
 admin_event_router = routers.SimpleRouter()
 admin_event_router.register("event", EventAdminViewSet)
 admin_event_router.register("sponsortier", SponsorTierAdminViewSet)
+admin_event_router.register("sponsortag", SponsorTagAdminViewSet)
 admin_event_router.register("sponsor", SponsorAdminViewSet)
 admin_event_router.register("presentationtype", PresentationTypeAdminViewSet)
 admin_event_router.register("presentation", PresentationAdminViewSet)

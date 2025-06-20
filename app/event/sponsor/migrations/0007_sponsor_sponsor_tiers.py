@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddField(
             model_name="sponsor",
-            name="sponsor_tiers",
+            name="tiers",
             field=models.ManyToManyField(through="sponsor.SponsorTierSponsorRelation", to="sponsor.sponsortier"),
         ),
     ]

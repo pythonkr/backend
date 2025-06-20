@@ -14,7 +14,8 @@ class Sponsor(BaseAbstractModel):
     logo = models.ForeignKey(to="file.PublicFile", on_delete=models.PROTECT)
     sitemap = models.ForeignKey(to="cms.Sitemap", on_delete=models.PROTECT, null=True, blank=True)
 
-    sponsor_tiers = models.ManyToManyField(to="SponsorTier", through="SponsorTierSponsorRelation")
+    tiers = models.ManyToManyField(to="SponsorTier", through="SponsorTierSponsorRelation")
+    tags = models.ManyToManyField(to="SponsorTag", through="SponsorTagRelation")
 
     class Meta:
         ordering = ["name"]
@@ -55,3 +56,23 @@ class SponsorTierSponsorRelation(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["tier", "sponsor"], name="uq__spsr_tier_rel__tier_spsr")]
+
+
+class SponsorTag(BaseAbstractModel):
+    event = models.ForeignKey(Event, on_delete=models.PROTECT)
+    name = models.CharField(max_length=256)
+
+    class Meta:
+        ordering = ["name"]
+        constraints = [models.UniqueConstraint(fields=["name"], name="uq__spsr_tag__name")]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class SponsorTagRelation(models.Model):
+    sponsor = models.ForeignKey(Sponsor, on_delete=models.CASCADE)
+    tag = models.ForeignKey(SponsorTag, on_delete=models.CASCADE)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["sponsor", "tag"], name="uq__spsr_tag_rel__spsr_tag")]
