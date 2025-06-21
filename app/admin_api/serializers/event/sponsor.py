@@ -23,4 +23,13 @@ class SponsorAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, seria
 
     class Meta:
         model = Sponsor
-        fields = COMMON_ADMIN_FIELDS + ("event", "logo", "sitemap", "name_ko", "name_en", "tiers", "tags")
+        fields = COMMON_ADMIN_FIELDS + (
+            "event",
+            "logo",
+            "name_ko",
+            "name_en",
+            "description_ko",
+            "description_en",
+            "tiers",
+            "tags",
+        )

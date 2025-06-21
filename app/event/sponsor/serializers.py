@@ -8,7 +8,7 @@ class SponsorSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Sponsor
-        fields = ("id", "name", "logo", "sitemap_id", "tags")
+        fields = ("id", "name", "logo", "description", "tags")
 
 
 class SponsorTierSerializer(serializers.ModelSerializer):
