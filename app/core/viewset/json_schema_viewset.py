@@ -46,6 +46,12 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
             "translation_fields": set(),
         }
 
+        for schema_field in result["schema"]["properties"].values():
+            if "pattern" in schema_field:
+                # Remove the pattern as python regex is not well compatible with javaScript regex.
+                # TODO: FIXME: Add a compatibility layer for regex patterns.
+                schema_field.pop("pattern", None)
+
         if hasattr(serializer_class.Meta, "model") and "properties" in result["schema"]:
             model_fields = serializer_class.Meta.model._meta.fields
             model_m2m_fields = serializer_class.Meta.model._meta.many_to_many
