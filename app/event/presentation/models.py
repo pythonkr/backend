@@ -33,7 +33,13 @@ class PresentationType(BaseAbstractModel):
     name = models.CharField(max_length=256)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["event", "name"], name="uq__prst_type__event__name")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["event", "name"],
+                name="uq__prst_type__event__name",
+                condition=models.Q(deleted_at__isnull=True),
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"[{self.event.name}] {self.name}"
@@ -44,7 +50,13 @@ class PresentationCategory(BaseAbstractModel):
     name = models.CharField(max_length=256)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["type", "name"], name="uq__prst_cat__type__name")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["type", "name"],
+                name="uq__prst_cat__type__name",
+                condition=models.Q(deleted_at__isnull=True),
+            ),
+        ]
 
     def __str__(self) -> str:
         return self.name
