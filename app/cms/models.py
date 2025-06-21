@@ -91,9 +91,6 @@ class Sitemap(BaseAbstractModel):
     external_link = models.URLField(
         null=True, blank=True, help_text="외부 링크인 경우 Page를 지정하는 대신 URL을 입력하세요."
     )
-    is_frontend_page = models.BooleanField(
-        default=False, help_text="만약 이 Sitemap이 프론트엔드에 하드코딩된 페이지라면 체크하세요."
-    )
 
     hide = models.BooleanField(default=False, help_text="이 Sitemap을 숨길지 여부")
 

@@ -16,7 +16,6 @@ class SitemapAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, seria
             "order",
             "page",
             "external_link",
-            "is_frontend_page",
             "name_ko",
             "name_en",
             "hide",
@@ -47,14 +46,11 @@ class SitemapAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, seria
     def validate(self, attrs: dict) -> dict:
         page = attrs.get("page", getattr(self.instance, "page", None))
         external_link = attrs.get("external_link", getattr(self.instance, "external_link", None))
-        is_frontend_page = attrs.get("is_frontend_page", getattr(self.instance, "is_frontend_page", False))
 
-        if not (page or external_link or is_frontend_page):
-            raise serializers.ValidationError(
-                "Page 또는 External Link, is_frontend_page 중 하나는 반드시 선택 또는 입력해야 합니다."
-            )
-        if len([v for v in (page, external_link, is_frontend_page) if v]) > 1:
-            raise serializers.ValidationError("Page, External Link, is_frontend_page 중 하나만 선택할 수 있습니다.")
+        if not (page or external_link):
+            raise serializers.ValidationError("Page 또는 External Link 중 하나는 반드시 선택 또는 입력해야 합니다.")
+        if page and external_link:
+            raise serializers.ValidationError("Page, External Link 중 하나만 선택 또는 입력할 수 있습니다.")
 
         return attrs
 
