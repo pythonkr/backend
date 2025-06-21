@@ -84,7 +84,17 @@ class Sitemap(BaseAbstractModel):
     route_code = models.CharField(max_length=256, blank=True)
     name = models.CharField(max_length=256)
     order = models.IntegerField(default=0, validators=[MinValueValidator(0)])
-    page = models.ForeignKey(Page, on_delete=models.PROTECT)
+
+    page = models.ForeignKey(
+        Page, on_delete=models.PROTECT, null=True, blank=True, help_text="Sitemap 클릭 시 보여질 Page"
+    )
+    external_link = models.URLField(
+        null=True, blank=True, help_text="외부 링크인 경우 Page를 지정하는 대신 URL을 입력하세요."
+    )
+    is_frontend_page = models.BooleanField(
+        default=False, help_text="만약 이 Sitemap이 프론트엔드에 하드코딩된 페이지라면 체크하세요."
+    )
+
     hide = models.BooleanField(default=False, help_text="이 Sitemap을 숨길지 여부")
 
     display_start_at = models.DateTimeField(null=True, blank=True)
@@ -94,6 +104,9 @@ class Sitemap(BaseAbstractModel):
 
     class Meta:
         ordering = ["order"]
+        constraints = [
+            models.UniqueConstraint(fields=["parent_sitemap", "route_code"], name="uq__sitemap__parent_route_code"),
+        ]
 
     def __str__(self):
         return f"{self.route} ({self.name})"
