@@ -102,7 +102,11 @@ class Sitemap(BaseAbstractModel):
     class Meta:
         ordering = ["order"]
         constraints = [
-            models.UniqueConstraint(fields=["parent_sitemap", "route_code"], name="uq__sitemap__parent_route_code"),
+            models.UniqueConstraint(
+                fields=["parent_sitemap", "route_code"],
+                name="uq__sitemap__parent_route_code",
+                condition=models.Q(deleted_at__isnull=True),
+            ),
         ]
 
     def __str__(self):

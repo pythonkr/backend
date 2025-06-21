@@ -19,7 +19,13 @@ class Sponsor(BaseAbstractModel):
 
     class Meta:
         ordering = ["name"]
-        constraints = [models.UniqueConstraint(fields=["event", "name"], name="uq__spsr__name")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["event", "name"],
+                name="uq__spsr__name",
+                condition=models.Q(deleted_at__isnull=True),
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.event.name} - {self.name}"
@@ -35,8 +41,16 @@ class SponsorTier(BaseAbstractModel):
     class Meta:
         ordering = ["order"]
         constraints = [
-            models.UniqueConstraint(fields=["event", "name"], name="uq__spsr_tier__name"),
-            models.UniqueConstraint(fields=["event", "order"], name="uq__spsr_tier__order"),
+            models.UniqueConstraint(
+                fields=["event", "name"],
+                name="uq__spsr_tier__name",
+                condition=models.Q(deleted_at__isnull=True),
+            ),
+            models.UniqueConstraint(
+                fields=["event", "order"],
+                name="uq__spsr_tier__order",
+                condition=models.Q(deleted_at__isnull=True),
+            ),
         ]
 
     def __str__(self) -> str:
@@ -64,7 +78,13 @@ class SponsorTag(BaseAbstractModel):
 
     class Meta:
         ordering = ["name"]
-        constraints = [models.UniqueConstraint(fields=["name"], name="uq__spsr_tag__name")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["name"],
+                name="uq__spsr_tag__name",
+                condition=models.Q(deleted_at__isnull=True),
+            ),
+        ]
 
     def __str__(self) -> str:
         return self.name
