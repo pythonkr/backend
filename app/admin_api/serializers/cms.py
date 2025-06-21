@@ -35,12 +35,12 @@ class SitemapAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, seria
         if not value:
             return None
 
-        # 순환 참조를 방지하기 위한 검증, 단 값이 현재 설정된 parent_sitemap과 다를 때만 수행
-        if (parent_sitemap := self.instance) and self.instance.parent_sitemap != value:
-            while parent_sitemap:
-                if value == parent_sitemap:
-                    raise serializers.ValidationError("Parent Sitemap이 본인 또는 자식 Sitemap을 가리킬 수 없습니다.")
-                parent_sitemap = parent_sitemap.parent_sitemap
+        # 순환 참조를 방지하기 위한 검증
+        parent_sitemap = value
+        while parent_sitemap:
+            if parent_sitemap == self.instance:
+                raise serializers.ValidationError("Parent Sitemap이 본인 또는 자식 Sitemap을 가리킬 수 없습니다.")
+            parent_sitemap = parent_sitemap.parent_sitemap
 
         return value
 
