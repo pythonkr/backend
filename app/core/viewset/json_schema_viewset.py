@@ -70,12 +70,16 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
                 if isinstance(field, ForeignKey):
                     if not (s_field := typing.cast(serializers.PrimaryKeyRelatedField | None, ser_fields[field.name])):
                         continue
-                    e_values = self.get_enum_values(s_field.get_queryset(), field.null)
+                    e_values_qs = field.remote_field.model.objects if s_field.read_only else s_field.get_queryset()
+                    e_values = self.get_enum_values(e_values_qs, field.null)
                     result["schema"]["properties"][field.name]["oneOf"] = e_values
                 elif isinstance(field, ManyToManyField):
                     if not (s_field := typing.cast(serializers.ManyRelatedField | None, ser_fields[field.name])):
                         continue
-                    e_values = self.get_enum_values(s_field.child_relation.get_queryset(), False)
+                    e_values_qs = (
+                        field.remote_field.model.objects if s_field.read_only else s_field.child_relation.get_queryset()
+                    )
+                    e_values = self.get_enum_values(e_values_qs, False)
                     result["schema"]["properties"][field.name]["items"]["oneOf"] = e_values
                     result["schema"]["properties"][field.name]["uniqueItems"] = True
                     self.set_ui_schema(result["ui_schema"], field.name, {"ui:field": "m2m_select"})
