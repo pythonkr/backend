@@ -4,7 +4,7 @@ import collections.abc
 import contextlib
 import functools
 
-from core.models import BaseAbstractModel, BaseAbstractModelQuerySet
+from core.models import BaseAbstractModel, BaseAbstractModelQuerySet, MarkdownField
 from django.contrib.auth import get_user_model
 from django.db import models
 from event.models import Event
@@ -97,4 +97,4 @@ class PresentationCategoryRelation(models.Model):
 class PresentationSpeaker(BaseAbstractModel):
     presentation = models.ForeignKey(Presentation, on_delete=models.PROTECT, related_name="speakers")
     user = models.ForeignKey(User, on_delete=models.PROTECT)
-    biography = models.TextField(blank=True, default="")
+    biography = MarkdownField(blank=True, default="")

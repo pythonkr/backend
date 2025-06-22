@@ -2,7 +2,7 @@ import collections.abc
 import contextlib
 import functools
 
-from core.models import BaseAbstractModel
+from core.models import BaseAbstractModel, MarkdownField
 from django.db import models
 from event.models import Event
 
@@ -12,7 +12,7 @@ class Sponsor(BaseAbstractModel):
     name = models.CharField(max_length=256)
 
     logo = models.ForeignKey(to="file.PublicFile", on_delete=models.PROTECT)
-    description = models.TextField(blank=True, default="")
+    description = MarkdownField(blank=True, default="")
 
     tiers = models.ManyToManyField(to="SponsorTier", through="SponsorTierSponsorRelation")
     tags = models.ManyToManyField(to="SponsorTag", through="SponsorTagRelation")
