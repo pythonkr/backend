@@ -31,14 +31,18 @@ class PresentationAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, 
     categories = PresentationCategoryField(
         many=True, required=False, queryset=PresentationCategory.objects.filter_active()
     )
+    image = serializers.PrimaryKeyRelatedField(
+        queryset=PublicFile.objects.filter_active(), allow_null=True, required=False
+    )
 
     class Meta:
         model = Presentation
         fields = COMMON_ADMIN_FIELDS + (
-            "categories",
             "type",
+            "categories",
             "title_ko",
             "title_en",
+            "image",
             "description_ko",
             "description_en",
         )
