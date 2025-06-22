@@ -67,4 +67,4 @@ class SectionAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, seria
 
     class Meta:
         model = Section
-        fields = COMMON_ADMIN_FIELDS + ("page", "external_link", "order", "body_ko", "body_en")
+        fields = COMMON_ADMIN_FIELDS + ("page", "order", "body_ko", "body_en")
