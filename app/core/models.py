@@ -70,3 +70,7 @@ class BaseAbstractModel(models.Model):
         self.deleted_at = Now()
         self.deleted_by = get_current_user()
         super().save(using=using, update_fields={"deleted_by", "deleted_at"})
+
+
+class MarkdownField(models.TextField):
+    is_markdown = True

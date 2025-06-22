@@ -7,7 +7,7 @@ import functools
 import re
 import typing
 
-from core.models import BaseAbstractModel, BaseAbstractModelQuerySet
+from core.models import BaseAbstractModel, BaseAbstractModelQuerySet, MarkdownField
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
@@ -145,7 +145,7 @@ class Section(BaseAbstractModel):
     order = models.IntegerField(default=0)
 
     css = models.TextField(null=True, blank=True, default=None)
-    body = models.TextField(help_text="Content of the page, Written in markdown format")
+    body = MarkdownField(help_text="Content of the page, Written in markdown format")
 
     class Meta:
         ordering = ["order"]
