@@ -14,7 +14,7 @@ class PresentationCategoryTranslationOptions(TranslationOptions):
 
 @register(Presentation)
 class PresentationTranslationOptions(TranslationOptions):
-    fields = ("title",)
+    fields = ("title", "description")
 
 
 @register(PresentationSpeaker)
