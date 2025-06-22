@@ -6,13 +6,13 @@ import typing
 from core.const.tag import OpenAPITag
 from core.models import MarkdownField
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
-from django.db.models.base import Model
 from django.db.models.fields import TextField
 from django.db.models.fields.files import FileField
 from django.db.models.fields.related import ForeignKey, ManyToManyField
+from django.db.models.query import QuerySet
 from drf_spectacular import openapi, types, utils
 from modeltranslation.fields import TranslationField
-from rest_framework import decorators, response, status, viewsets
+from rest_framework import decorators, response, serializers, status, viewsets
 
 
 class JsonSchemaViewSet(viewsets.GenericViewSet):
@@ -24,18 +24,17 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
 
     @staticmethod
     @functools.lru_cache
-    def get_enum_values(model: Model, is_nullable: bool) -> list[dict[str, str]]:
+    def get_enum_values(model_qs: QuerySet, is_nullable: bool) -> list[dict[str, str]]:
         enum_values: list[dict[str, str]] = [{"const": None, "title": "빈 값"}] if is_nullable else []
 
-        if hasattr(model, "objects"):
-            qs = model.objects.all()
-            if hasattr(qs, "filter_active"):
-                qs = qs.filter_active()
-            elif hasattr(model, "is_active"):
-                qs = qs.filter(is_active=True)
+        qs = model_qs.all()
+        if hasattr(qs, "filter_active"):
+            qs = qs.filter_active()
+        elif hasattr(model_qs.model, "is_active"):
+            qs = qs.filter(is_active=True)
 
-            for row in qs:
-                enum_values.append({"const": str(row.pk), "title": str(row)})
+        for row in qs:
+            enum_values.append({"const": str(row.pk), "title": str(row)})
 
         return enum_values
 
@@ -60,18 +59,23 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
                 schema_field.pop("pattern", None)
 
         if hasattr(serializer_class.Meta, "model") and "properties" in result["schema"]:
+            ser_fields: dict[str, serializers.Field] = serializer_class().fields
             model_fields = serializer_class.Meta.model._meta.fields
             model_m2m_fields = serializer_class.Meta.model._meta.many_to_many
 
             for field in model_fields + model_m2m_fields:
-                if field.name not in result["schema"]["properties"]:
+                if field.name not in result["schema"]["properties"] or field.name not in ser_fields:
                     continue
 
                 if isinstance(field, ForeignKey):
-                    e_values = self.get_enum_values(field.related_model, field.null)
+                    if not (s_field := typing.cast(serializers.PrimaryKeyRelatedField | None, ser_fields[field.name])):
+                        continue
+                    e_values = self.get_enum_values(s_field.get_queryset(), field.null)
                     result["schema"]["properties"][field.name]["oneOf"] = e_values
                 elif isinstance(field, ManyToManyField):
-                    e_values = self.get_enum_values(field.related_model, False)
+                    if not (s_field := typing.cast(serializers.ManyRelatedField | None, ser_fields[field.name])):
+                        continue
+                    e_values = self.get_enum_values(s_field.child_relation.get_queryset(), False)
                     result["schema"]["properties"][field.name]["items"]["oneOf"] = e_values
                     result["schema"]["properties"][field.name]["uniqueItems"] = True
                     self.set_ui_schema(result["ui_schema"], field.name, {"ui:field": "m2m_select"})
