@@ -2,6 +2,7 @@ from admin_api.views.cms import PageAdminViewSet, SitemapAdminViewSet
 from admin_api.views.event.event import EventAdminViewSet
 from admin_api.views.event.presentation import (
     PresentationAdminViewSet,
+    PresentationCategoryAdminViewSet,
     PresentationSpeakerAdminViewSet,
     PresentationTypeAdminViewSet,
 )
@@ -28,11 +29,9 @@ admin_event_router.register("sponsortier", SponsorTierAdminViewSet)
 admin_event_router.register("sponsortag", SponsorTagAdminViewSet)
 admin_event_router.register("sponsor", SponsorAdminViewSet)
 admin_event_router.register("presentationtype", PresentationTypeAdminViewSet)
+admin_event_router.register("presentationcategory", PresentationCategoryAdminViewSet)
 admin_event_router.register("presentation", PresentationAdminViewSet)
-admin_event_router.register(
-    "presentation/(?P<presentation_id>{UUID_V4_PATTERN})/speaker",
-    PresentationSpeakerAdminViewSet,
-)
+admin_event_router.register("presentationspeaker", PresentationSpeakerAdminViewSet)
 
 urlpatterns = [
     path("cms/", include(admin_cms_router.urls)),
