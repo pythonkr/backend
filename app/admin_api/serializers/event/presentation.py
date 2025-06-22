@@ -23,7 +23,7 @@ class PresentationAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, 
     class PresentationCategoryField(serializers.PrimaryKeyRelatedField):
         def get_queryset(self):
             qs = super().get_queryset()
-            return qs.filter(type=self.instance.type) if self.instance else qs.none()
+            return qs.filter(type=self.parent.instance.type) if self.parent.instance else qs.none()
 
     categories = PresentationCategoryField(
         many=True, required=False, queryset=PresentationCategory.objects.filter_active()
