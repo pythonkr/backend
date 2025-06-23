@@ -67,19 +67,19 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
                 if field.name not in result["schema"]["properties"] or field.name not in ser_fields:
                     continue
 
+                serializer_field = ser_fields[field.name]
+                if serializer_field.read_only:
+                    continue
+
                 if isinstance(field, ForeignKey):
-                    if not (s_field := typing.cast(serializers.PrimaryKeyRelatedField | None, ser_fields[field.name])):
+                    if not (s_field := typing.cast(serializers.PrimaryKeyRelatedField | None, serializer_field)):
                         continue
-                    e_values_qs = field.remote_field.model.objects if s_field.read_only else s_field.get_queryset()
-                    e_values = self.get_enum_values(e_values_qs, field.null)
+                    e_values = self.get_enum_values(s_field.get_queryset(), field.null)
                     result["schema"]["properties"][field.name]["oneOf"] = e_values
                 elif isinstance(field, ManyToManyField):
-                    if not (s_field := typing.cast(serializers.ManyRelatedField | None, ser_fields[field.name])):
+                    if not (s_field := typing.cast(serializers.ManyRelatedField | None, serializer_field)):
                         continue
-                    e_values_qs = (
-                        field.remote_field.model.objects if s_field.read_only else s_field.child_relation.get_queryset()
-                    )
-                    e_values = self.get_enum_values(e_values_qs, False)
+                    e_values = self.get_enum_values(s_field.child_relation.get_queryset(), False)
                     result["schema"]["properties"][field.name]["items"]["oneOf"] = e_values
                     result["schema"]["properties"][field.name]["uniqueItems"] = True
                     self.set_ui_schema(result["ui_schema"], field.name, {"ui:field": "m2m_select"})
