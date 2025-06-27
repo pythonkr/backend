@@ -68,16 +68,18 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
                     continue
 
                 serializer_field = ser_fields[field.name]
-                if serializer_field.read_only:
-                    continue
 
                 if isinstance(field, ForeignKey):
                     if not (s_field := typing.cast(serializers.PrimaryKeyRelatedField | None, serializer_field)):
+                        continue
+                    if serializer_field.read_only:
                         continue
                     e_values = self.get_enum_values(s_field.get_queryset(), field.null)
                     result["schema"]["properties"][field.name]["oneOf"] = e_values
                 elif isinstance(field, ManyToManyField):
                     if not (s_field := typing.cast(serializers.ManyRelatedField | None, serializer_field)):
+                        continue
+                    if serializer_field.read_only:
                         continue
                     e_values = self.get_enum_values(s_field.child_relation.get_queryset(), False)
                     result["schema"]["properties"][field.name]["items"]["oneOf"] = e_values
