@@ -1,5 +1,3 @@
-import typing
-
 from core.const.serializer import COMMON_ADMIN_FIELDS
 from core.serializer.base_abstract_serializer import BaseAbstractSerializer
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
@@ -22,13 +20,7 @@ class PresentationCategoryAdminSerializer(BaseAbstractSerializer, JsonSchemaSeri
 
 
 class PresentationAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
-    class PresentationCategoryField(serializers.PrimaryKeyRelatedField):
-        def get_queryset(self):
-            qs = super().get_queryset()
-            instance = typing.cast(serializers.ManyRelatedField, self.parent).parent.instance
-            return qs.filter(type=instance.type) if instance else qs.none()
-
-    categories = PresentationCategoryField(
+    categories = serializers.PrimaryKeyRelatedField(
         many=True, required=False, queryset=PresentationCategory.objects.filter_active()
     )
     image = serializers.PrimaryKeyRelatedField(
