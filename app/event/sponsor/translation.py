@@ -14,4 +14,4 @@ class SponsorTagTranslationOptions(TranslationOptions):
 
 @register(Sponsor)
 class SponsorTranslationOptions(TranslationOptions):
-    fields = ("name", "description")
+    fields = ("name", "description", "logo")
