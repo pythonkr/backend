@@ -14,4 +14,4 @@ class SponsorConfig(AppConfig):
 
         register(SponsorTier)
         register(SponsorTag)
-        register(Sponsor)
+        register(Sponsor, excluded_fields=["logo_ko", "logo_en"])
