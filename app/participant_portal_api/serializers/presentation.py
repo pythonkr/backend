@@ -2,7 +2,6 @@ import typing
 import uuid
 
 from core.util.thread_local import get_current_user
-from django.db import transaction
 from event.presentation.models import Presentation, PresentationSpeaker
 from file.models import PublicFile
 from participant_portal_api.serializers.modification_audit import ModificationAuditCreationPortalSerializer
@@ -71,27 +70,22 @@ class PresentationPortalSerializer(ModificationAuditCreationPortalSerializer, se
 
         return result
 
-    def create(self, validated_data):
-        raise NotImplementedError("Creation of presentations is not allowed in the participant portal.")
+    def validate(self, attrs: dict) -> dict:
+        attrs = super().validate(attrs)
 
-    @transaction.atomic
-    def update(self, presentation, validated_data):
-        speakers = typing.cast(list[PresentationSpeakerPortalData], validated_data["speakers"])
+        speakers = typing.cast(list[PresentationSpeakerPortalData], attrs["speakers"])
         if not isinstance(speakers, list):
             raise serializers.ValidationError("Speakers must be a list.")
 
         for speaker_data in speakers:
             if not (speaker_instance := self.get_speaker_instance(speaker_data["id"])):
-                raise serializers.ValidationError(
-                    f"Speaker with ID {speaker_data['id']} not found or does not belong to this presentation."
-                )
+                err_msg = f"Speaker with ID {speaker_data['id']} not found or does not belong to this presentation."
+                raise serializers.ValidationError(err_msg)
 
-            speaker_serializer = PresentationSpeakerPortalSerializer(
+            PresentationSpeakerPortalSerializer(
                 instance=speaker_instance,
                 data=speaker_data,
                 partial=True,
-            )
-            speaker_serializer.is_valid(raise_exception=True)
-            speaker_serializer.save()
+            ).is_valid(raise_exception=True)
 
-        return super().update(presentation, validated_data)
+        return attrs

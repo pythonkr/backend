@@ -60,10 +60,28 @@ class ModificationAudit(BaseAbstractModel):
 
     def apply_modification(self, save: bool = False) -> models.Model:
         for field, value in self.modification_data.items():
-            setattr(self.instance, field, value)
+            if isinstance(value, list):
+                if not (sub_qs := getattr(self.instance, field, None)):
+                    continue
+                if not isinstance(sub_qs, models.manager.BaseManager):
+                    continue
+                for sub_value in value:
+                    if not isinstance(sub_value, dict):
+                        continue
+                    if not (sub_instance_id := sub_value.get("id")):
+                        continue
+                    sub_qs.filter(pk=sub_instance_id).update(**sub_value)
+            elif isinstance(value, dict):
+                if not (sub_instance := getattr(self.instance, field, None)):
+                    continue
+                for sub_field, sub_value in value.items():
+                    setattr(sub_instance, sub_field, sub_value)
+                sub_instance.save()
+            else:
+                setattr(self.instance, field, value)
 
         if save:
-            self.instance.save(update_fields=self.modification_data.keys())
+            self.instance.save()
 
         return self.instance
 
