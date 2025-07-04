@@ -67,7 +67,7 @@ class ModificationAudit(BaseAbstractModel):
                     continue
 
                 for sub_instance in sub_instances:
-                    sub_data = sub_value_map.get[str(sub_instance.pk)]
+                    sub_data = sub_value_map[str(sub_instance.pk)]
                     for sub_field, sub_value in sub_data.items():
                         setattr(sub_instance, sub_field, sub_value)
 
