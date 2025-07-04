@@ -18,8 +18,8 @@ class PublicFilePortalUploadSerializer(serializers.Serializer):
         new_file = PublicFile(file=validated_data["file"])
         new_file.clean()
 
-        if new_file.hash and PublicFile.objects.filter(hash=new_file.hash).exists():
-            raise serializers.ValidationError({"file": "A file with the same hash already exists."})
+        if new_file.hash and (pf := PublicFile.objects.filter(hash=new_file.hash).exists()):
+            return pf
 
         new_file.save()
         return new_file
