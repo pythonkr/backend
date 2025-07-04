@@ -13,6 +13,7 @@ from admin_api.serializers.event.presentation import (
     PresentationSpeakerAdminSerializer,
     PresentationTypeAdminSerializer,
 )
+from core.const.regex import UUID_V4_REGEX
 from core.const.tag import OpenAPITag
 from core.permissions import IsSuperUser
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
@@ -55,13 +56,13 @@ class PresentationAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     queryset = Presentation.objects.get_all_nested_data().select_related("created_by", "updated_by", "deleted_by")
 
     @extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION])
-    @decorators.action(detail=True, methods=["get"], url_path="preview")
-    def preview_modification_audit(self, request: request.Request, *args: tuple, **kwargs: dict) -> response.Response:
-        if not (
-            mod_audit := typing.cast(
-                ModificationAudit | None, ModificationAudit.objects.filter_requested(self.get_object()).first()
-            )
-        ):
+    @decorators.action(detail=True, methods=["get"], url_path=r"preview/(?P<audit_id>[\w-]+)")
+    def preview_modification_audit(self, audit_id: str, *args: tuple, **kwargs: dict) -> response.Response:
+        if not UUID_V4_REGEX.match(kwargs.get("audit_id", "")):
+            return response.Response(status=status.HTTP_404_NOT_FOUND)
+
+        presentation: Presentation = self.get_object()
+        if not (mod_audit := ModificationAudit.objects.filter_requested(presentation).filter(id=audit_id).first()):
             return response.Response(status=status.HTTP_404_NOT_FOUND)
 
         return response.Response(data=self.get_serializer(mod_audit.apply_modification(save=False)).data)

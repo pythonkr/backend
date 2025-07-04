@@ -28,7 +28,11 @@ class UserPortalViewSet(viewsets.GenericViewSet):
         if not request.user.is_authenticated:
             return response.Response(status=status.HTTP_401_UNAUTHORIZED)
 
-        return response.Response(data=UserPortalSerializer(request.user).data)
+        user = request.user
+        if mod_audit := ModificationAudit.objects.filter_requested(user).first():
+            user = mod_audit.apply_modification(save=False)
+
+        return response.Response(data=self.get_serializer(user).data)
 
     @extend_schema(
         tags=[OpenAPITag.PARTICIPANT_PORTAL_USER],
