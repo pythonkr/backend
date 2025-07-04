@@ -128,9 +128,8 @@ class ModificationAuditCreationPortalSerializer(serializers.ModelSerializer):
 
     def save(self, **kwargs: dict) -> models.Model:
         """instance.save()를 호출하는 대신, 변경된 데이터를 추출하여 ModificationAudit 인스턴스를 생성합니다."""
-        return ModificationAudit.objects.create(
-            instance=self.instance, modification_data=self.validated_data
-        ).apply_modification(save=False)
+        ModificationAudit.objects.create(instance=self.instance, modification_data=self.validated_data)
+        return self.instance
 
 
 class ModificationAuditCancelPortalSerializer(serializers.ModelSerializer):

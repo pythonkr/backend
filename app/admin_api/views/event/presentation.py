@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import typing
-
 from admin_api.filtersets.event.presentation import (
     PresentationAdminFilterSet,
     PresentationCategoryAdminFilterSet,
@@ -25,7 +23,7 @@ from event.presentation.models import (
     PresentationType,
 )
 from participant_portal_api.models import ModificationAudit
-from rest_framework import decorators, request, response, status, viewsets
+from rest_framework import decorators, response, status, viewsets
 
 ADMIN_METHODS = ["list", "retrieve", "create", "update", "partial_update", "destroy"]
 
@@ -58,14 +56,13 @@ class PresentationAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     @extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION])
     @decorators.action(detail=True, methods=["get"], url_path=r"preview/(?P<audit_id>[\w-]+)")
     def preview_modification_audit(self, audit_id: str, *args: tuple, **kwargs: dict) -> response.Response:
-        if not UUID_V4_REGEX.match(kwargs.get("audit_id", "")):
+        if not UUID_V4_REGEX.match(audit_id):
             return response.Response(status=status.HTTP_404_NOT_FOUND)
 
-        presentation: Presentation = self.get_object()
-        if not (mod_audit := ModificationAudit.objects.filter_requested(presentation).filter(id=audit_id).first()):
+        if not (audit := ModificationAudit.objects.filter_by_instance(self.get_object()).filter(id=audit_id).first()):
             return response.Response(status=status.HTTP_404_NOT_FOUND)
 
-        return response.Response(data=self.get_serializer(mod_audit.apply_modification(save=False)).data)
+        return response.Response(data=audit.get_applied_data(serializer_class=self.get_serializer()))
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION]) for m in ADMIN_METHODS})
@@ -77,13 +74,12 @@ class PresentationSpeakerAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     queryset = PresentationSpeaker.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")
 
     @extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION])
-    @decorators.action(detail=True, methods=["get"], url_path="preview")
-    def preview_modification_audit(self, request: request.Request, *args: tuple, **kwargs: dict) -> response.Response:
-        if not (
-            mod_audit := typing.cast(
-                ModificationAudit | None, ModificationAudit.objects.filter_requested(self.get_object()).first()
-            )
-        ):
+    @decorators.action(detail=True, methods=["get"], url_path=r"preview/(?P<audit_id>[\w-]+)")
+    def preview_modification_audit(self, audit_id: str, *args: tuple, **kwargs: dict) -> response.Response:
+        if not UUID_V4_REGEX.match(audit_id):
             return response.Response(status=status.HTTP_404_NOT_FOUND)
 
-        return response.Response(data=self.get_serializer(mod_audit.apply_modification(save=False)).data)
+        if not (audit := ModificationAudit.objects.filter_by_instance(self.get_object()).filter(id=audit_id).first()):
+            return response.Response(status=status.HTTP_404_NOT_FOUND)
+
+        return response.Response(data=audit.get_applied_data(serializer_class=self.get_serializer()))
