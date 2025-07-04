@@ -42,4 +42,4 @@ class PublicFilePortalViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         instance = serializer.save()
 
-        return response.Response(data=PublicFilePortalUploadSerializer(instance).data, status=status.HTTP_201_CREATED)
+        return response.Response(data=PublicFilePortalSerializer(instance).data, status=status.HTTP_201_CREATED)
