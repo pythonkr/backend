@@ -68,7 +68,7 @@ class ModificationAudit(BaseAbstractModel):
             if isinstance(orig_value, list):
                 sub_mod_value_map: dict[str, typing.Any] = {v["id"]: v for v in mod_data}
                 new_value = []
-                for orig_sub_value in orig_value[field]:
+                for orig_sub_value in orig_value:
                     if not isinstance(orig_sub_value, dict) or not (sub_value_id := orig_sub_value.get("id")):
                         continue
 
