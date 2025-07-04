@@ -355,6 +355,9 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "PyCon KR Backend API",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
+    "SWAGGER_UI_SETTINGS": {
+        "docExpansion": "none",  # Collapse all endpoints by default
+    },
 }
 
 # Sentry Settings
