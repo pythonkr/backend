@@ -61,23 +61,35 @@ class ModificationAudit(BaseAbstractModel):
     def apply_modification(self, save: bool = False) -> models.Model:
         for field, value in self.modification_data.items():
             if isinstance(value, list):
-                if not (sub_qs := getattr(self.instance, field, None)):
+                # One to Many case
+                sub_value_map = {sub_value["id"]: sub_value for sub_value in value}
+                if not (sub_instances := list(getattr(self.instance, field).filter(pk__in=sub_value_map))):
                     continue
-                if not isinstance(sub_qs, models.manager.BaseManager):
-                    continue
-                for sub_value in value:
-                    if not isinstance(sub_value, dict):
-                        continue
-                    if not (sub_instance_id := sub_value.get("id")):
-                        continue
-                    sub_qs.filter(pk=sub_instance_id).update(**sub_value)
+
+                for sub_instance in sub_instances:
+                    sub_data = sub_value_map.get[str(sub_instance.pk)]
+                    for sub_field, sub_value in sub_data.items():
+                        setattr(sub_instance, sub_field, sub_value)
+
+                    if save:
+                        sub_instance.save()
+
+                if not save:
+                    setattr(self.instance, field, sub_instances)
             elif isinstance(value, dict):
+                # One to One case
                 if not (sub_instance := getattr(self.instance, field, None)):
                     continue
+
                 for sub_field, sub_value in value.items():
                     setattr(sub_instance, sub_field, sub_value)
-                sub_instance.save()
+
+                if save:
+                    sub_instance.save()
+                else:
+                    setattr(self.instance, field, sub_instance)
             else:
+                # 일반 필드 업데이트
                 setattr(self.instance, field, value)
 
         if save:

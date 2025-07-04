@@ -41,6 +41,51 @@ class ModificationAuditResponsePortalSerializer(serializers.ModelSerializer):
         )
 
 
+def _model_to_jsonable_dict(instance: models.Model, new_data: dict) -> dict[str, str | None]:
+    """모델 인스턴스를 JSON 직렬화 가능한 딕셔너리로 변환합니다."""
+    if not instance:
+        return {}
+
+    data: dict[str, str | None] = {}
+    for field, value in new_data.items():
+        if not hasattr(instance, field):
+            continue
+
+        if isinstance(value, list):
+            sub_data = []
+
+            for sub_value in value:
+                # One to Many case
+                if not isinstance(sub_value, dict) or "id" not in sub_value:
+                    continue
+                sub_qs = getattr(instance, field, None)
+                if not isinstance(sub_qs, models.manager.BaseManager):
+                    continue
+                if not (sub_instance := sub_qs.filter(pk=sub_value["id"]).first()):
+                    continue
+
+                sub_data.append(_model_to_jsonable_dict(sub_instance, sub_value))
+
+            if sub_data:
+                data[field] = sub_data
+
+        elif isinstance(value, dict):
+            # One to One case
+            if not (sub_instance := getattr(instance, field, None)):
+                continue
+
+            data[field] = _model_to_jsonable_dict(sub_instance, value)
+
+        elif getattr(instance, field) != value:
+            if isinstance(value, models.Model):
+                field = f"{getattr(instance._meta.model, field).field.name}_id"
+                value = str(value.pk)
+
+            data[field] = value
+
+    return data
+
+
 class ModificationAuditCreationPortalSerializer(serializers.ModelSerializer):
     has_requested_modification_audit = serializers.SerializerMethodField()
     requested_modification_audit_id = serializers.SerializerMethodField()
@@ -76,29 +121,16 @@ class ModificationAuditCreationPortalSerializer(serializers.ModelSerializer):
                 "Please cancel the existing request and try again."
             )
 
-        modification_data: dict[str, str | None] = {}
-        for field, value in attrs.items():
-            if hasattr(self.instance, field) and getattr(self.instance, field) != value:
-                if isinstance(value, models.Model):
-                    field = f"{getattr(self.instance._meta.model, field).field.name}_id"
-                    value = str(value.pk)
-
-                modification_data[field] = value
-
-        if not modification_data:
+        if not (modification_data := _model_to_jsonable_dict(self.instance, attrs)):
             raise serializers.ValidationError("변경된 데이터가 없습니다.\nNo modification data provided.")
 
         return modification_data
 
     def save(self, **kwargs: dict) -> models.Model:
         """instance.save()를 호출하는 대신, 변경된 데이터를 추출하여 ModificationAudit 인스턴스를 생성합니다."""
-        ModificationAudit.objects.create(instance=self.instance, modification_data=self.validated_data)
-
-        for field, value in self.validated_data.items():
-            if hasattr(self.instance, field):
-                setattr(self.instance, field, value)
-
-        return self.instance
+        return ModificationAudit.objects.create(
+            instance=self.instance, modification_data=self.validated_data
+        ).apply_modification(save=False)
 
 
 class ModificationAuditCancelPortalSerializer(serializers.ModelSerializer):
