@@ -11,3 +11,7 @@ class OpenAPITag:
     ADMIN_EVENT_PRESENTATION = "Admin > Event > Presentation"
     ADMIN_EVENT_SPONSOR = "Admin > Event > Sponsor"
     ADMIN_JSON_SCHEMA = "Admin > JSON Schema"
+
+    PARTICIPANT_PORTAL_USER = "Participant Portal > Sign-In & Sign-Out & My Profile"
+    PARTICIPANT_PORTAL_PUBLIC_FILE = "Participant Portal > Public File"
+    PARTICIPANT_PORTAL_PRESENTATION = "Participant Portal > Presentation"

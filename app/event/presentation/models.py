@@ -62,6 +62,7 @@ class PresentationCategory(BaseAbstractModel):
 class Presentation(BaseAbstractModel):
     type = models.ForeignKey(PresentationType, on_delete=models.PROTECT)
     title = models.CharField(max_length=256)
+    summary = models.TextField(blank=True, default="")
     description = MarkdownField(blank=True, default="")
     image = models.ForeignKey(PublicFile, on_delete=models.PROTECT, null=True, blank=True)
     categories = models.ManyToManyField(to="PresentationCategory", through="PresentationCategoryRelation")
