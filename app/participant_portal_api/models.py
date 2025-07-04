@@ -1,21 +1,61 @@
+import contextlib
 import typing
 
 from core.models import BaseAbstractModel, BaseAbstractModelQuerySet
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import FieldDoesNotExist
 from django.db import models
 from event.presentation.models import Presentation, PresentationSpeaker
+from rest_framework import serializers
 from user.models import UserExt
+
+T = typing.TypeVar("T", bound=models.Model)
+
+
+def _apply_dict_to_model(instance: T, data: dict, save: bool = False) -> T:
+    model_class = type(instance)
+
+    for field_name, value in data.items():
+        with contextlib.suppress(FieldDoesNotExist):
+            field = model_class._meta.get_field(field_name)
+
+            if isinstance(field, models.ForeignKey):
+                # One to One or One to Many case
+                if isinstance(value, dict):
+                    if not (sub_instance := field.related_model.objects.filter(pk=value.get("id")).first()):
+                        continue
+                    setattr(instance, field_name, _apply_dict_to_model(sub_instance, value), save)
+                elif isinstance(value, (int, str)):
+                    if not (sub_instance := field.related_model.objects.filter(pk=value).first()):
+                        continue
+                    setattr(instance, field_name, sub_instance.pk if field_name.endswith("_id") else sub_instance)
+            elif isinstance(field, models.ManyToOneRel):
+                if save:
+                    if not all(isinstance(v, dict) and "id" in v for v in value):
+                        continue
+                    for sub_value in value:
+                        getattr(instance, field).filter(pk=sub_value.pop("id")).update(**sub_value)
+            else:
+                # 일반 필드 업데이트
+                setattr(instance, field_name, value)
+
+    if save:
+        instance.save()
+
+    return instance
 
 
 class ModificationAuditQuerySet(BaseAbstractModelQuerySet):
-    def filter_requested(self, instance: models.Model) -> typing.Self:
+    def filter_by_instance(self, instance: models.Model) -> typing.Self:
         return self.filter_active().filter(
             instance_type__app_label=instance._meta.app_label,
             instance_type__model=instance._meta.model_name,
             instance_id=str(instance.pk),
-            status=ModificationAudit.Status.REQUESTED,
         )
+
+    def filter_requested(self, instance: models.Model) -> typing.Self:
+        return self.filter_active().filter_by_instance(instance).filter(status=ModificationAudit.Status.REQUESTED)
 
 
 class ModificationAudit(BaseAbstractModel):
@@ -58,41 +98,32 @@ class ModificationAudit(BaseAbstractModel):
     def __str__(self) -> str:
         return str(self.instance)
 
-    def apply_modification(self, save: bool = False) -> models.Model:
-        for field, value in self.modification_data.items():
-            if isinstance(value, list):
-                # One to Many case
-                sub_value_map = {sub_value["id"]: sub_value for sub_value in value}
-                if not (sub_instances := list(getattr(self.instance, field).filter(pk__in=sub_value_map))):
+    def get_applied_data(self, serializer_class: type[serializers.ModelSerializer]) -> dict:
+        one_to_many: dict[str, dict[str, dict[str, typing.Any]]] = {
+            k: {sv["id"]: sv for sv in v}
+            for k, v in self.modification_data.items()
+            if isinstance(v, list) and all(isinstance(i, dict) and "id" in i for i in v)
+        }
+
+        modified_instance = _apply_dict_to_model(instance=self.instance, data=self.modification_data, save=False)
+        modified_data = serializer_class(instance=modified_instance).data
+
+        for field_name, mod_values in one_to_many.items():
+            if field_name not in modified_data:
+                continue
+
+            for field_value in modified_data[field_name]:
+                if not (isinstance(field_value, dict) and (value_id := field_value.get("id"))):
                     continue
 
-                for sub_instance in sub_instances:
-                    sub_data = sub_value_map[str(sub_instance.pk)]
-                    for sub_field, sub_value in sub_data.items():
-                        setattr(sub_instance, sub_field, sub_value)
+                if value_id in mod_values:
+                    # 기존 값에 수정된 값을 병합합니다.
+                    field_value.update(mod_values[value_id])
 
-                    if save:
-                        sub_instance.save()
-            elif isinstance(value, dict):
-                # One to One case
-                if not (sub_instance := getattr(self.instance, field, None)):
-                    continue
+        return modified_data
 
-                for sub_field, sub_value in value.items():
-                    setattr(sub_instance, sub_field, sub_value)
-
-                if save:
-                    sub_instance.save()
-                else:
-                    setattr(self.instance, field, sub_instance)
-            else:
-                # 일반 필드 업데이트
-                setattr(self.instance, field, value)
-
-        if save:
-            self.instance.save()
-
-        return self.instance
+    def apply_modification(self) -> models.Model:
+        return _apply_dict_to_model(instance=self.instance, data=self.modification_data, save=True)
 
 
 class ModificationAuditComment(BaseAbstractModel):
