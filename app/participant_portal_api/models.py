@@ -1,3 +1,4 @@
+import copy
 import typing
 
 from core.models import BaseAbstractModel, BaseAbstractModelQuerySet
@@ -58,21 +59,38 @@ class ModificationAudit(BaseAbstractModel):
     def __str__(self) -> str:
         return str(self.instance)
 
-    def apply_modification(self, save: bool = False) -> models.Model:
+    def join_modification_data(self, data: dict) -> dict:
+        new_data: dict[str, typing.Any] = copy.deepcopy(self.modification_data)
+        for field, orig_value in data.items():
+            if not (mod_data := self.modification_data.get(field)):
+                continue
+
+            if isinstance(orig_value, list):
+                sub_mod_value_map: dict[str, typing.Any] = {v["id"]: v for v in mod_data}
+                new_value = []
+                for orig_sub_value in orig_value[field]:
+                    if not isinstance(orig_sub_value, dict) or not (sub_value_id := orig_sub_value.get("id")):
+                        continue
+
+                    new_value.append(orig_sub_value | sub_mod_value_map.get(sub_value_id, {}))
+
+                new_data[field] = new_value
+            elif isinstance(orig_value, dict):
+                # One to One case
+                new_data[field] = orig_value | mod_data
+            else:
+                # 일반 필드 업데이트
+                new_data[field] = mod_data
+
+        return new_data
+
+    def apply_modification(self) -> models.Model:
         for field, value in self.modification_data.items():
             if isinstance(value, list):
                 # One to Many case
-                sub_value_map = {sub_value["id"]: sub_value for sub_value in value}
-                if not (sub_instances := list(getattr(self.instance, field).filter(pk__in=sub_value_map))):
-                    continue
+                for sub_value in value:
+                    getattr(self.instance, field).filter(pk=sub_value.pop("id")).update(**sub_value)
 
-                for sub_instance in sub_instances:
-                    sub_data = sub_value_map[str(sub_instance.pk)]
-                    for sub_field, sub_value in sub_data.items():
-                        setattr(sub_instance, sub_field, sub_value)
-
-                    if save:
-                        sub_instance.save()
             elif isinstance(value, dict):
                 # One to One case
                 if not (sub_instance := getattr(self.instance, field, None)):
@@ -81,16 +99,12 @@ class ModificationAudit(BaseAbstractModel):
                 for sub_field, sub_value in value.items():
                     setattr(sub_instance, sub_field, sub_value)
 
-                if save:
-                    sub_instance.save()
-                else:
-                    setattr(self.instance, field, sub_instance)
+                sub_instance.save()
             else:
                 # 일반 필드 업데이트
                 setattr(self.instance, field, value)
 
-        if save:
-            self.instance.save()
+        self.instance.save()
 
         return self.instance
 

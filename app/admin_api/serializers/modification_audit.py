@@ -49,7 +49,8 @@ class ModificationAuditApprovalAdminSerializer(serializers.ModelSerializer):
     def save(self, **kwargs: dict) -> ModificationAudit:
         instance: ModificationAudit = self.instance
         instance.status = ModificationAudit.Status.APPROVED
-        instance.apply_modification(save=True)
+        instance.apply_modification()
+        instance.save()
 
         return instance
 
