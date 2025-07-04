@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import typing
+
 from admin_api.filtersets.event.presentation import (
     PresentationAdminFilterSet,
     PresentationCategoryAdminFilterSet,
@@ -21,7 +23,8 @@ from event.presentation.models import (
     PresentationSpeaker,
     PresentationType,
 )
-from rest_framework import viewsets
+from participant_portal_api.models import ModificationAudit
+from rest_framework import decorators, request, response, status, viewsets
 
 ADMIN_METHODS = ["list", "retrieve", "create", "update", "partial_update", "destroy"]
 
@@ -51,6 +54,18 @@ class PresentationAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     filterset_class = PresentationAdminFilterSet
     queryset = Presentation.objects.get_all_nested_data().select_related("created_by", "updated_by", "deleted_by")
 
+    @extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION])
+    @decorators.action(detail=True, methods=["get"], url_path="preview")
+    def preview_modification_audit(self, request: request.Request, *args: tuple, **kwargs: dict) -> response.Response:
+        if not (
+            mod_audit := typing.cast(
+                ModificationAudit | None, ModificationAudit.objects.filter_requested(self.get_object()).first()
+            )
+        ):
+            return response.Response(status=status.HTTP_404_NOT_FOUND)
+
+        return response.Response(data=self.get_serializer(mod_audit.apply_modification(save=False)).data)
+
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION]) for m in ADMIN_METHODS})
 class PresentationSpeakerAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
@@ -59,3 +74,15 @@ class PresentationSpeakerAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     permission_classes = [IsSuperUser]
     filterset_class = PresentationSpeakerAdminFilterSet
     queryset = PresentationSpeaker.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")
+
+    @extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION])
+    @decorators.action(detail=True, methods=["get"], url_path="preview")
+    def preview_modification_audit(self, request: request.Request, *args: tuple, **kwargs: dict) -> response.Response:
+        if not (
+            mod_audit := typing.cast(
+                ModificationAudit | None, ModificationAudit.objects.filter_requested(self.get_object()).first()
+            )
+        ):
+            return response.Response(status=status.HTTP_404_NOT_FOUND)
+
+        return response.Response(data=self.get_serializer(mod_audit.apply_modification(save=False)).data)

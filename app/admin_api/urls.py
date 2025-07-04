@@ -8,6 +8,7 @@ from admin_api.views.event.presentation import (
 )
 from admin_api.views.event.sponsor import SponsorAdminViewSet, SponsorTagAdminViewSet, SponsorTierAdminViewSet
 from admin_api.views.file import PublicFileAdminViewSet
+from admin_api.views.modification_audit import ModificationAuditAdminViewSet
 from admin_api.views.user import OrganizationAdminViewSet, UserAdminViewSet
 from django.urls import include, path
 from rest_framework import routers
@@ -33,9 +34,15 @@ admin_event_router.register("presentationcategory", PresentationCategoryAdminVie
 admin_event_router.register("presentation", PresentationAdminViewSet)
 admin_event_router.register("presentationspeaker", PresentationSpeakerAdminViewSet)
 
+admin_modificationaudit_router = routers.SimpleRouter()
+admin_modificationaudit_router.register(
+    "modification-audit", ModificationAuditAdminViewSet, basename="admin-modification-audit"
+)
+
 urlpatterns = [
     path("cms/", include(admin_cms_router.urls)),
     path("file/", include(admin_file_router.urls)),
     path("user/", include(admin_user_router.urls)),
     path("event/", include(admin_event_router.urls)),
+    path("modification-audit/", include(admin_modificationaudit_router.urls)),
 ]

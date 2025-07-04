@@ -1,6 +1,7 @@
 from core.util.thread_local import get_current_user
 from event.presentation.models import Presentation, PresentationSpeaker
 from file.models import PublicFile
+from participant_portal_api.serializers.modification_audit import ModificationAuditCreationPortalSerializer
 from rest_framework import serializers
 
 
@@ -12,7 +13,7 @@ class PresentationSpeakerPortalSerializer(serializers.ModelSerializer):
         fields = ("id", "biography_ko", "biography_en", "image", "user")
 
 
-class PresentationPortalSerializer(serializers.ModelSerializer):
+class PresentationPortalSerializer(ModificationAuditCreationPortalSerializer, serializers.ModelSerializer):
     title = serializers.CharField(read_only=True)
     summary = serializers.CharField(read_only=True)
     description = serializers.CharField(read_only=True)
@@ -35,6 +36,8 @@ class PresentationPortalSerializer(serializers.ModelSerializer):
             "description_en",
             "image",
             "speakers",
+            "has_requested_modification_audit",
+            "requested_modification_audit_id",
         )
 
     def to_representation(self, instance):
