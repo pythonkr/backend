@@ -18,7 +18,7 @@ class PublicFilePortalUploadSerializer(serializers.Serializer):
         new_file = PublicFile(file=validated_data["file"])
         new_file.clean()
 
-        if new_file.hash and (pf := PublicFile.objects.filter(hash=new_file.hash).exists()):
+        if new_file.hash and (pf := PublicFile.objects.filter(hash=new_file.hash).first()):
             return pf
 
         new_file.save()
