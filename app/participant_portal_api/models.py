@@ -73,9 +73,6 @@ class ModificationAudit(BaseAbstractModel):
 
                     if save:
                         sub_instance.save()
-
-                if not save:
-                    setattr(self.instance, field, sub_instances)
             elif isinstance(value, dict):
                 # One to One case
                 if not (sub_instance := getattr(self.instance, field, None)):
