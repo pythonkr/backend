@@ -1,3 +1,5 @@
+import typing
+
 from admin_api.serializers.user import (
     OrganizationAdminSerializer,
     UserAdminPasswordChangeSerializer,
@@ -10,6 +12,7 @@ from core.permissions import IsSuperUser
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from django.contrib.auth import login, logout
 from drf_spectacular.utils import extend_schema, extend_schema_view
+from participant_portal_api.models import ModificationAudit
 from rest_framework import decorators, mixins, request, response, status, viewsets
 from user.models import UserExt
 from user.models.organization import Organization
@@ -77,6 +80,18 @@ class UserAdminViewSet(
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return response.Response(data=UserAdminSerializer(serializer.instance).data)
+
+    @extend_schema(tags=[OpenAPITag.ADMIN_USER])
+    @decorators.action(detail=True, methods=["get"], url_path="preview")
+    def preview_modification_audit(self, request: request.Request, *args: tuple, **kwargs: dict) -> response.Response:
+        if not (
+            mod_audit := typing.cast(
+                ModificationAudit | None, ModificationAudit.objects.filter_requested(self.get_object()).first()
+            )
+        ):
+            return response.Response(status=status.HTTP_404_NOT_FOUND)
+
+        return response.Response(data=self.get_serializer(mod_audit.apply_modification(save=False)).data)
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_USER]) for m in ADMIN_METHODS})

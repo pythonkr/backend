@@ -5,6 +5,7 @@ import unicodedata
 from core.serializer.read_only_serializer import ReadOnlyModelSerializer
 from core.util.thread_local import get_current_user
 from file.models import PublicFile
+from participant_portal_api.serializers.modification_audit import ModificationAuditCreationPortalSerializer
 from rest_framework import serializers
 from user.models import UserExt
 
@@ -13,7 +14,7 @@ def normalize_str(value: str) -> str:
     return unicodedata.normalize("NFC", value).strip() if value else ""
 
 
-class UserPortalSerializer(serializers.ModelSerializer):
+class UserPortalSerializer(ModificationAuditCreationPortalSerializer, serializers.ModelSerializer):
     id = serializers.IntegerField(read_only=True)
     email = serializers.EmailField(read_only=True)
     nickname = serializers.CharField(read_only=True)  # django-modeltranslation에 의해 accept-language에 따라 응답됨
@@ -23,7 +24,18 @@ class UserPortalSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserExt
-        fields = ("id", "email", "profile_image", "username", "nickname", "nickname_ko", "nickname_en", "image")
+        fields = (
+            "id",
+            "email",
+            "profile_image",
+            "username",
+            "nickname",
+            "nickname_ko",
+            "nickname_en",
+            "image",
+            "has_requested_modification_audit",
+            "requested_modification_audit_id",
+        )
 
     def validate_image(self, image: PublicFile | None) -> PublicFile | None:
         if not image:

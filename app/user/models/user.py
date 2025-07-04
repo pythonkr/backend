@@ -3,7 +3,7 @@ from django.db import models
 
 
 class UserExt(AbstractUser):
-    image = models.ForeignKey("file.PublicFile", on_delete=models.PROTECT, null=True, blank=True)
+    # image = models.ForeignKey("file.PublicFile", on_delete=models.PROTECT, null=True, blank=True)
     nickname = models.CharField(max_length=128, null=True, blank=True)
 
     class Meta:
@@ -20,4 +20,4 @@ class UserExt(AbstractUser):
         ]
 
     def __str__(self):
-        return f"{self.nickname} <{self.email}>"
+        return f"[User] {self.nickname} <{self.email}>"

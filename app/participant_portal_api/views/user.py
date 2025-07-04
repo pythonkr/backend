@@ -1,6 +1,9 @@
+import typing
+
 from core.const.tag import OpenAPITag
 from django.contrib.auth import login, logout
 from drf_spectacular.utils import extend_schema
+from participant_portal_api.models import ModificationAudit
 from participant_portal_api.permissions import IsSessionSpeaker
 from participant_portal_api.serializers.user import (
     UserPortalPasswordChangeSerializer,
@@ -41,6 +44,18 @@ class UserPortalViewSet(viewsets.GenericViewSet):
         instance = serializer.save()
 
         return response.Response(data=UserPortalSerializer(instance).data)
+
+    @extend_schema(tags=[OpenAPITag.PARTICIPANT_PORTAL_PRESENTATION])
+    @decorators.action(detail=False, methods=["get"], url_path="me/preview")
+    def preview_modification_audit(self, request: request.Request, *args: tuple, **kwargs: dict) -> response.Response:
+        if not (
+            mod_audit := typing.cast(
+                ModificationAudit | None, ModificationAudit.objects.filter_requested(request.user).first()
+            )
+        ):
+            return response.Response(status=status.HTTP_404_NOT_FOUND)
+
+        return response.Response(data=self.get_serializer(mod_audit.apply_modification(save=False)).data)
 
     @extend_schema(
         tags=[OpenAPITag.PARTICIPANT_PORTAL_USER],
