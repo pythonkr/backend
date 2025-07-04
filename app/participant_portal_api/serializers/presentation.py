@@ -16,6 +16,10 @@ class PresentationSpeakerPortalSerializer(serializers.ModelSerializer):
         model = PresentationSpeaker
         fields = ("id", "biography_ko", "biography_en", "image", "user")
 
+    def to_internal_value(self, data: dict) -> dict:
+        """Override to_internal_value to ensure that the 'id' field is included in the validated data."""
+        return super().to_internal_value(data) | {"id": data.get("id")}
+
 
 class PresentationSpeakerPortalData(typing.TypedDict):
     id: str | uuid.UUID
@@ -70,22 +74,19 @@ class PresentationPortalSerializer(ModificationAuditCreationPortalSerializer, se
 
         return result
 
-    def validate(self, attrs: dict) -> dict:
-        attrs = super().validate(attrs)
-
-        speakers = typing.cast(list[PresentationSpeakerPortalData], attrs["speakers"])
-        if not isinstance(speakers, list):
+    def validate_speakers(self, value: list[PresentationSpeakerPortalData]) -> list[PresentationSpeakerPortalData]:
+        if not isinstance(value, list):
             raise serializers.ValidationError("Speakers must be a list.")
 
-        for speaker_data in speakers:
-            if not (speaker_instance := self.get_speaker_instance(speaker_data["id"])):
+        for speaker_data in value:
+            if not isinstance(speaker_data, dict):
+                raise serializers.ValidationError("Each speaker must be a dictionary.")
+
+            if "id" not in speaker_data or not speaker_data["id"]:
+                raise serializers.ValidationError("Each speaker must have a valid ID.")
+
+            if not self.get_speaker_instance(speaker_data["id"]):
                 err_msg = f"Speaker with ID {speaker_data['id']} not found or does not belong to this presentation."
                 raise serializers.ValidationError(err_msg)
 
-            PresentationSpeakerPortalSerializer(
-                instance=speaker_instance,
-                data=speaker_data,
-                partial=True,
-            ).is_valid(raise_exception=True)
-
-        return attrs
+        return value
