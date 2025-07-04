@@ -1,4 +1,8 @@
+import typing
+import uuid
+
 from core.util.thread_local import get_current_user
+from django.db import transaction
 from event.presentation.models import Presentation, PresentationSpeaker
 from file.models import PublicFile
 from participant_portal_api.serializers.modification_audit import ModificationAuditCreationPortalSerializer
@@ -7,10 +11,18 @@ from rest_framework import serializers
 
 class PresentationSpeakerPortalSerializer(serializers.ModelSerializer):
     image = serializers.PrimaryKeyRelatedField(queryset=PublicFile.objects.filter_active(), allow_null=True)
+    user = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = PresentationSpeaker
         fields = ("id", "biography_ko", "biography_en", "image", "user")
+
+
+class PresentationSpeakerPortalData(typing.TypedDict):
+    id: str | uuid.UUID
+    biography_ko: str | None
+    biography_en: str | None
+    image: str | uuid.UUID | None
 
 
 class PresentationPortalSerializer(ModificationAuditCreationPortalSerializer, serializers.ModelSerializer):
@@ -19,7 +31,7 @@ class PresentationPortalSerializer(ModificationAuditCreationPortalSerializer, se
     description = serializers.CharField(read_only=True)
 
     image = serializers.PrimaryKeyRelatedField(queryset=PublicFile.objects.filter_active(), allow_null=True)
-    speakers = PresentationSpeakerPortalSerializer(many=True, read_only=True)
+    speakers = PresentationSpeakerPortalSerializer(many=True, required=True)
 
     class Meta:
         model = Presentation
@@ -40,6 +52,17 @@ class PresentationPortalSerializer(ModificationAuditCreationPortalSerializer, se
             "requested_modification_audit_id",
         )
 
+    def get_speaker_instance(self, speaker_id: str | uuid.UUID) -> PresentationSpeaker | None:
+        return (
+            PresentationSpeaker.objects.filter_active()
+            .filter(
+                presentation=self.instance,
+                id=speaker_id,
+                user=get_current_user(),
+            )
+            .first()
+        )
+
     def to_representation(self, instance):
         result = super().to_representation(instance)
 
@@ -47,3 +70,28 @@ class PresentationPortalSerializer(ModificationAuditCreationPortalSerializer, se
             result["speakers"] = [s for s in speakers if s["user"] == current_user.pk]
 
         return result
+
+    def create(self, validated_data):
+        raise NotImplementedError("Creation of presentations is not allowed in the participant portal.")
+
+    @transaction.atomic
+    def update(self, presentation, validated_data):
+        speakers = typing.cast(list[PresentationSpeakerPortalData], validated_data["speakers"])
+        if not isinstance(speakers, list):
+            raise serializers.ValidationError("Speakers must be a list.")
+
+        for speaker_data in speakers:
+            if not (speaker_instance := self.get_speaker_instance(speaker_data["id"])):
+                raise serializers.ValidationError(
+                    f"Speaker with ID {speaker_data['id']} not found or does not belong to this presentation."
+                )
+
+            speaker_serializer = PresentationSpeakerPortalSerializer(
+                instance=speaker_instance,
+                data=speaker_data,
+                partial=True,
+            )
+            speaker_serializer.is_valid(raise_exception=True)
+            speaker_serializer.save()
+
+        return super().update(presentation, validated_data)
