@@ -21,11 +21,14 @@ class ModificationAuditResponseAdminSerializer(serializers.ModelSerializer):
 
     class ModificationAuditResponseInstanceAdminSerializer(serializers.Serializer):
         model = serializers.CharField(source="instance_type.model")
-        app = serializers.CharField(source="instance_type.app_label")
+        app = serializers.SerializerMethodField(read_only=True)
         id = serializers.CharField(source="instance_id")
 
         class Meta:
             fields = read_only_fields = ("model", "app", "id")
+
+        def get_app(self, obj: ModificationAudit) -> str:
+            return type(obj.instance).__module__.split(".")[0]
 
     comments = ModificationAuditCommentAdminSerializer(many=True, read_only=True)
     str_repr = serializers.CharField(source="__str__", read_only=True)
