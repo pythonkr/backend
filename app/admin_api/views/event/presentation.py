@@ -23,7 +23,7 @@ from event.presentation.models import (
     PresentationType,
 )
 from participant_portal_api.models import ModificationAudit
-from rest_framework import decorators, response, status, viewsets
+from rest_framework import decorators, request, response, status, viewsets
 
 ADMIN_METHODS = ["list", "retrieve", "create", "update", "partial_update", "destroy"]
 
@@ -55,7 +55,9 @@ class PresentationAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
 
     @extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION])
     @decorators.action(detail=True, methods=["get"], url_path=r"preview/(?P<audit_id>[\w-]+)")
-    def preview_modification_audit(self, audit_id: str, *args: tuple, **kwargs: dict) -> response.Response:
+    def preview_modification_audit(
+        self, request: request.Request, audit_id: str, *args: tuple, **kwargs: dict
+    ) -> response.Response:
         if not UUID_V4_REGEX.match(audit_id):
             return response.Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -75,7 +77,9 @@ class PresentationSpeakerAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
 
     @extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION])
     @decorators.action(detail=True, methods=["get"], url_path=r"preview/(?P<audit_id>[\w-]+)")
-    def preview_modification_audit(self, audit_id: str, *args: tuple, **kwargs: dict) -> response.Response:
+    def preview_modification_audit(
+        self, request: request.Request, audit_id: str, *args: tuple, **kwargs: dict
+    ) -> response.Response:
         if not UUID_V4_REGEX.match(audit_id):
             return response.Response(status=status.HTTP_404_NOT_FOUND)
 

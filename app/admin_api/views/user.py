@@ -82,7 +82,9 @@ class UserAdminViewSet(
 
     @extend_schema(tags=[OpenAPITag.ADMIN_USER])
     @decorators.action(detail=True, methods=["get"], url_path=r"preview/(?P<audit_id>[\w-]+)")
-    def preview_modification_audit(self, audit_id: str, *args: tuple, **kwargs: dict) -> response.Response:
+    def preview_modification_audit(
+        self, request: request.Request, audit_id: str, *args: tuple, **kwargs: dict
+    ) -> response.Response:
         if not UUID_V4_REGEX.match(audit_id):
             return response.Response(status=status.HTTP_404_NOT_FOUND)
 
