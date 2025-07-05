@@ -89,7 +89,7 @@ class UserAdminViewSet(
         if not (audit := ModificationAudit.objects.filter_by_instance(self.get_object()).filter(id=audit_id).first()):
             return response.Response(status=status.HTTP_404_NOT_FOUND)
 
-        return response.Response(data=audit.get_applied_data(serializer_class=self.get_serializer()))
+        return response.Response(data=audit.get_applied_data(serializer_class=self.get_serializer_class()))
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_USER]) for m in ADMIN_METHODS})
