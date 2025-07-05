@@ -24,6 +24,9 @@ class ModificationAuditResponseAdminSerializer(serializers.ModelSerializer):
         app = serializers.CharField(source="instance_type.app_label")
         id = serializers.CharField(source="instance_id")
 
+        class Meta:
+            fields = read_only_fields = ("model", "app", "id")
+
     comments = ModificationAuditCommentAdminSerializer(many=True, read_only=True)
     str_repr = serializers.CharField(source="__str__", read_only=True)
     instance = ModificationAuditResponseInstanceAdminSerializer(source="*", read_only=True)
