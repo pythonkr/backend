@@ -42,7 +42,7 @@ class PresentationPortalViewSet(
     def retrieve(self, *args, **kwargs):
         """발표 조회 시, 수정 요청이 있는 경우 해당 요청의 ID를 포함하여 응답"""
         instance = self.get_object()
-        serializer_class = self.get_serializer()
+        serializer_class = self.get_serializer_class()
 
         if audit := ModificationAudit.objects.filter_requested(instance).first():
             data = audit.get_applied_data(serializer_class=serializer_class)
