@@ -19,8 +19,14 @@ class ModificationAuditResponseAdminSerializer(serializers.ModelSerializer):
             model = ModificationAuditComment
             fields = read_only_fields = ("id", "content", "created_at", "created_by", "updated_at")
 
+    class ModificationAuditResponseInstanceAdminSerializer(serializers.Serializer):
+        model = serializers.CharField(source="instance_type.model")
+        app = serializers.CharField(source="instance_type.app_label")
+        id = serializers.CharField(source="instance_id")
+
     comments = ModificationAuditCommentAdminSerializer(many=True, read_only=True)
     str_repr = serializers.CharField(source="__str__", read_only=True)
+    instance = ModificationAuditResponseInstanceAdminSerializer(source="*", read_only=True)
 
     class Meta:
         model = ModificationAudit
@@ -29,6 +35,7 @@ class ModificationAuditResponseAdminSerializer(serializers.ModelSerializer):
             "status",
             "created_at",
             "updated_at",
+            "instance",
             "modification_data",
             "comments",
             "str_repr",
