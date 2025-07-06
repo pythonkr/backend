@@ -10,6 +10,6 @@ def test_count_queries(
     django_assert_max_num_queries: DjangoAssertNumQueries, create_presentation_set: PresentationTestEntity
 ):
     reset_queries()
-    with django_assert_max_num_queries(3):
+    with django_assert_max_num_queries(5):
         queryset = Presentation.objects.get_all_nested_data()
         list(queryset)  # query evaluation

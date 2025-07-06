@@ -11,17 +11,31 @@ User = get_user_model()
 
 class PresentationQuerySet(BaseAbstractModelQuerySet):
     def get_all_nested_data(self):
-        return self.filter_active().prefetch_related(
-            models.Prefetch(
-                lookup="categories",
-                queryset=PresentationCategory.objects.filter_active(),
-                to_attr="_prefetched_active_categories",
-            ),
-            models.Prefetch(
-                lookup="speakers",
-                queryset=PresentationSpeaker.objects.filter_active().select_related("user"),
-                to_attr="_prefetched_active_speakers",
-            ),
+        return (
+            self.filter_active()
+            .prefetch_related(
+                models.Prefetch(
+                    lookup="categories",
+                    queryset=PresentationCategory.objects.filter_active(),
+                    to_attr="_prefetched_active_categories",
+                ),
+                models.Prefetch(
+                    lookup="speakers",
+                    queryset=PresentationSpeaker.objects.filter_active().select_related("user", "image"),
+                    to_attr="_prefetched_active_speakers",
+                ),
+                models.Prefetch(
+                    lookup="roomschedule_set",
+                    queryset=RoomSchedule.objects.filter_active().select_related("room", "room__event"),
+                    to_attr="_prefetched_active_room_schedules",
+                ),
+                models.Prefetch(
+                    lookup="call_for_presentation_schedules",
+                    queryset=CallForPresentationSchedule.objects.filter_active().select_related("presentation_type"),
+                    to_attr="_prefetched_active_call_for_presentation_schedules",
+                ),
+            )
+            .select_related("image")
         )
 
 
@@ -83,3 +97,25 @@ class PresentationSpeaker(BaseAbstractModel):
     user = models.ForeignKey(User, on_delete=models.PROTECT)
     image = models.ForeignKey(PublicFile, on_delete=models.PROTECT, null=True, blank=True)
     biography = MarkdownField(blank=True, default="")
+
+
+class CallForPresentationSchedule(BaseAbstractModel):
+    presentation_type = models.ForeignKey(PresentationType, on_delete=models.PROTECT)
+    presentation = models.ForeignKey(
+        Presentation, on_delete=models.PROTECT, related_name="call_for_presentation_schedules", null=True, blank=True
+    )
+    start_at = models.DateTimeField()
+    end_at = models.DateTimeField()
+    next_call_for_presentation_schedule = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True)
+
+
+class Room(BaseAbstractModel):
+    event = models.ForeignKey(Event, on_delete=models.PROTECT)
+    name = models.CharField(max_length=256)
+
+
+class RoomSchedule(BaseAbstractModel):
+    room = models.ForeignKey(Room, on_delete=models.PROTECT)
+    start_at = models.DateTimeField()
+    end_at = models.DateTimeField()
+    presentation = models.ForeignKey(Presentation, on_delete=models.PROTECT, null=True, blank=True)
