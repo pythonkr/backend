@@ -1,27 +1,30 @@
-from core.const.regex import UUID_V4_REGEX
 from core.const.tag import OpenAPITag
-from django.db.models import QuerySet
+from core.models import BaseAbstractModelQuerySet
+from django.db.models import Q
 from django.utils.decorators import method_decorator
 from django_filters import rest_framework as filters
 from django_filters.constants import EMPTY_VALUES
 from drf_spectacular.utils import extend_schema
-from event.presentation.models import Presentation, PresentationCategory, PresentationCategoryRelation
+from event.presentation.models import Presentation, PresentationCategory
 from event.presentation.serializers import PresentationSerializer
-from rest_framework import mixins, serializers, viewsets
+from rest_framework import mixins, viewsets
 
 
 class PresentationFilterSet(filters.FilterSet):
-    type = filters.UUIDFilter(field_name="type_id")
-    categories = filters.BaseCSVFilter(method="filter_by_category_ids")
+    event = filters.CharFilter(method="filter_by_event_name")
+    types = filters.BaseCSVFilter(method="filter_by_type_names")
 
-    def filter_by_category_ids(self, queryset: QuerySet, name: str, value: list[str]) -> QuerySet:
-        if not value or value in EMPTY_VALUES:
+    def filter_by_event_name(self, queryset: BaseAbstractModelQuerySet, name: str, value: str) -> Q:
+        if value in EMPTY_VALUES:
             return queryset
-        if not any(UUID_V4_REGEX.match(v) for v in value):
-            return serializers.ValidationError(f"Invalid UUID format in {name} filter: {value}.")
 
-        target_ids = PresentationCategoryRelation.objects.filter(category__id__in=value).values_list("presentation_id")
-        return queryset.filter(id__in=target_ids)
+        return queryset.filter(Q(type__event__name_ko=value) | Q(type__event__name_en=value))
+
+    def filter_by_type_names(self, queryset: BaseAbstractModelQuerySet, name: str, values: list[str]) -> Q:
+        if values in EMPTY_VALUES:
+            return queryset
+
+        return queryset.filter(Q(type__name_ko__in=values) | Q(type__name_en__in=values))
 
 
 @method_decorator(name="list", decorator=extend_schema(tags=[OpenAPITag.EVENT_PRESENTATION]))
