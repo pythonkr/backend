@@ -1,9 +1,12 @@
+import types
 import typing
 import unicodedata
 import uuid
 
+from core.util.django_orm import get_diff_data_from_jsonized_models, model_to_jsonable_dict
 from core.util.thread_local import get_current_user
-from django.db import models
+from django.contrib.contenttypes.models import ContentType
+from django.db import models, transaction
 from participant_portal_api.models import ModificationAudit, ModificationAuditComment
 from rest_framework import serializers
 from user.models import UserExt
@@ -121,15 +124,29 @@ class ModificationAuditCreationPortalSerializer(serializers.ModelSerializer):
                 "Please cancel the existing request and try again."
             )
 
-        if not (modification_data := _model_to_jsonable_dict(self.instance, attrs)):
+        return attrs
+
+    def save(self, **kwargs: dict) -> types.SimpleNamespace:
+        """instance.save()를 호출하는 대신, 변경된 데이터를 추출하여 ModificationAudit 인스턴스를 생성합니다."""
+        instance_type = ContentType.objects.get_for_model(self.instance)
+        instance_key = str(self.instance.pk)
+        original_data = model_to_jsonable_dict(self.instance)["model_data"]
+
+        with transaction.atomic(savepoint=True):
+            updated_instance = self.update(self.instance, self.validated_data)
+            updated_instance.refresh_from_db()
+            updated_data = model_to_jsonable_dict(updated_instance)["model_data"]
+            transaction.set_rollback(True)
+
+        if not (diff_data := get_diff_data_from_jsonized_models(original_data, updated_data)):
             raise serializers.ValidationError("변경된 데이터가 없습니다.\nNo modification data provided.")
 
-        return modification_data
-
-    def save(self, **kwargs: dict) -> models.Model:
-        """instance.save()를 호출하는 대신, 변경된 데이터를 추출하여 ModificationAudit 인스턴스를 생성합니다."""
-        ModificationAudit.objects.create(instance=self.instance, modification_data=self.validated_data)
-        return self.instance
+        return ModificationAudit.objects.create(
+            instance_type=instance_type,
+            instance_id=instance_key,
+            original_data=original_data,
+            modification_data=diff_data,
+        ).fake_modified_instance
 
 
 class ModificationAuditCancelPortalSerializer(serializers.ModelSerializer):
@@ -155,6 +172,7 @@ class ModificationAuditCancelPortalSerializer(serializers.ModelSerializer):
         return attrs
 
     def save(self, **kwargs: dict) -> ModificationAudit:
+        super().save(**kwargs)
         instance: ModificationAudit = self.instance
         instance.status = ModificationAudit.Status.CANCELLED
         instance.save(update_fields=["status"])

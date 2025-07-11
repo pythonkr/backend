@@ -90,3 +90,17 @@ class PresentationPortalSerializer(ModificationAuditCreationPortalSerializer, se
                 raise serializers.ValidationError(err_msg)
 
         return value
+
+    def update(self, instance: Presentation, validated_data: dict) -> Presentation:
+        speakers_data = validated_data.pop("speakers", [])
+        instance = super().update(instance, validated_data)
+
+        for speaker_data in speakers_data:
+            if not (speaker_instance := self.get_speaker_instance(speaker_data["id"])):
+                continue
+
+            for attr, value in speaker_data.items():
+                setattr(speaker_instance, attr, value)
+            speaker_instance.save()
+
+        return instance

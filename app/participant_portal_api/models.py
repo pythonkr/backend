@@ -1,49 +1,20 @@
-import contextlib
+import types
 import typing
 
 from core.models import BaseAbstractModel, BaseAbstractModelQuerySet
+from core.util.django_orm import (
+    apply_diff_to_jsonized_models,
+    apply_diff_to_model,
+    json_to_simplenamespace,
+    model_to_identifier,
+)
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import FieldDoesNotExist
 from django.db import models
 from event.presentation.models import Presentation, PresentationSpeaker
-from rest_framework import serializers
 from user.models import UserExt
 
 T = typing.TypeVar("T", bound=models.Model)
-
-
-def _apply_dict_to_model(instance: T, data: dict, save: bool = False) -> T:
-    model_class = type(instance)
-
-    for field_name, value in data.items():
-        with contextlib.suppress(FieldDoesNotExist):
-            field = model_class._meta.get_field(field_name)
-
-            if isinstance(field, models.ForeignKey):
-                # One to One or One to Many case
-                if isinstance(value, dict):
-                    if not (sub_instance := field.related_model.objects.filter(pk=value.get("id")).first()):
-                        continue
-                    setattr(instance, field_name, _apply_dict_to_model(sub_instance, value), save)
-                elif isinstance(value, (int, str)):
-                    if not (sub_instance := field.related_model.objects.filter(pk=value).first()):
-                        continue
-                    setattr(instance, field_name, sub_instance.pk if field_name.endswith("_id") else sub_instance)
-            elif isinstance(field, models.ManyToOneRel):
-                if save:
-                    if not all(isinstance(v, dict) and "id" in v for v in value):
-                        continue
-                    for sub_value in value:
-                        getattr(instance, field).filter(pk=sub_value.pop("id")).update(**sub_value)
-            else:
-                # 일반 필드 업데이트
-                setattr(instance, field_name, value)
-
-    if save:
-        instance.save()
-
-    return instance
 
 
 class ModificationAuditQuerySet(BaseAbstractModelQuerySet):
@@ -74,6 +45,7 @@ class ModificationAudit(BaseAbstractModel):
 
     action = models.CharField(max_length=16, choices=Action.choices, default=Action.UPDATE)
     status = models.CharField(max_length=32, choices=Status.choices, default=Status.REQUESTED)
+    original_data = models.JSONField(default=dict, blank=False)
     modification_data = models.JSONField(default=dict, blank=False)
 
     instance_type = models.ForeignKey(ContentType, on_delete=models.PROTECT)
@@ -98,32 +70,23 @@ class ModificationAudit(BaseAbstractModel):
     def __str__(self) -> str:
         return str(self.instance)
 
-    def get_applied_data(self, serializer_class: type[serializers.ModelSerializer]) -> dict:
-        one_to_many: dict[str, dict[str, dict[str, typing.Any]]] = {
-            k: {sv["id"]: sv for sv in v}
-            for k, v in self.modification_data.items()
-            if isinstance(v, list) and all(isinstance(i, dict) and "id" in i for i in v)
-        }
+    @property
+    def instance_identifier(self) -> str:
+        return model_to_identifier(self.instance)
 
-        modified_instance = _apply_dict_to_model(instance=self.instance, data=self.modification_data, save=False)
-        modified_data = serializer_class(instance=modified_instance).data
+    @property
+    def fake_original_instance(self) -> types.SimpleNamespace:
+        return json_to_simplenamespace(self.original_data)
 
-        for field_name, mod_values in one_to_many.items():
-            if field_name not in modified_data:
-                continue
-
-            for field_value in modified_data[field_name]:
-                if not (isinstance(field_value, dict) and (value_id := field_value.get("id"))):
-                    continue
-
-                if value_id in mod_values:
-                    # 기존 값에 수정된 값을 병합합니다.
-                    field_value.update(mod_values[value_id])
-
-        return modified_data
+    @property
+    def fake_modified_instance(self) -> types.SimpleNamespace:
+        updated_data = apply_diff_to_jsonized_models(self.original_data, self.modification_data)
+        return json_to_simplenamespace(updated_data)
 
     def apply_modification(self) -> models.Model:
-        return _apply_dict_to_model(instance=self.instance, data=self.modification_data, save=True)
+        apply_diff_to_model(self.modification_data)
+        self.instance.refresh_from_db()
+        return self.instance
 
 
 class ModificationAuditComment(BaseAbstractModel):
