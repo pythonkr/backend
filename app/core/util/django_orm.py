@@ -38,8 +38,13 @@ def model_to_identifier(instance: models.Model) -> str:
     return f"mdl:{instance._meta.app_label}:{instance._meta.model_name}:{instance.pk}"
 
 
+def is_identifier(identifier: str) -> bool:
+    """Check if the given string is a valid model identifier."""
+    return isinstance(identifier, str) and identifier.startswith("mdl:") and len(identifier.split(":")) == 4
+
+
 def identifier_to_model(identifier: str) -> models.Model | None:
-    if not identifier.startswith("mdl:"):
+    if not is_identifier(identifier):
         raise ValueError(f"Invalid model identifier: {identifier}")
 
     with contextlib.suppress(ValueError, LookupError, ObjectDoesNotExist):
@@ -220,12 +225,18 @@ def json_to_simplenamespace(model_data: dict[str, dict[str, typing.Any]], key: s
     # link identifiers in resolved models to their SimpleNamespace instances
     for resolved_model in resolved_models.values():
         for attr_name, attr_value in resolved_model.__dict__.items():
-            if isinstance(attr_value, str) and attr_value.startswith("mdl:"):
-                setattr(resolved_model, attr_name, resolved_models[attr_value])
-            elif isinstance(attr_value, list) and all(
-                isinstance(item, str) and item.startswith("mdl:") for item in attr_value
-            ):
-                resolved_many_rel_models = [resolved_models[item] for item in attr_value]
+            if is_identifier(attr_value):
+                if not (resolved_instance := resolved_models.get(attr_value)):
+                    resolved_instance = identifier_to_model(attr_value)
+                setattr(resolved_model, attr_name, resolved_instance)
+            elif isinstance(attr_value, list) and all(is_identifier(item) for item in attr_value):
+                resolved_many_rel_models = []
+                for item in attr_value:
+                    if not (resolved_instance := resolved_models.get(item)):
+                        resolved_instance = identifier_to_model(item)
+                    if not resolved_instance:
+                        raise ValueError(f"Related model not found for identifier: {item}")
+
                 setattr(resolved_model, attr_name, resolved_many_rel_models)
 
     return resolved_models[key]
@@ -240,12 +251,12 @@ def apply_diff_to_model(models_data: dict[str, dict[str, typing.Any]]) -> list[m
 
         # Apply the data to the model instance
         for field_name, value in model_data.items():
-            if isinstance(value, str) and value.startswith("mdl:"):
+            if is_identifier(value):
                 # If the value is a model identifier, resolve it to a model instance
                 if not (related_model_instance := identifier_to_model(value)):
                     raise ValueError(f"Related model not found for identifier: {value}")
                 setattr(model_instance, field_name, related_model_instance)
-            elif isinstance(value, list) and all(isinstance(item, str) and item.startswith("mdl:") for item in value):
+            elif isinstance(value, list) and all(is_identifier(item) for item in value):
                 # If the value is a list of model identifiers, resolve them to model instances
                 related_model_instances = [identifier_to_model(item) for item in value]
                 if None in related_model_instances:
