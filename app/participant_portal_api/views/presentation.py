@@ -45,7 +45,7 @@ class PresentationPortalViewSet(
         serializer_class = self.get_serializer_class()
 
         if audit := ModificationAudit.objects.filter_requested(instance).first():
-            data = audit.get_applied_data(serializer_class=serializer_class)
+            data = serializer_class(audit.fake_modified_instance, context={"request": self.request}).data
         else:
             data = serializer_class(instance).data
 
