@@ -228,14 +228,21 @@ def json_to_simplenamespace(model_data: dict[str, dict[str, typing.Any]], key: s
             if is_identifier(attr_value):
                 if not (resolved_instance := resolved_models.get(attr_value)):
                     resolved_instance = identifier_to_model(attr_value)
+                if not resolved_instance:
+                    raise ValueError(f"Foreign model not found for identifier: {attr_value}")
                 setattr(resolved_model, attr_name, resolved_instance)
-            elif isinstance(attr_value, list) and all(is_identifier(item) for item in attr_value):
+            elif (
+                isinstance(attr_value, collections.abc.Iterable)
+                and attr_value
+                and all(is_identifier(item) for item in attr_value)
+            ):
                 resolved_many_rel_models = []
                 for item in attr_value:
                     if not (resolved_instance := resolved_models.get(item)):
                         resolved_instance = identifier_to_model(item)
                     if not resolved_instance:
                         raise ValueError(f"Related model not found for identifier: {item}")
+                    resolved_many_rel_models.append(resolved_instance)
 
                 setattr(resolved_model, attr_name, resolved_many_rel_models)
 
@@ -256,7 +263,7 @@ def apply_diff_to_model(models_data: dict[str, dict[str, typing.Any]]) -> list[m
                 if not (related_model_instance := identifier_to_model(value)):
                     raise ValueError(f"Related model not found for identifier: {value}")
                 setattr(model_instance, field_name, related_model_instance)
-            elif isinstance(value, list) and all(is_identifier(item) for item in value):
+            elif isinstance(value, collections.abc.Iterable) and value and all(is_identifier(item) for item in value):
                 # If the value is a list of model identifiers, resolve them to model instances
                 related_model_instances = [identifier_to_model(item) for item in value]
                 if None in related_model_instances:

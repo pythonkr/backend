@@ -1,8 +1,10 @@
+from admin_api.serializers.modification_audit import ModificationAuditResponseAdminSerializer
 from core.const.serializer import COMMON_ADMIN_FIELDS
 from core.serializer.base_abstract_serializer import BaseAbstractSerializer
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
 from event.presentation.models import Presentation, PresentationCategory, PresentationSpeaker, PresentationType
 from file.models import PublicFile
+from participant_portal_api.models import ModificationAudit
 from rest_framework import serializers
 from user.models import UserExt
 
@@ -61,3 +63,49 @@ class PresentationSpeakerAdminSerializer(BaseAbstractSerializer, JsonSchemaSeria
     class Meta:
         model = PresentationSpeaker
         fields = COMMON_ADMIN_FIELDS + ("presentation", "user", "image", "biography_ko", "biography_en")
+
+
+class PresentationModificationAuditPreviewAdminSerializer(serializers.ModelSerializer):
+    class PresentationSerializer(serializers.ModelSerializer):
+        class PresentationSpeakerSerializer(serializers.ModelSerializer):
+            class UserSerializer(serializers.ModelSerializer):
+                class Meta:
+                    model = UserExt
+                    fields = ("id", "nickname_ko", "nickname_en")
+
+            user = UserSerializer(read_only=True)
+            image = serializers.FileField(read_only=True, allow_null=True, source="image.file")
+
+            class Meta:
+                model = PresentationSpeaker
+                fields = ("id", "user", "image", "biography_ko", "biography_en")
+
+        type = serializers.CharField(read_only=True, source="type.name_ko")
+        categories = serializers.SerializerMethodField(read_only=True)
+        speakers = PresentationSpeakerSerializer(read_only=True, many=True)
+
+        class Meta:
+            model = Presentation
+            fields = (
+                "type",
+                "categories",
+                "image",
+                "title_ko",
+                "title_en",
+                "summary_ko",
+                "summary_en",
+                "description_ko",
+                "description_en",
+                "speakers",
+            )
+
+        def get_categories(self, obj: Presentation) -> list[str]:
+            return [cat.name_ko for cat in obj.categories]
+
+    modification_audit = ModificationAuditResponseAdminSerializer(source="*")
+    original = PresentationSerializer(source="fake_original_instance")
+    modified = PresentationSerializer(source="fake_modified_instance")
+
+    class Meta:
+        model = ModificationAudit
+        fields = ("modification_audit", "original", "modified")
