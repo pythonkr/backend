@@ -29,8 +29,8 @@ class UserPortalViewSet(viewsets.GenericViewSet):
         user = request.user
         serializer_class = self.get_serializer_class()
 
-        if mod_audit := ModificationAudit.objects.filter_requested(user).first():
-            data = mod_audit.get_applied_data(serializer_class=serializer_class)
+        if audit := ModificationAudit.objects.filter_requested(user).first():
+            data = serializer_class(audit.fake_modified_instance, context={"request": self.request}).data
         else:
             data = serializer_class(user).data
 
