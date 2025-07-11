@@ -76,12 +76,12 @@ class ModificationAudit(BaseAbstractModel):
 
     @property
     def fake_original_instance(self) -> types.SimpleNamespace:
-        return json_to_simplenamespace(self.original_data)
+        return json_to_simplenamespace(self.original_data, self.instance_identifier)
 
     @property
     def fake_modified_instance(self) -> types.SimpleNamespace:
         updated_data = apply_diff_to_jsonized_models(self.original_data, self.modification_data)
-        return json_to_simplenamespace(updated_data)
+        return json_to_simplenamespace(updated_data, self.instance_identifier)
 
     def apply_modification(self) -> models.Model:
         apply_diff_to_model(self.modification_data)
