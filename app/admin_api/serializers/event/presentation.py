@@ -2,6 +2,7 @@ from admin_api.serializers.modification_audit import ModificationAuditResponseAd
 from core.const.serializer import COMMON_ADMIN_FIELDS
 from core.serializer.base_abstract_serializer import BaseAbstractSerializer
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
+from django.core.files.storage import storages
 from event.presentation.models import Presentation, PresentationCategory, PresentationSpeaker, PresentationType
 from file.models import PublicFile
 from participant_portal_api.models import ModificationAudit
@@ -73,16 +74,19 @@ class PresentationModificationAuditPreviewAdminSerializer(serializers.ModelSeria
                     model = UserExt
                     fields = ("id", "nickname_ko", "nickname_en")
 
-            user = UserSerializer(read_only=True)
-            image = serializers.FileField(read_only=True, allow_null=True, source="image.file")
+            user = UserSerializer()
+            image = serializers.SerializerMethodField()
 
             class Meta:
                 model = PresentationSpeaker
                 fields = ("id", "user", "image", "biography_ko", "biography_en")
 
-        type = serializers.CharField(read_only=True, source="type.name_ko")
-        categories = serializers.SerializerMethodField(read_only=True)
-        speakers = PresentationSpeakerSerializer(read_only=True, many=True)
+            def get_image(self, obj: UserExt) -> str | None:
+                return storages["public"].path(obj.image.file) if obj.image else None
+
+        type = serializers.CharField(source="type.name_ko")
+        categories = serializers.SerializerMethodField()
+        speakers = PresentationSpeakerSerializer(many=True)
 
         class Meta:
             model = Presentation

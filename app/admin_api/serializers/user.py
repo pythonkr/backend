@@ -6,6 +6,7 @@ from core.const.serializer import COMMON_ADMIN_FIELDS
 from core.serializer.base_abstract_serializer import BaseAbstractSerializer
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
 from core.serializer.read_only_serializer import ReadOnlyModelSerializer
+from django.core.files.storage import storages
 from participant_portal_api.models import ModificationAudit
 from rest_framework import serializers
 from user.models import UserExt
@@ -46,8 +47,7 @@ class UserModificationAuditPreviewAdminSerializer(serializers.ModelSerializer):
             fields = ("id", "image", "email", "nickname_ko", "nickname_en")
 
         def get_image(self, obj: UserExt) -> str | None:
-            # I don't know why, but serializers.FileField(source="image.file") does not work here.
-            return obj.image.file if obj.image else None
+            return storages["public"].path(obj.image.file) if obj.image else None
 
     modification_audit = ModificationAuditResponseAdminSerializer(source="*")
     original = UserSerializer(source="fake_original_instance")
