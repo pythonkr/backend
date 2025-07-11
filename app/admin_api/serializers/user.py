@@ -6,7 +6,6 @@ from core.const.serializer import COMMON_ADMIN_FIELDS
 from core.serializer.base_abstract_serializer import BaseAbstractSerializer
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
 from core.serializer.read_only_serializer import ReadOnlyModelSerializer
-from django.core.files.storage import storages
 from participant_portal_api.models import ModificationAudit
 from rest_framework import serializers
 from user.models import UserExt
@@ -40,14 +39,11 @@ class UserAdminSerializer(JsonSchemaSerializer, serializers.ModelSerializer):
 
 class UserModificationAuditPreviewAdminSerializer(serializers.ModelSerializer):
     class UserSerializer(serializers.ModelSerializer):
-        image = serializers.SerializerMethodField()
+        image_id = serializers.CharField(source="image.id", allow_null=True, required=False)
 
         class Meta:
             model = UserExt
-            fields = ("id", "image", "email", "nickname_ko", "nickname_en")
-
-        def get_image(self, obj: UserExt) -> str | None:
-            return storages["public"].url(str(obj.image.file)) if obj.image else None
+            fields = ("id", "image_id", "email", "nickname_ko", "nickname_en")
 
     modification_audit = ModificationAuditResponseAdminSerializer(source="*")
     original = UserSerializer(source="fake_original_instance")

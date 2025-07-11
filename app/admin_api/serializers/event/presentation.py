@@ -2,7 +2,6 @@ from admin_api.serializers.modification_audit import ModificationAuditResponseAd
 from core.const.serializer import COMMON_ADMIN_FIELDS
 from core.serializer.base_abstract_serializer import BaseAbstractSerializer
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
-from django.core.files.storage import storages
 from event.presentation.models import Presentation, PresentationCategory, PresentationSpeaker, PresentationType
 from file.models import PublicFile
 from participant_portal_api.models import ModificationAudit
@@ -75,17 +74,15 @@ class PresentationModificationAuditPreviewAdminSerializer(serializers.ModelSeria
                     fields = ("id", "nickname_ko", "nickname_en")
 
             user = UserSerializer()
-            image = serializers.SerializerMethodField()
+            image_id = serializers.CharField(source="image.id", allow_null=True, required=False)
 
             class Meta:
                 model = PresentationSpeaker
-                fields = ("id", "user", "image", "biography_ko", "biography_en")
-
-            def get_image(self, obj: UserExt) -> str | None:
-                return storages["public"].url(str(obj.image.file)) if obj.image else None
+                fields = ("id", "user", "image_id", "biography_ko", "biography_en")
 
         type = serializers.CharField(source="type.name_ko")
         categories = serializers.SerializerMethodField()
+        image_id = serializers.CharField(source="image.id", allow_null=True, required=False)
         speakers = PresentationSpeakerSerializer(many=True)
 
         class Meta:
@@ -93,7 +90,7 @@ class PresentationModificationAuditPreviewAdminSerializer(serializers.ModelSeria
             fields = (
                 "type",
                 "categories",
-                "image",
+                "image_id",
                 "title_ko",
                 "title_en",
                 "summary_ko",
