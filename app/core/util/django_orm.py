@@ -11,11 +11,14 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db.models.fields.files import FieldFile
 from django.forms import model_to_dict
+from django.utils.functional import Promise
 
 
 def arbitrary_value_to_basic_type(value: typing.Any) -> str | int | float | bool | None:
     """Convert an arbitrary value to a basic type that can be JSON serialized."""
-    if isinstance(value, (int, float, bool)):
+    if isinstance(value, Promise):
+        return str(value)
+    elif isinstance(value, (int, float, bool)):
         return value
     elif isinstance(value, str):
         return value
@@ -62,17 +65,21 @@ def _model_to_jsonable_dict(  # noqa: C901
     jsonable_model_dict: dict[str, str | int | float | bool | None] = {
         "id": str(instance.pk) if isinstance(instance.pk, uuid.UUID) else instance.pk,
         "pk": str(instance.pk) if isinstance(instance.pk, uuid.UUID) else instance.pk,
-        "_meta": types.SimpleNamespace(
-            app_label=instance._meta.app_label,
-            model_name=instance._meta.model_name,
-            verbose_name=instance._meta.verbose_name,
-            verbose_name_plural=instance._meta.verbose_name_plural,
-        ),
+        "_meta": {
+            "app_label": instance._meta.app_label,
+            "model_name": str(instance._meta.model_name),
+            "verbose_name": str(instance._meta.verbose_name),
+            "verbose_name_plural": str(instance._meta.verbose_name_plural),
+        },
     }
 
     for field, value in model_dict.items():
         if isinstance(value, (datetime.datetime, datetime.date, datetime.time)):
             jsonable_model_dict[field] = value.isoformat()
+        elif isinstance(value, Promise):
+            # Django's translation system returns a Promise object for translated strings.
+            # We can safely convert it to a string.
+            jsonable_model_dict[field] = str(value)
         elif isinstance(value, (uuid.UUID, int, str)):
             # Is this field just a UUID | int | str, or is it a ForeignKey/OneToOneField?
             # django.forms.model_to_dict will return a UUID for Proxy model fields,
@@ -197,6 +204,9 @@ def apply_diff_to_jsonized_models(
             )
 
         for field_name, new_value in diff_data.items():
+            if field_name.startswith("_"):
+                # Skip private fields
+                continue
             updated_models[model_identifier][field_name] = new_value
 
     return updated_models
