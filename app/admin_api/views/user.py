@@ -3,6 +3,7 @@ from admin_api.serializers.user import (
     UserAdminPasswordChangeSerializer,
     UserAdminSerializer,
     UserAdminSignInSerializer,
+    UserModificationAuditPreviewAdminSerializer,
 )
 from core.const.account import INITIAL_ADMIN_PASSWORD
 from core.const.regex import UUID_V4_REGEX
@@ -80,7 +81,10 @@ class UserAdminViewSet(
         serializer.save()
         return response.Response(data=UserAdminSerializer(serializer.instance).data)
 
-    @extend_schema(tags=[OpenAPITag.ADMIN_USER])
+    @extend_schema(
+        tags=[OpenAPITag.ADMIN_USER],
+        responses={status.HTTP_200_OK: UserModificationAuditPreviewAdminSerializer},
+    )
     @decorators.action(detail=True, methods=["get"], url_path=r"preview/(?P<audit_id>[\w-]+)")
     def preview_modification_audit(
         self, request: request.Request, audit_id: str, *args: tuple, **kwargs: dict
@@ -91,7 +95,7 @@ class UserAdminViewSet(
         if not (audit := ModificationAudit.objects.filter_by_instance(self.get_object()).filter(id=audit_id).first()):
             return response.Response(status=status.HTTP_404_NOT_FOUND)
 
-        return response.Response(data=audit.get_applied_data(serializer_class=self.get_serializer_class()))
+        return response.Response(data=UserModificationAuditPreviewAdminSerializer(instance=audit).data)
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_USER]) for m in ADMIN_METHODS})
