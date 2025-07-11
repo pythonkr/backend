@@ -8,11 +8,9 @@ from admin_api.filtersets.event.presentation import (
 from admin_api.serializers.event.presentation import (
     PresentationAdminSerializer,
     PresentationCategoryAdminSerializer,
-    PresentationModificationAuditPreviewAdminSerializer,
     PresentationSpeakerAdminSerializer,
     PresentationTypeAdminSerializer,
 )
-from core.const.regex import UUID_V4_REGEX
 from core.const.tag import OpenAPITag
 from core.permissions import IsSuperUser
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
@@ -23,8 +21,7 @@ from event.presentation.models import (
     PresentationSpeaker,
     PresentationType,
 )
-from participant_portal_api.models import ModificationAudit
-from rest_framework import decorators, request, response, status, viewsets
+from rest_framework import viewsets
 
 ADMIN_METHODS = ["list", "retrieve", "create", "update", "partial_update", "destroy"]
 
@@ -53,22 +50,6 @@ class PresentationAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     permission_classes = [IsSuperUser]
     filterset_class = PresentationAdminFilterSet
     queryset = Presentation.objects.get_all_nested_data().select_related("created_by", "updated_by", "deleted_by")
-
-    @extend_schema(
-        tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION],
-        responses={status.HTTP_200_OK: PresentationModificationAuditPreviewAdminSerializer},
-    )
-    @decorators.action(detail=True, methods=["get"], url_path=r"preview/(?P<audit_id>[\w-]+)")
-    def preview_modification_audit(
-        self, request: request.Request, audit_id: str, *args: tuple, **kwargs: dict
-    ) -> response.Response:
-        if not UUID_V4_REGEX.match(audit_id):
-            return response.Response(status=status.HTTP_404_NOT_FOUND)
-
-        if not (audit := ModificationAudit.objects.filter_by_instance(self.get_object()).filter(id=audit_id).first()):
-            return response.Response(status=status.HTTP_404_NOT_FOUND)
-
-        return response.Response(data=PresentationModificationAuditPreviewAdminSerializer(instance=audit).data)
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION]) for m in ADMIN_METHODS})

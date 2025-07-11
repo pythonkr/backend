@@ -1,6 +1,7 @@
 import typing
 import unicodedata
 
+from event.presentation.models import Presentation, PresentationSpeaker
 from participant_portal_api.models import ModificationAudit, ModificationAuditComment
 from rest_framework import serializers
 from user.models import UserExt
@@ -96,3 +97,67 @@ class ModificationAuditRejectionAdminSerializer(serializers.ModelSerializer):
             ModificationAuditComment.objects.create(audit=instance, content=reason)
 
         return instance
+
+
+class PresentationModificationAuditPreviewAdminSerializer(serializers.ModelSerializer):
+    class PresentationSerializer(serializers.ModelSerializer):
+        class PresentationSpeakerSerializer(serializers.ModelSerializer):
+            class UserSerializer(serializers.ModelSerializer):
+                class Meta:
+                    model = UserExt
+                    fields = ("id", "nickname_ko", "nickname_en")
+
+            user = UserSerializer()
+            image_id = serializers.CharField(source="image.id", allow_null=True, required=False)
+
+            class Meta:
+                model = PresentationSpeaker
+                fields = ("id", "user", "image_id", "biography_ko", "biography_en")
+
+        type = serializers.CharField(source="type.name_ko")
+        categories = serializers.SerializerMethodField()
+        image_id = serializers.CharField(source="image.id", allow_null=True, required=False)
+        speakers = PresentationSpeakerSerializer(many=True)
+
+        class Meta:
+            model = Presentation
+            fields = (
+                "type",
+                "categories",
+                "image_id",
+                "title_ko",
+                "title_en",
+                "summary_ko",
+                "summary_en",
+                "description_ko",
+                "description_en",
+                "speakers",
+            )
+
+        def get_categories(self, obj: Presentation) -> list[str]:
+            return [cat.name_ko for cat in obj.categories]
+
+    modification_audit = ModificationAuditResponseAdminSerializer(source="*")
+    original = PresentationSerializer(source="fake_original_instance")
+    modified = PresentationSerializer(source="fake_modified_instance")
+
+    class Meta:
+        model = ModificationAudit
+        fields = ("modification_audit", "original", "modified")
+
+
+class UserModificationAuditPreviewAdminSerializer(serializers.ModelSerializer):
+    class UserSerializer(serializers.ModelSerializer):
+        image_id = serializers.CharField(source="image.id", allow_null=True, required=False)
+
+        class Meta:
+            model = UserExt
+            fields = ("id", "image_id", "email", "nickname_ko", "nickname_en")
+
+    modification_audit = ModificationAuditResponseAdminSerializer(source="*")
+    original = UserSerializer(source="fake_original_instance")
+    modified = UserSerializer(source="fake_modified_instance")
+
+    class Meta:
+        model = ModificationAudit
+        fields = ("modification_audit", "original", "modified")

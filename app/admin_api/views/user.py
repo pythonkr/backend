@@ -3,16 +3,13 @@ from admin_api.serializers.user import (
     UserAdminPasswordChangeSerializer,
     UserAdminSerializer,
     UserAdminSignInSerializer,
-    UserModificationAuditPreviewAdminSerializer,
 )
 from core.const.account import INITIAL_ADMIN_PASSWORD
-from core.const.regex import UUID_V4_REGEX
 from core.const.tag import OpenAPITag
 from core.permissions import IsSuperUser
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from django.contrib.auth import login, logout
 from drf_spectacular.utils import extend_schema, extend_schema_view
-from participant_portal_api.models import ModificationAudit
 from rest_framework import decorators, mixins, request, response, status, viewsets
 from user.models import UserExt
 from user.models.organization import Organization
@@ -80,22 +77,6 @@ class UserAdminViewSet(
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return response.Response(data=UserAdminSerializer(serializer.instance).data)
-
-    @extend_schema(
-        tags=[OpenAPITag.ADMIN_USER],
-        responses={status.HTTP_200_OK: UserModificationAuditPreviewAdminSerializer},
-    )
-    @decorators.action(detail=True, methods=["get"], url_path=r"preview/(?P<audit_id>[\w-]+)")
-    def preview_modification_audit(
-        self, request: request.Request, audit_id: str, *args: tuple, **kwargs: dict
-    ) -> response.Response:
-        if not UUID_V4_REGEX.match(audit_id):
-            return response.Response(status=status.HTTP_404_NOT_FOUND)
-
-        if not (audit := ModificationAudit.objects.filter_by_instance(self.get_object()).filter(id=audit_id).first()):
-            return response.Response(status=status.HTTP_404_NOT_FOUND)
-
-        return response.Response(data=UserModificationAuditPreviewAdminSerializer(instance=audit).data)
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_USER]) for m in ADMIN_METHODS})
