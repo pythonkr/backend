@@ -1,12 +1,10 @@
 import functools
 import typing
 
-from admin_api.serializers.modification_audit import ModificationAuditResponseAdminSerializer
 from core.const.serializer import COMMON_ADMIN_FIELDS
 from core.serializer.base_abstract_serializer import BaseAbstractSerializer
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
 from core.serializer.read_only_serializer import ReadOnlyModelSerializer
-from participant_portal_api.models import ModificationAudit
 from rest_framework import serializers
 from user.models import UserExt
 from user.models.organization import Organization
@@ -35,23 +33,6 @@ class UserAdminSerializer(JsonSchemaSerializer, serializers.ModelSerializer):
             "date_joined": {"read_only": True},
             "last_login": {"read_only": True},
         }
-
-
-class UserModificationAuditPreviewAdminSerializer(serializers.ModelSerializer):
-    class UserSerializer(serializers.ModelSerializer):
-        image_id = serializers.CharField(source="image.id", allow_null=True, required=False)
-
-        class Meta:
-            model = UserExt
-            fields = ("id", "image_id", "email", "nickname_ko", "nickname_en")
-
-    modification_audit = ModificationAuditResponseAdminSerializer(source="*")
-    original = UserSerializer(source="fake_original_instance")
-    modified = UserSerializer(source="fake_modified_instance")
-
-    class Meta:
-        model = ModificationAudit
-        fields = ("modification_audit", "original", "modified")
 
 
 class UserAdminSignInSerializerData(typing.TypedDict):
