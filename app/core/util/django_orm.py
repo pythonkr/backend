@@ -170,7 +170,7 @@ def get_diff_data_from_jsonized_models(
             value_b = model_tobe[field_name]
             if value_a == value_b:
                 continue
-            if type(value_a) != type(value_b):  # noqa: E721
+            if value_a is not None and value_b is not None and type(value_a) != type(value_b):  # noqa: E721
                 raise TypeError(
                     f"Type mismatch for field '{field_name}' in model '{model_identifier}': "
                     f"{type(value_a)} != {type(value_b)}"
