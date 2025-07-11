@@ -47,7 +47,7 @@ class UserModificationAuditPreviewAdminSerializer(serializers.ModelSerializer):
             fields = ("id", "image", "email", "nickname_ko", "nickname_en")
 
         def get_image(self, obj: UserExt) -> str | None:
-            return storages["public"].path(obj.image.file) if obj.image else None
+            return storages["public"].url(obj.image.file) if obj.image else None
 
     modification_audit = ModificationAuditResponseAdminSerializer(source="*")
     original = UserSerializer(source="fake_original_instance")

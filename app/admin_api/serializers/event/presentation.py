@@ -82,7 +82,7 @@ class PresentationModificationAuditPreviewAdminSerializer(serializers.ModelSeria
                 fields = ("id", "user", "image", "biography_ko", "biography_en")
 
             def get_image(self, obj: UserExt) -> str | None:
-                return storages["public"].path(obj.image.file) if obj.image else None
+                return storages["public"].url(obj.image.file) if obj.image else None
 
         type = serializers.CharField(source="type.name_ko")
         categories = serializers.SerializerMethodField()
