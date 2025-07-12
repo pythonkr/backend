@@ -95,6 +95,11 @@ class ModificationAuditCreationPortalSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_requested_modification_audit(instance: models.Model) -> ModificationAudit | None:
+        # instance can be a model or fake instance (e.g., types.SimpleNamespace)
+        # If it's a fake instance, we need to convert _meta dict to types.SimpleNamespace
+        if isinstance(instance, types.SimpleNamespace):
+            instance._meta = types.SimpleNamespace(**instance._meta)
+
         return ModificationAudit.objects.filter_requested(instance).first()
 
     def get_has_requested_modification_audit(self, obj: models.Model) -> bool:
