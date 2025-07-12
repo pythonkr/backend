@@ -56,7 +56,7 @@ class UserPortalViewSet(viewsets.GenericViewSet):
         request=UserPortalSignInSerializer,
         responses={status.HTTP_200_OK: UserPortalSerializer},
     )
-    @decorators.action(detail=False, methods=["post"], url_path="signin")
+    @decorators.action(detail=False, methods=["post"], url_path="signin", permission_classes=[])
     def signin(self, request: request.Request, *args: tuple, **kwargs: dict) -> response.Response:
         serializer = UserPortalSignInSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
