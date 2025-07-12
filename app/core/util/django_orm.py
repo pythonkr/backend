@@ -245,6 +245,8 @@ def json_to_simplenamespace(model_data: dict[str, dict[str, typing.Any]], key: s
                     resolved_many_rel_models.append(resolved_instance)
 
                 setattr(resolved_model, attr_name, resolved_many_rel_models)
+            elif isinstance(attr_value, dict):
+                setattr(resolved_model, attr_name, types.SimpleNamespace(**attr_value))
 
     return resolved_models[key]
 
