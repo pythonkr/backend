@@ -44,51 +44,6 @@ class ModificationAuditResponsePortalSerializer(serializers.ModelSerializer):
         )
 
 
-def _model_to_jsonable_dict(instance: models.Model, new_data: dict) -> dict[str, str | None]:
-    """모델 인스턴스를 JSON 직렬화 가능한 딕셔너리로 변환합니다."""
-    if not instance:
-        return {}
-
-    data: dict[str, str | None] = {}
-    for field, value in new_data.items():
-        if not hasattr(instance, field):
-            continue
-
-        if isinstance(value, list):
-            sub_data = []
-
-            for sub_value in value:
-                # One to Many case
-                if not isinstance(sub_value, dict) or "id" not in sub_value:
-                    continue
-                sub_qs = getattr(instance, field, None)
-                if not isinstance(sub_qs, models.manager.BaseManager):
-                    continue
-                if not (sub_instance := sub_qs.filter(pk=sub_value["id"]).first()):
-                    continue
-
-                sub_data.append(_model_to_jsonable_dict(sub_instance, sub_value))
-
-            if sub_data:
-                data[field] = sub_data
-
-        elif isinstance(value, dict):
-            # One to One case
-            if not (sub_instance := getattr(instance, field, None)):
-                continue
-
-            data[field] = _model_to_jsonable_dict(sub_instance, value)
-
-        elif getattr(instance, field) != value:
-            if isinstance(value, models.Model):
-                field = f"{getattr(instance._meta.model, field).field.name}_id"
-                value = str(value.pk)
-
-            data[field] = value
-
-    return data
-
-
 class ModificationAuditCreationPortalSerializer(serializers.ModelSerializer):
     has_requested_modification_audit = serializers.SerializerMethodField()
     requested_modification_audit_id = serializers.SerializerMethodField()
