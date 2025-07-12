@@ -70,7 +70,7 @@ class ModificationAuditApprovalAdminSerializer(serializers.ModelSerializer):
 
 
 class ModificationAuditRejectionAdminSerializer(serializers.ModelSerializer):
-    reason = serializers.CharField(required=True, allow_blank=True, allow_null=True, write_only=True)
+    reason = serializers.CharField(required=False, allow_blank=True, allow_null=True, write_only=True)
 
     class Meta:
         model = ModificationAudit
@@ -90,12 +90,12 @@ class ModificationAuditRejectionAdminSerializer(serializers.ModelSerializer):
 
     def save(self, **kwargs: dict) -> ModificationAudit:
         instance: ModificationAudit = self.instance
-        instance.status = ModificationAudit.Status.REJECTED
-        instance.save(update_fields=["status"])
 
-        if reason := self.validated_data["reason"]:
+        if reason := self.validated_data.get("reason"):
             ModificationAuditComment.objects.create(audit=instance, content=reason)
 
+        instance.status = ModificationAudit.Status.REJECTED
+        instance.save(update_fields=["status"])
         return instance
 
 
