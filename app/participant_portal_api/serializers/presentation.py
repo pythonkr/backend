@@ -77,7 +77,9 @@ class PresentationPortalSerializer(ModificationAuditCreationPortalSerializer, se
         result = super().to_representation(instance)
 
         if (current_user := get_current_user()) and (speakers := result.get("speakers")):
-            result["speakers"] = [s for s in speakers if s["user"] == current_user.pk]
+            result["speakers"] = [s for s in speakers if s["user"]["id"] == current_user.pk]
+        else:
+            result["speakers"] = []
 
         return result
 
