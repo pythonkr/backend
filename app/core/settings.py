@@ -56,7 +56,11 @@ IS_LOCAL = env("IS_LOCAL")
 
 DEPLOYMENT_RELEASE_VERSION = os.environ.get("DEPLOYMENT_RELEASE_VERSION", "unknown")
 # Loggers
-SLACK = types.SimpleNamespace(token=env("SLACK_LOG_TOKEN", default=""), channel=env("SLACK_LOG_CHANNEL", default=""))
+SLACK = types.SimpleNamespace(
+    token=env("SLACK_LOG_TOKEN", default=""),
+    channel=env("SLACK_LOG_CHANNEL", default=""),
+    modification_audit_notification_channel=env("SLACK_MODIFICATION_AUDIT_NOTIFICATION_CHANNEL", default=""),
+)
 
 LOG_LEVEL = env("LOG_LEVEL")
 LOGGING = {
@@ -339,6 +343,13 @@ CSRF_COOKIE_HTTPONLY = False  # CSRF_COOKIE_HTTPONLY must be False to allow Java
 CSRF_COOKIE_DOMAIN = COOKIE_DOMAIN
 CSRF_TRUSTED_ORIGINS = (
     set(env.list("CSRF_TRUSTED_ORIGINS", default=["https://rest-api.pycon.kr"])) | COOKIE_TRUSTED_ORIGIN_SET
+)
+
+# Frontend domain settings
+FRONTEND_DOMAIN = types.SimpleNamespace(
+    main=env("FRONTEND_MAIN_DOMAIN", default="https://pycon.kr"),
+    admin=env("FRONTEND_ADMIN_DOMAIN", default="https://admin.pycon.kr"),
+    participant=env("FRONTEND_PARTICIPANT_DOMAIN", default="https://participant.pycon.kr"),
 )
 
 # Django Rest Framework Settings

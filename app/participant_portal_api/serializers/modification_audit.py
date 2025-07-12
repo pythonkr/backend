@@ -141,12 +141,14 @@ class ModificationAuditCreationPortalSerializer(serializers.ModelSerializer):
         if not (diff_data := get_diff_data_from_jsonized_models(original_data, updated_data)):
             raise serializers.ValidationError("변경된 데이터가 없습니다.\nNo modification data provided.")
 
-        return ModificationAudit.objects.create(
+        audit: ModificationAudit = ModificationAudit.objects.create(
             instance_type=instance_type,
             instance_id=instance_key,
             original_data=original_data,
             modification_data=diff_data,
-        ).fake_modified_instance
+        )
+        audit.notify_creation_to_slack()
+        return audit.fake_modified_instance
 
 
 class ModificationAuditCancelPortalSerializer(serializers.ModelSerializer):

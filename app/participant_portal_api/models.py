@@ -1,6 +1,18 @@
+from __future__ import annotations
+
 import types
 import typing
 
+from core.const.datetime import KST
+from core.external_apis.slack.blocks import (
+    SlackBlocks,
+    SlackHeaderParentBlock,
+    SlackMarkDownChildBlock,
+    SlackPlainTextChildBlock,
+    SlackSectionParentBlock,
+    SlackURLButtonAccessoryBlock,
+)
+from core.external_apis.slack.client import SlackClient
 from core.models import BaseAbstractModel, BaseAbstractModelQuerySet
 from core.util.django_orm import (
     apply_diff_to_jsonized_models,
@@ -8,6 +20,7 @@ from core.util.django_orm import (
     json_to_simplenamespace,
     model_to_identifier,
 )
+from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
@@ -15,6 +28,10 @@ from event.presentation.models import Presentation, PresentationSpeaker
 from user.models import UserExt
 
 T = typing.TypeVar("T", bound=models.Model)
+AUDIT_TYPE: dict[models.Model, str] = {
+    Presentation: "발표",
+    UserExt: "프로필",
+}
 
 
 class ModificationAuditQuerySet(BaseAbstractModelQuerySet):
@@ -87,6 +104,37 @@ class ModificationAudit(BaseAbstractModel):
         apply_diff_to_model(self.modification_data)
         self.instance.refresh_from_db()
         return self.instance
+
+    def notify_creation_to_slack(self) -> None:
+        if not (audit_noti_channel := settings.SLACK.modification_audit_notification_channel):
+            return
+
+        created_at_kst_str = self.created_at.astimezone(KST).strftime("%y년 %m월 %d일 %H시 %M분")
+        audit_instance_type_str = AUDIT_TYPE.get(self.instance_type.model_class(), "알 수 없음")
+        blocks = SlackBlocks(
+            blocks=[
+                SlackHeaderParentBlock(text=SlackPlainTextChildBlock(text=":pencil: 수정 요청이 들어왔어요!")),
+                SlackSectionParentBlock(
+                    fields=[
+                        SlackMarkDownChildBlock(text=f"*수정 유형*\n{audit_instance_type_str}"),
+                        SlackMarkDownChildBlock(text=f"*요청 시간*\n{created_at_kst_str}"),
+                        SlackMarkDownChildBlock(text=f"*요청자*\n{self.created_by.nickname}"),
+                        SlackMarkDownChildBlock(text=f"*요청 ID*\n{self.id}"),
+                    ]
+                ),
+                SlackSectionParentBlock(
+                    text=SlackMarkDownChildBlock(text="어드민에서 수정 내역을 확인 후 승인 또는 반려해주세요."),
+                    accessory=SlackURLButtonAccessoryBlock(
+                        text=SlackPlainTextChildBlock(text="수정 심사 페이지 열기"),
+                        url=f"{settings.FRONTEND_DOMAIN.admin}/modification-audit/{self.id}",
+                    ),
+                ),
+            ]
+        )
+
+        SlackClient().send_message(
+            channel_id=audit_noti_channel, text="새로운 수정 요청이 도착했습니다.", blocks=blocks
+        )
 
 
 class ModificationAuditComment(BaseAbstractModel):
