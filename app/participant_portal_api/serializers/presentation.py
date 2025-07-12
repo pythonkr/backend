@@ -6,11 +6,18 @@ from event.presentation.models import Presentation, PresentationSpeaker
 from file.models import PublicFile
 from participant_portal_api.serializers.modification_audit import ModificationAuditCreationPortalSerializer
 from rest_framework import serializers
+from user.models import UserExt
+
+
+class PresentationUserPortalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserExt
+        fields = ("id", "email", "nickname_ko", "nickname_en")
 
 
 class PresentationSpeakerPortalSerializer(serializers.ModelSerializer):
     image = serializers.PrimaryKeyRelatedField(queryset=PublicFile.objects.filter_active(), allow_null=True)
-    user = serializers.PrimaryKeyRelatedField(read_only=True)
+    user = PresentationUserPortalSerializer(read_only=True)
 
     class Meta:
         model = PresentationSpeaker
