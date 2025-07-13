@@ -6,7 +6,7 @@ import typing
 from core.const.tag import OpenAPITag
 from core.models import MarkdownField
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
-from django.db.models.fields import TextField
+from django.db.models.fields import TextField, URLField
 from django.db.models.fields.files import FileField
 from django.db.models.fields.related import ForeignKey, ManyToManyField
 from django.db.models.query import QuerySet
@@ -43,7 +43,7 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
         ui_schema.setdefault(field_name, {})
         ui_schema[field_name].update(data)
 
-    def get_json_schema(self) -> dict:
+    def get_json_schema(self) -> dict:  # noqa: C901
         serializer_class = typing.cast(type[JsonSchemaSerializer], self.get_serializer_class())
 
         result = {
@@ -87,6 +87,8 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
                     self.set_ui_schema(result["ui_schema"], field.name, {"ui:field": "m2m_select"})
                 elif isinstance(field, FileField):
                     self.set_ui_schema(result["ui_schema"], field.name, {"ui:field": "file"})
+                elif isinstance(field, URLField):
+                    self.set_ui_schema(result["ui_schema"], field.name, {"ui:hideError": True})
                 elif isinstance(field, TranslationField):
                     result["translation_fields"].add(field.translated_field.name)
                     if isinstance(field.translated_field, MarkdownField):
