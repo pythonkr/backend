@@ -79,7 +79,7 @@ class Presentation(BaseAbstractModel):
     summary = models.TextField(blank=True, default="")
     description = MarkdownField(blank=True, default="")
     image = models.ForeignKey(PublicFile, on_delete=models.PROTECT, null=True, blank=True)
-    slideshow_url = models.URLField(blank=True, default="")
+    slideshow_url = models.URLField(null=True, blank=True, default="")
 
     categories = models.ManyToManyField(to="PresentationCategory", through="PresentationCategoryRelation")
     objects: PresentationQuerySet = PresentationQuerySet.as_manager()
