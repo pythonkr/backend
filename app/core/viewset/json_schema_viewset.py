@@ -88,7 +88,7 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
                 elif isinstance(field, FileField):
                     self.set_ui_schema(result["ui_schema"], field.name, {"ui:field": "file"})
                 elif isinstance(field, URLField):
-                    self.set_ui_schema(result["ui_schema"], field.name, {"ui:hideError": True})
+                    result["schema"]["properties"][field.name].pop("format", None)
                 elif isinstance(field, TranslationField):
                     result["translation_fields"].add(field.translated_field.name)
                     if isinstance(field.translated_field, MarkdownField):
