@@ -131,6 +131,7 @@ class PresentationModificationAuditPreviewAdminSerializer(serializers.ModelSeria
                 "summary_en",
                 "description_ko",
                 "description_en",
+                "slideshow_url",
                 "speakers",
             )
 
