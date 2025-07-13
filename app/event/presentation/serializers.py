@@ -53,6 +53,7 @@ class PresentationSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "title",
+            "summary",
             "description",
             "image",
             "categories",
