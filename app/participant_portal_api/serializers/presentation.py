@@ -56,6 +56,7 @@ class PresentationPortalSerializer(ModificationAuditCreationPortalSerializer, se
             "description",
             "description_ko",
             "description_en",
+            "slideshow_url",
             "image",
             "speakers",
             "has_requested_modification_audit",
