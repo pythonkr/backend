@@ -126,7 +126,7 @@ class ModificationAudit(BaseAbstractModel):
                     text=SlackMarkDownChildBlock(text="어드민에서 수정 내역을 확인 후 승인 또는 반려해주세요."),
                     accessory=SlackURLButtonAccessoryBlock(
                         text=SlackPlainTextChildBlock(text="수정 심사 페이지 열기"),
-                        url=f"{settings.FRONTEND_DOMAIN.admin}/modification-audit/{self.id}",
+                        url=f"{settings.FRONTEND_DOMAIN.admin}/modification-audit/modification-audit/{self.id}",
                     ),
                 ),
             ]
