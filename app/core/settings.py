@@ -347,9 +347,9 @@ CSRF_TRUSTED_ORIGINS = (
 
 # Frontend domain settings
 FRONTEND_DOMAIN = types.SimpleNamespace(
-    main=env("FRONTEND_MAIN_DOMAIN", default="https://pycon.kr"),
-    admin=env("FRONTEND_ADMIN_DOMAIN", default="https://admin.pycon.kr"),
-    participant=env("FRONTEND_PARTICIPANT_DOMAIN", default="https://participant.pycon.kr"),
+    main=env("FRONTEND_MAIN_URL", default="https://pycon.kr"),
+    admin=env("FRONTEND_ADMIN_URL", default="https://admin.pycon.kr"),
+    participant=env("FRONTEND_PARTICIPANT_URL", default="https://participant.pycon.kr"),
 )
 
 # Django Rest Framework Settings
