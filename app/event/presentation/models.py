@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import suppress
+
 from core.models import BaseAbstractModel, BaseAbstractModelQuerySet, MarkdownField
 from django.contrib.auth import get_user_model
 from django.db import models
@@ -86,6 +88,16 @@ class Presentation(BaseAbstractModel):
 
     def __str__(self) -> str:
         return f"[{self.type.name}] {self.title}"
+
+    def active_categories(self) -> list[PresentationCategory]:
+        with suppress(AttributeError):
+            return self._prefetched_active_categories
+        return list(self.categories.filter_active())
+
+    def active_speakers(self) -> list[PresentationSpeaker]:
+        with suppress(AttributeError):
+            return self._prefetched_active_speakers
+        return list(self.speakers.filter_active())
 
 
 class PresentationCategoryRelation(models.Model):
