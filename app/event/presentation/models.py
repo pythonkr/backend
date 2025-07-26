@@ -126,9 +126,15 @@ class Room(BaseAbstractModel):
     event = models.ForeignKey(Event, on_delete=models.PROTECT)
     name = models.CharField(max_length=256)
 
+    def __str__(self) -> str:
+        return f"[{self.event.name}] {self.name}"
+
 
 class RoomSchedule(BaseAbstractModel):
     room = models.ForeignKey(Room, on_delete=models.PROTECT)
     start_at = models.DateTimeField()
     end_at = models.DateTimeField()
-    presentation = models.ForeignKey(Presentation, on_delete=models.PROTECT, null=True, blank=True)
+    presentation = models.ForeignKey(Presentation, on_delete=models.PROTECT)
+
+    def __str__(self) -> str:
+        return f"[{self.room}] {self.start_at} - {self.end_at} ({self.presentation})"
