@@ -1,7 +1,14 @@
 from core.const.serializer import COMMON_ADMIN_FIELDS
 from core.serializer.base_abstract_serializer import BaseAbstractSerializer
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
-from event.presentation.models import Presentation, PresentationCategory, PresentationSpeaker, PresentationType
+from event.presentation.models import (
+    Presentation,
+    PresentationCategory,
+    PresentationSpeaker,
+    PresentationType,
+    Room,
+    RoomSchedule,
+)
 from file.models import PublicFile
 from rest_framework import serializers
 from user.models import UserExt
@@ -62,3 +69,15 @@ class PresentationSpeakerAdminSerializer(BaseAbstractSerializer, JsonSchemaSeria
     class Meta:
         model = PresentationSpeaker
         fields = COMMON_ADMIN_FIELDS + ("presentation", "user", "image", "biography_ko", "biography_en")
+
+
+class RoomScheduleAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
+    class Meta:
+        model = RoomSchedule
+        fields = ("room", "start_time", "end_time", "presentation")
+
+
+class RoomAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
+    class Meta:
+        model = Room
+        fields = COMMON_ADMIN_FIELDS + ("event", "name_ko", "name_en")

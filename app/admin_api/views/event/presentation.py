@@ -4,12 +4,15 @@ from admin_api.filtersets.event.presentation import (
     PresentationAdminFilterSet,
     PresentationCategoryAdminFilterSet,
     PresentationSpeakerAdminFilterSet,
+    RoomScheduleAdminFilterSet,
 )
 from admin_api.serializers.event.presentation import (
     PresentationAdminSerializer,
     PresentationCategoryAdminSerializer,
     PresentationSpeakerAdminSerializer,
     PresentationTypeAdminSerializer,
+    RoomAdminSerializer,
+    RoomScheduleAdminSerializer,
 )
 from core.const.tag import OpenAPITag
 from core.permissions import IsSuperUser
@@ -20,6 +23,8 @@ from event.presentation.models import (
     PresentationCategory,
     PresentationSpeaker,
     PresentationType,
+    Room,
+    RoomSchedule,
 )
 from rest_framework import viewsets
 
@@ -59,3 +64,20 @@ class PresentationSpeakerAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     permission_classes = [IsSuperUser]
     filterset_class = PresentationSpeakerAdminFilterSet
     queryset = PresentationSpeaker.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")
+
+
+@extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION]) for m in ADMIN_METHODS})
+class RoomAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+    http_method_names = ["get", "post", "patch", "delete"]
+    serializer_class = RoomAdminSerializer
+    permission_classes = [IsSuperUser]
+    queryset = Room.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")
+
+
+@extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION]) for m in ADMIN_METHODS})
+class RoomScheduleAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+    http_method_names = ["get", "post", "patch", "delete"]
+    serializer_class = RoomScheduleAdminSerializer
+    permission_classes = [IsSuperUser]
+    filterset_class = RoomScheduleAdminFilterSet
+    queryset = RoomSchedule.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")
