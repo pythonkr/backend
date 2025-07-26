@@ -11,3 +11,7 @@ class PresentationAdminFilterSet(filters.FilterSet):
 
 class PresentationSpeakerAdminFilterSet(filters.FilterSet):
     presentation = filters.UUIDFilter(field_name="presentation_id")
+
+
+class RoomScheduleAdminFilterSet(filters.FilterSet):
+    room = filters.UUIDFilter(field_name="room_id")

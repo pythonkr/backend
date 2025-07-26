@@ -5,6 +5,8 @@ from admin_api.views.event.presentation import (
     PresentationCategoryAdminViewSet,
     PresentationSpeakerAdminViewSet,
     PresentationTypeAdminViewSet,
+    RoomAdminViewSet,
+    RoomScheduleAdminViewSet,
 )
 from admin_api.views.event.sponsor import SponsorAdminViewSet, SponsorTagAdminViewSet, SponsorTierAdminViewSet
 from admin_api.views.file import PublicFileAdminViewSet
@@ -33,6 +35,8 @@ admin_event_router.register("presentationtype", PresentationTypeAdminViewSet)
 admin_event_router.register("presentationcategory", PresentationCategoryAdminViewSet)
 admin_event_router.register("presentation", PresentationAdminViewSet)
 admin_event_router.register("presentationspeaker", PresentationSpeakerAdminViewSet)
+admin_event_router.register("room", RoomAdminViewSet)
+admin_event_router.register("roomschedule", RoomScheduleAdminViewSet)
 
 admin_modificationaudit_router = routers.SimpleRouter()
 admin_modificationaudit_router.register(

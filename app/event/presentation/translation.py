@@ -1,4 +1,4 @@
-from event.presentation.models import Presentation, PresentationCategory, PresentationSpeaker, PresentationType
+from event.presentation.models import Presentation, PresentationCategory, PresentationSpeaker, PresentationType, Room
 from modeltranslation.translator import TranslationOptions, register
 
 
@@ -20,3 +20,8 @@ class PresentationTranslationOptions(TranslationOptions):
 @register(PresentationSpeaker)
 class PresentationSpeakerTranslationOptions(TranslationOptions):
     fields = ("biography",)
+
+
+@register(Room)
+class RoomTranslationOptions(TranslationOptions):
+    fields = ("name",)
