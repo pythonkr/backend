@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import datetime
+import uuid
 from contextlib import suppress
+from typing import Self
 
 from core.models import BaseAbstractModel, BaseAbstractModelQuerySet, MarkdownField
 from django.contrib.auth import get_user_model
@@ -130,11 +133,25 @@ class Room(BaseAbstractModel):
         return f"[{self.event.name}] {self.name}"
 
 
+class RoomScheduleQuerySet(BaseAbstractModelQuerySet):
+    def filter_conflict(self, room: Room | uuid.UUID | str, start: datetime.datetime, end: datetime.datetime) -> Self:
+        qs = self
+
+        if isinstance(room, (uuid.UUID, str)):
+            qs = qs.filter(room_id=room)
+        elif isinstance(room, Room):
+            qs = qs.filter(room=room)
+
+        return qs.filter(start_at__lt=end, end_at__gt=start)
+
+
 class RoomSchedule(BaseAbstractModel):
     room = models.ForeignKey(Room, on_delete=models.PROTECT)
     start_at = models.DateTimeField()
     end_at = models.DateTimeField()
     presentation = models.ForeignKey(Presentation, on_delete=models.PROTECT)
+
+    objects: RoomScheduleQuerySet = RoomScheduleQuerySet.as_manager()
 
     def __str__(self) -> str:
         return f"[{self.room}] {self.start_at} - {self.end_at} ({self.presentation})"
