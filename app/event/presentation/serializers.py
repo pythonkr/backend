@@ -25,12 +25,10 @@ class PresentationSpeakerSerializer(serializers.ModelSerializer):
 
 class RoomScheduleSerializer(serializers.ModelSerializer):
     room_name = serializers.CharField(source="room.name", read_only=True)
-    event_id = serializers.IntegerField(source="room.event.id", read_only=True)
-    event_name = serializers.CharField(source="room.event.name", read_only=True)
 
     class Meta:
         model = RoomSchedule
-        fields = ("id", "room_name", "event_id", "event_name", "start_at", "end_at")
+        fields = ("id", "room_name", "start_at", "end_at")
 
 
 class CallForPresentationScheduleSerializer(serializers.ModelSerializer):
@@ -45,7 +43,7 @@ class PresentationSerializer(serializers.ModelSerializer):
     image = serializers.FileField(source="image.file", read_only=True, allow_null=True)
     categories = PresentationCategorySerializer(many=True, read_only=True, source="active_categories")
     speakers = PresentationSpeakerSerializer(many=True, read_only=True, source="active_speakers")
-    room_schedules = RoomScheduleSerializer(source="room_schedules_set", many=True, read_only=True)
+    room_schedules = RoomScheduleSerializer(many=True, read_only=True, source="active_room_schedules")
     call_for_presentation_schedules = CallForPresentationScheduleSerializer(many=True, read_only=True)
 
     class Meta:

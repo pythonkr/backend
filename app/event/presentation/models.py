@@ -30,8 +30,8 @@ class PresentationQuerySet(BaseAbstractModelQuerySet):
                     to_attr="_prefetched_active_speakers",
                 ),
                 models.Prefetch(
-                    lookup="roomschedule_set",
-                    queryset=RoomSchedule.objects.filter_active().select_related("room", "room__event"),
+                    lookup="room_schedules",
+                    queryset=RoomSchedule.objects.filter_active().select_related("room"),
                     to_attr="_prefetched_active_room_schedules",
                 ),
                 models.Prefetch(
@@ -102,6 +102,11 @@ class Presentation(BaseAbstractModel):
             return self._prefetched_active_speakers
         return list(self.speakers.filter_active())
 
+    def active_room_schedules(self) -> list[RoomSchedule]:
+        with suppress(AttributeError):
+            return self._prefetched_active_room_schedules
+        return list(self.room_schedules.filter_active())
+
 
 class PresentationCategoryRelation(models.Model):
     presentation = models.ForeignKey(Presentation, on_delete=models.CASCADE)
@@ -149,7 +154,7 @@ class RoomSchedule(BaseAbstractModel):
     room = models.ForeignKey(Room, on_delete=models.PROTECT)
     start_at = models.DateTimeField()
     end_at = models.DateTimeField()
-    presentation = models.ForeignKey(Presentation, on_delete=models.PROTECT)
+    presentation = models.ForeignKey(Presentation, on_delete=models.PROTECT, related_name="room_schedules")
 
     objects: RoomScheduleQuerySet = RoomScheduleQuerySet.as_manager()
 
