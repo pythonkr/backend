@@ -75,7 +75,7 @@ class PresentationSpeakerAdminSerializer(BaseAbstractSerializer, JsonSchemaSeria
 class RoomScheduleAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
     class Meta:
         model = RoomSchedule
-        fields = ("room", "start_at", "end_at", "presentation")
+        fields = ("id", "room", "start_at", "end_at", "presentation")
 
     def validate(self, attrs: dict) -> dict:
         start_at = any_to_datetime(attrs.get("start_at", getattr(self.instance, "start_at", None)))
