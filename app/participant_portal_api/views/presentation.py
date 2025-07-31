@@ -32,10 +32,12 @@ class PresentationPortalViewSet(
             super()
             .get_queryset()
             .filter(
-                id__in=PresentationSpeaker.objects.filter(
+                id__in=PresentationSpeaker.objects.filter_active()
+                .filter(
                     user=self.request.user,
                     presentation__deleted_at__isnull=True,
-                ).values_list("presentation_id", flat=True),
+                )
+                .values_list("presentation_id", flat=True),
             )
         )
 
