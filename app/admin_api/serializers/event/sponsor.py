@@ -33,4 +33,5 @@ class SponsorAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, seria
             "description_en",
             "tiers",
             "tags",
+            "fixed_at",
         )
