@@ -16,9 +16,10 @@ class Sponsor(BaseAbstractModel):
 
     tiers = models.ManyToManyField(to="SponsorTier", through="SponsorTierSponsorRelation")
     tags = models.ManyToManyField(to="SponsorTag", through="SponsorTagRelation")
+    fixed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        ordering = ["name"]
+        ordering = ["name", "fixed_at"]
         constraints = [
             models.UniqueConstraint(
                 fields=["event", "name"],
