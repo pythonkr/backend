@@ -19,7 +19,7 @@ class Sponsor(BaseAbstractModel):
     fixed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        ordering = ["-fixed_at", "name"]
+        ordering = ["fixed_at", "name"]
         indexes = [models.Index(fields=["event", "fixed_at"], name="idx__spsr__event_fixed_at")]
         constraints = [
             models.UniqueConstraint(
