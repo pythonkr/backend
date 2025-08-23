@@ -62,7 +62,7 @@ class GoogleOAuth2ViewSet(viewsets.ViewSet):
         try:
             refresh_token = fetch_credentials(flow, code).refresh_token
             system = UserExt.get_system_user()
-            GoogleOAuth2.objects.get_or_create(refresh_token=refresh_token, created_by=system, modified_by=system)
+            GoogleOAuth2.objects.get_or_create(refresh_token=refresh_token, created_by=system, updated_by=system)
             return response.Response({"detail": "Google OAuth setup completed successfully."})
         except Exception as e:
             logger.error(f"Failed to fetch Google OAuth2 credentials: {e}", exc_info=e)
