@@ -21,7 +21,7 @@ def create_oauth_flow() -> Flow | None:
             },
         },
         scopes=settings.GOOGLE_CLOUD.SCOPES,
-        redirect_uri=urljoin(settings.BACKEND_DOMAIN, reverse("v1:google-oauth2-authorize")),
+        redirect_uri=urljoin(settings.BACKEND_DOMAIN, reverse("v1:google-oauth2-redirect")),
     )
 
 
