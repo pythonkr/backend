@@ -60,6 +60,10 @@ local-shell:
 local-shell-plus:
 	@ENV_PATH=envfile/.env.local uv run python app/manage.py shell_plus
 
+# Run django db-shell
+local-dbshell:
+	@ENV_PATH=envfile/.env.local uv run python app/manage.py dbshell
+
 # Run django makemigrations
 local-makemigrations:
 	@ENV_PATH=envfile/.env.local uv run python app/manage.py makemigrations
