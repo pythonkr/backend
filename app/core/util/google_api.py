@@ -1,9 +1,10 @@
 from urllib.parse import urljoin
 
-from core.const.google_api import GOOGLE_OAUTH2_AUTH_URI, GOOGLE_OAUTH2_REDIRECT_PATH, GOOGLE_OAUTH2_TOKEN_URI
+from core.const.google_api import GOOGLE_OAUTH2_AUTH_URI, GOOGLE_OAUTH2_TOKEN_URI
 from django.conf import settings
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
+from rest_framework.reverse import reverse
 
 
 def create_oauth_flow() -> Flow | None:
@@ -20,7 +21,7 @@ def create_oauth_flow() -> Flow | None:
             },
         },
         scopes=settings.GOOGLE_CLOUD.SCOPES,
-        redirect_uri=urljoin(settings.BACKEND_DOMAIN, GOOGLE_OAUTH2_REDIRECT_PATH),
+        redirect_uri=urljoin(settings.BACKEND_DOMAIN, reverse("v1:google-oauth2-authorize")),
     )
 
 
