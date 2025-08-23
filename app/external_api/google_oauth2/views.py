@@ -1,4 +1,5 @@
 from logging import getLogger
+from traceback import format_exception
 
 from core.util.google_api import create_authorization_url, create_oauth_flow, fetch_credentials
 from django.shortcuts import redirect
@@ -65,4 +66,4 @@ class GoogleOAuth2ViewSet(viewsets.ViewSet):
             return response.Response({"detail": "Google OAuth setup completed successfully."})
         except Exception as e:
             logger.error(f"Failed to fetch Google OAuth2 credentials: {e}", exc_info=e)
-            return self._response_400(f"Failed to fetch credentials: {e}")
+            return self._response_400(f"Failed to fetch credentials: {e}", "".join(format_exception(e)))
