@@ -29,6 +29,7 @@ v1_apis: list[resolvers.URLPattern | resolvers.URLResolver] = [
     path("participant-portal/", include("participant_portal_api.urls")),
     path("event/presentation/", include("event.presentation.urls")),
     path("event/sponsor/", include("event.sponsor.urls")),
+    path("external-api/", include("external_api.urls")),
 ]
 
 urlpatterns = [
