@@ -166,6 +166,8 @@ INSTALLED_APPS = [
     "event.sponsor",
     "admin_api",
     "participant_portal_api",
+    "external_api",
+    "external_api.google_oauth2",
     # django-constance
     "constance",
 ]
@@ -346,6 +348,7 @@ CSRF_TRUSTED_ORIGINS = (
 )
 
 # Frontend domain settings
+BACKEND_DOMAIN = env("BACKEND_DOMAIN", default="https://rest-api.pycon.kr")
 FRONTEND_DOMAIN = types.SimpleNamespace(
     main=env("FRONTEND_MAIN_URL", default="https://pycon.kr"),
     admin=env("FRONTEND_ADMIN_URL", default="https://admin.pycon.kr"),
@@ -370,6 +373,12 @@ SPECTACULAR_SETTINGS = {
         "docExpansion": "none",  # Collapse all endpoints by default
     },
 }
+
+GOOGLE_CLOUD = types.SimpleNamespace(
+    CLIENT_ID=env("GOOGLE_OAUTH_CLIENT_ID", default=""),
+    CLIENT_SECRET=env("GOOGLE_OAUTH_CLIENT_SECRET", default=""),
+    SCOPES=env.list("GOOGLE_OAUTH_SCOPES", default=[]),
+)
 
 # Sentry Settings
 if SENTRY_DSN := env("SENTRY_DSN", default=""):
