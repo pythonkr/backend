@@ -5,11 +5,7 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-    dependencies = [
-        ("file", "0002_alter_publicfile_file"),
-        ("presentation", "0013_alter_roomschedule_presentation"),
-    ]
-
+    dependencies = [("presentation", "0013_alter_roomschedule_presentation")]
     operations = [
         migrations.AddField(
             model_name="historicalpresentation",
