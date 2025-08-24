@@ -45,6 +45,7 @@ class PresentationSerializer(serializers.ModelSerializer):
     speakers = PresentationSpeakerSerializer(many=True, read_only=True, source="active_speakers")
     room_schedules = RoomScheduleSerializer(many=True, read_only=True, source="active_room_schedules")
     call_for_presentation_schedules = CallForPresentationScheduleSerializer(many=True, read_only=True)
+    public_slideshow_file = serializers.FileField(source="public_slideshow_file.file", read_only=True, allow_null=True)
 
     class Meta:
         model = Presentation
@@ -54,6 +55,7 @@ class PresentationSerializer(serializers.ModelSerializer):
             "summary",
             "description",
             "slideshow_url",
+            "public_slideshow_file",
             "image",
             "categories",
             "speakers",

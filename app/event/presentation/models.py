@@ -83,8 +83,16 @@ class Presentation(BaseAbstractModel):
     title = models.CharField(max_length=256)
     summary = models.TextField(blank=True, default="")
     description = MarkdownField(blank=True, default="")
-    image = models.ForeignKey(PublicFile, on_delete=models.PROTECT, null=True, blank=True)
-    slideshow_url = models.URLField(null=True, blank=True, default="")
+    image = models.ForeignKey(PublicFile, on_delete=models.PROTECT, null=True, blank=True, related_name="+")
+    slideshow_url = models.URLField(null=True, blank=True, default="", help_text="발표자가 제출한 발표 자료 URL")
+    public_slideshow_file = models.ForeignKey(
+        PublicFile,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        help_text="최종 외부 공개용 발표 자료",
+        related_name="+",
+    )
 
     categories = models.ManyToManyField(to="PresentationCategory", through="PresentationCategoryRelation")
     objects: PresentationQuerySet = PresentationQuerySet.as_manager()

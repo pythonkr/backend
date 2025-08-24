@@ -34,6 +34,9 @@ class PresentationAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, 
     image = serializers.PrimaryKeyRelatedField(
         queryset=PublicFile.objects.filter_active(), allow_null=True, required=False
     )
+    public_slideshow_file = serializers.PrimaryKeyRelatedField(
+        queryset=PublicFile.objects.filter_active(), allow_null=True, required=False
+    )
 
     class Meta:
         model = Presentation
@@ -45,6 +48,7 @@ class PresentationAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, 
             "summary_ko",
             "summary_en",
             "slideshow_url",
+            "public_slideshow_file",
             "image",
             "description_ko",
             "description_en",
