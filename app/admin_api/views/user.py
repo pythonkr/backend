@@ -1,10 +1,13 @@
+import secrets
+import string
+
 from admin_api.serializers.user import (
     OrganizationAdminSerializer,
     UserAdminPasswordChangeSerializer,
+    UserAdminPasswordResetResponseSerializer,
     UserAdminSerializer,
     UserAdminSignInSerializer,
 )
-from core.const.account import INITIAL_ADMIN_PASSWORD
 from core.const.tag import OpenAPITag
 from core.permissions import IsSuperUser
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
@@ -58,13 +61,22 @@ class UserAdminViewSet(
         logout(request=request)
         return response.Response(status=status.HTTP_204_NO_CONTENT)
 
-    @extend_schema(tags=[OpenAPITag.ADMIN_USER], responses={status.HTTP_204_NO_CONTENT: None})
+    @extend_schema(
+        tags=[OpenAPITag.ADMIN_USER],
+        responses={status.HTTP_200_OK: UserAdminPasswordResetResponseSerializer},
+    )
     @decorators.action(detail=True, methods=["DELETE"], url_path="password")
     def reset_password(self, *args: tuple, **kwargs: dict) -> response.Response:
+        alphabet = string.ascii_letters + string.digits + string.punctuation
+        new_password = "".join(secrets.choice(alphabet) for _ in range(16))
+
         user: UserExt = self.get_object()
-        user.set_password(INITIAL_ADMIN_PASSWORD)
+        user.set_password(new_password)
         user.save(update_fields=["password"])
-        return response.Response(status=status.HTTP_204_NO_CONTENT)
+        return response.Response(
+            data={"password": new_password},
+            status=status.HTTP_200_OK,
+        )
 
     @extend_schema(
         tags=[OpenAPITag.ADMIN_ACCOUNT],
