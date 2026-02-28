@@ -102,6 +102,10 @@ class UserAdminPasswordChangeSerializer(JsonSchemaSerializer, ReadOnlyModelSeria
         return user
 
 
+class UserAdminPasswordResetResponseSerializer(serializers.Serializer):
+    password = serializers.CharField(read_only=True)
+
+
 class OrganizationAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
     class Meta:
         model = Organization
