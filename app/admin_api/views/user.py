@@ -1,6 +1,3 @@
-import secrets
-import string
-
 from admin_api.serializers.user import (
     OrganizationAdminSerializer,
     UserAdminPasswordChangeSerializer,
@@ -8,6 +5,7 @@ from admin_api.serializers.user import (
     UserAdminSerializer,
     UserAdminSignInSerializer,
 )
+from core.const.account import generate_random_password
 from core.const.tag import OpenAPITag
 from core.permissions import IsSuperUser
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
@@ -33,6 +31,16 @@ class UserAdminViewSet(
     serializer_class = UserAdminSerializer
     permission_classes = [IsSuperUser]
     queryset = UserExt.objects.filter(is_active=True)
+
+    def create(self, request: request.Request, *args: tuple, **kwargs: dict) -> response.Response:
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+
+        data = serializer.data
+        data["password"] = serializer._generated_password
+        headers = self.get_success_headers(data)
+        return response.Response(data=data, status=status.HTTP_201_CREATED, headers=headers)
 
     @extend_schema(tags=[OpenAPITag.ADMIN_ACCOUNT], responses={status.HTTP_200_OK: UserAdminSerializer})
     @decorators.action(detail=False, methods=["GET"], permission_classes=[])
@@ -67,8 +75,7 @@ class UserAdminViewSet(
     )
     @decorators.action(detail=True, methods=["DELETE"], url_path="password")
     def reset_password(self, *args: tuple, **kwargs: dict) -> response.Response:
-        alphabet = string.ascii_letters + string.digits + string.punctuation
-        new_password = "".join(secrets.choice(alphabet) for _ in range(16))
+        new_password = generate_random_password()
 
         user: UserExt = self.get_object()
         user.set_password(new_password)
