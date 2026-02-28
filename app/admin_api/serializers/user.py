@@ -1,7 +1,7 @@
 import functools
 import typing
 
-from core.const.account import INITIAL_ADMIN_PASSWORD
+from core.const.account import generate_random_password
 from core.const.serializer import COMMON_ADMIN_FIELDS
 from core.serializer.base_abstract_serializer import BaseAbstractSerializer
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
@@ -36,7 +36,9 @@ class UserAdminSerializer(JsonSchemaSerializer, serializers.ModelSerializer):
         }
 
     def create(self, validated_data: dict[str, typing.Any]) -> UserExt:
-        return UserExt.objects.create_user(**validated_data, password=INITIAL_ADMIN_PASSWORD)
+        password = generate_random_password()
+        self._generated_password = password
+        return UserExt.objects.create_user(**validated_data, password=password)
 
 
 class UserAdminSignInSerializerData(typing.TypedDict):
