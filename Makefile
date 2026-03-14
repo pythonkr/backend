@@ -3,12 +3,8 @@ PROJECT_DIR := $(dir $(MKFILE_PATH))
 
 # Set additional build args for docker image build using make arguments
 IMAGE_NAME := pycon_backend
-ifeq (docker-build,$(firstword $(MAKECMDGOALS)))
-  TAG_NAME := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
-  $(eval $(TAG_NAME):;@:)
-endif
-TAG_NAME := $(if $(TAG_NAME),$(TAG_NAME),local)
-CONTAINER_NAME = $(IMAGE_NAME)_$(TAG_NAME)_container
+LAMBDA_CONTAINER_NAME = $(IMAGE_NAME)_lambda_container
+SERVER_CONTAINER_NAME = $(IMAGE_NAME)_server_container
 
 ifeq ($(DOCKER_DEBUG),true)
 	DOCKER_MID_BUILD_OPTIONS = --progress=plain --no-cache
@@ -107,39 +103,68 @@ zappa-export:
 	uv run zappa save-python-settings-file
 
 # =============================================================================
-# Docker related commands
+# Docker related commands (Lambda)
 
-# Docker image build
-# Usage: make docker-build <tag-name:=local>
-# if you want to build with debug mode, set DOCKER_DEBUG=true
-# ex) make docker-build or make docker-build some_TAG_NAME DOCKER_DEBUG=true
-docker-build:
+# Lambda Docker image build
+docker-lambda-build:
 	@docker build \
-		-f ./infra/Dockerfile -t $(IMAGE_NAME):$(TAG_NAME) \
+		-f ./infra/lambda.Dockerfile -t $(IMAGE_NAME):lambda \
 		--build-arg GIT_HASH=$(shell git rev-parse HEAD) \
 		--build-arg IMAGE_BUILD_DATETIME=$(shell date +%Y-%m-%d_%H:%M:%S) \
 		$(DOCKER_MID_BUILD_OPTIONS) $(PROJECT_DIR) $(DOCKER_END_BUILD_OPTIONS)
 
-docker-run: docker-compose-up
-	@(docker stop $(CONTAINER_NAME) || true && docker rm $(CONTAINER_NAME) || true) > /dev/null 2>&1
+docker-lambda-run: docker-compose-up
+	@(docker stop $(LAMBDA_CONTAINER_NAME) || true && docker rm $(LAMBDA_CONTAINER_NAME) || true) > /dev/null 2>&1
 	@docker run -d --rm \
 		-p 48000:8080 \
 		--env-file envfile/.env.local --env-file envfile/.env.docker \
-		--name $(CONTAINER_NAME) \
-		$(IMAGE_NAME):$(TAG_NAME)
+		--name $(LAMBDA_CONTAINER_NAME) \
+		$(IMAGE_NAME):lambda
 
-docker-readyz:
+docker-lambda-readyz:
 	curl -X POST http://localhost:48000/2015-03-31/functions/function/invocations -d $(AWS_LAMBDA_READYZ_PAYLOAD) | jq '.body | fromjson'
 
-docker-test: docker-run docker-readyz
+docker-lambda-test: docker-lambda-run docker-lambda-readyz
 
-docker-build-and-test: docker-build docker-test
+docker-lambda-build-and-test: docker-lambda-build docker-lambda-test
 
-docker-stop:
-	docker stop $(CONTAINER_NAME) || true
+docker-lambda-stop:
+	docker stop $(LAMBDA_CONTAINER_NAME) || true
 
-docker-rm: docker-stop
-	docker rm $(CONTAINER_NAME) || true
+docker-lambda-rm: docker-lambda-stop
+	docker rm $(LAMBDA_CONTAINER_NAME) || true
+
+# =============================================================================
+# Docker related commands (Server)
+
+# Server Docker image build
+docker-server-build:
+	@docker build \
+		-f ./infra/server.Dockerfile -t $(IMAGE_NAME):server \
+		--build-arg GIT_HASH=$(shell git rev-parse HEAD) \
+		--build-arg IMAGE_BUILD_DATETIME=$(shell date +%Y-%m-%d_%H:%M:%S) \
+		$(DOCKER_MID_BUILD_OPTIONS) $(PROJECT_DIR) $(DOCKER_END_BUILD_OPTIONS)
+
+docker-server-run: docker-compose-up
+	@(docker stop $(SERVER_CONTAINER_NAME) || true && docker rm $(SERVER_CONTAINER_NAME) || true) > /dev/null 2>&1
+	@docker run -d --rm \
+		-p 8000:8000 \
+		--env-file envfile/.env.local --env-file envfile/.env.docker \
+		--name $(SERVER_CONTAINER_NAME) \
+		$(IMAGE_NAME):server
+
+docker-server-readyz:
+	curl -s http://localhost:8000/readyz/ | jq '.'
+
+docker-server-test: docker-server-run docker-server-readyz
+
+docker-server-build-and-test: docker-server-build docker-server-test
+
+docker-server-stop:
+	docker stop $(SERVER_CONTAINER_NAME) || true
+
+docker-server-rm: docker-server-stop
+	docker rm $(SERVER_CONTAINER_NAME) || true
 
 # Docker compose setup
 # Below commands are for local development only

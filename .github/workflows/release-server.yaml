@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       WORKFLOW_PHASE:
-        description: "zappa env setup"
+        description: "배포할 대상 환경을 선택하세요."
         required: true
         default: dev
         type: choice
@@ -26,7 +26,6 @@ jobs:
     env:
       API_STAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.WORKFLOW_PHASE || 'dev' }}
       BUMP_RULE: ${{ (github.event_name == 'workflow_dispatch' && inputs.WORKFLOW_PHASE || 'dev') == 'dev' && '--stage' || '' }}
-      AWS_ECR_REGISTRY: ${{ github.event_name == 'workflow_dispatch' && secrets.AWS_ECR_PROD_URL || secrets.AWS_ECR_DEV_URL }}
 
     steps:
       # Checkout source codes
@@ -34,14 +33,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      # Setup AWS Credentials, Python, uv, docker buildx, and login to ECR.
-      - name: Setup AWS Credentials
-        uses: aws-actions/configure-aws-credentials@master
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -54,10 +45,12 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Login to ECR
+
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.AWS_ECR_REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Get current date, repo name and release tag version
         id: info
@@ -67,16 +60,18 @@ jobs:
           echo "::set-output name=date::$(date +'%Y-%m-%d_%H:%M:%S')"
           echo "::set-output name=repository_name::$(echo ${{ github.repository }} | sed -e 's/${{ github.repository_owner }}\///')"
 
-      # Build and Push Docker image to ECR
-      - name: Build and Push Docker image to ECR
+      # Build and Push Docker image to Docker Hub
+      - name: Build and Push Docker image to Docker Hub
         uses: docker/build-push-action@v5
         with:
           push: true
-          tags: ${{ env.AWS_ECR_REGISTRY }}:${{ steps.info.outputs.TAG }},${{ env.AWS_ECR_REGISTRY }}:latest
+          tags: |
+            ${{ secrets.DOCKERHUB_IMAGE }}:${{ steps.info.outputs.TAG }}
+            ${{ secrets.DOCKERHUB_IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           context: .
-          file: ./infra/Dockerfile
+          file: ./infra/server.Dockerfile
           platforms: linux/amd64
           provenance: false
           build-args: |
@@ -89,42 +84,6 @@ jobs:
         run: |
           git tag ${{ steps.info.outputs.TAG }}
           git push origin ${{ steps.info.outputs.TAG }}
-
-      # Checkout and import zappa config & environment variables from pyconkr-secrets repo
-      - name: Checkout secrets repo
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ secrets.PYCONKR_SECRET_REPOSITORY }}
-          ssh-key: ${{ secrets.PYCONKR_SECRET_REPOSITORY_DEPLOY_KEY }}
-          path: secret_envs
-          clean: false
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |
-            ${{ steps.info.outputs.repository_name }}/zappa_settings.json
-            ${{ steps.info.outputs.repository_name }}/environment_variables.json
-      - run: mv secret_envs/${{ steps.info.outputs.repository_name }}/*.json ./ && rm -rf secret_envs
-
-      # Apply environment variables in environment_variables.json to AWS SSM Parameter Store.
-      - run: |
-          python .github/scripts/update_ssm_parameter_store.py \
-            --project_name ${{ steps.info.outputs.repository_name }} \
-            --stage ${{ env.API_STAGE }} \
-            --json_file environment_variables.json
-
-      # Zappa update
-      - name: Zappa Update
-        run: uv run zappa update ${{ env.API_STAGE }} --docker-image-uri ${{ env.AWS_ECR_REGISTRY }}:${{ steps.info.outputs.TAG }}
-
-      - name: Django collect staticfiles
-        run: uv run zappa manage ${{ env.API_STAGE }} "collectstatic --no-input"
-
-      # Django migrate
-      - name: Django migrate
-        run: uv run zappa manage ${{ env.API_STAGE }} "migrate --noinput"
-
-      # Zappa certify
-      - name: Zappa Certify
-        run: uv run zappa certify ${{ env.API_STAGE }} --yes
 
       # Notify to Slack (Success)
       - name: Notify deployment to Slack
@@ -139,7 +98,7 @@ jobs:
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "${{ steps.info.outputs.repository_name }} ${{ steps.info.outputs.TAG }} 버전 배포 실패 :rotating_light: (${{ job.status }})",
+                    "text": "${{ steps.info.outputs.repository_name }} ${{ steps.info.outputs.TAG }} 버전 Build & Push 실패 :rotating_light: (${{ job.status }})",
                     "emoji": true
                   }
                 },
@@ -171,7 +130,7 @@ jobs:
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "${{ steps.info.outputs.repository_name }} ${{ steps.info.outputs.TAG }} 버전 배포 성공 :tada:",
+                    "text": "${{ steps.info.outputs.repository_name }} ${{ steps.info.outputs.TAG }} 버전 Build & Push 성공 :tada:",
                     "emoji": true
                   }
                 },
