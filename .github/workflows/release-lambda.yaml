@@ -1,4 +1,4 @@
-name: Release
+name: Release-AWS Lambda
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
