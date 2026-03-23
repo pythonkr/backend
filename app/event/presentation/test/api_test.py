@@ -1,6 +1,6 @@
 import http
 import urllib.parse
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import pytest
 from django.urls import reverse
