@@ -51,23 +51,24 @@ repos:
     rev: "6.0.1"
     hooks:
       - id: isort
-  - repo: https://github.com/dosisod/refurb
-    rev: v2.0.0
-    hooks:
-      - id: refurb
-        additional_dependencies:
-          - boto3
-          - django-constance
-          - django-cors-headers
-          - django-environ
-          - django-extensions
-          - django-filter
-          - django-simple-history
-          - django-stubs[compatible-mypy]
-          - drf-spectacular
-          - drf-standardized-errors
-          - djangorestframework-stubs[compatible-mypy]
-          - zappa-django-utils
+  # TODO: https://github.com/dosisod/refurb/issues/372 문제 해소 후 uncomment 필요
+  # - repo: https://github.com/dosisod/refurb
+  #   rev: v2.0.0
+  #   hooks:
+  #     - id: refurb
+  #       additional_dependencies:
+  #         - boto3
+  #         - django-constance
+  #         - django-cors-headers
+  #         - django-environ
+  #         - django-extensions
+  #         - django-filter
+  #         - django-simple-history
+  #         - django-stubs[compatible-mypy]
+  #         - drf-spectacular
+  #         - drf-standardized-errors
+  #         - djangorestframework-stubs[compatible-mypy]
+  #         - zappa-django-utils
   - repo: https://github.com/astral-sh/uv-pre-commit
     rev: 0.6.12
     hooks:
