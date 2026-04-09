@@ -5,63 +5,66 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = "==3.12.*"
 dependencies = [
-    "argon2-cffi>=23.1.0",
-    "awslambdaric>=3.0.2",
+    "argon2-cffi>=25.1.0",
+    "awslambdaric>=4.0.0",
     "boto3 (>=1.37.37,<2.0.0)",
-    "django>=5.2",
-    "django-constance>=4.3.2",
-    "django-cors-headers>=4.7.0",
-    "django-environ>=0.12.0",
-    "django-extensions>=3.2.3",
-    "django-filter>=25.1",
-    "django-modeltranslation>=0.19.13",
-    "django-picklefield>=3.3",
-    "django-simple-history>=3.8.0",
+    "django>=6.0.4",
+    "django-constance>=4.3.5",
+    "django-cors-headers>=4.9.0",
+    "django-environ>=0.13.0",
+    "django-extensions>=4.1",
+    "django-filter>=25.2",
+    "django-modeltranslation>=0.20.2",
+    "django-picklefield>=3.4.0",
+    "django-simple-history>=3.11.0",
     "django-storages[s3]>=1.14.6",
-    "djangorestframework>=3.16.0",
-    "drf-spectacular>=0.28.0",
-    "drf-standardized-errors[openapi]>=0.14.1",
-    "faker>=37.3.0",
-    "gunicorn>=23.0.0",
-    "google-api-python-client>=2.179.0",
-    "google-auth-httplib2>=0.2.0",
-    "google-auth-oauthlib>=1.2.2",
+    "djangorestframework>=3.17.1",
+    "drf-spectacular>=0.29.0",
+    "drf-standardized-errors[openapi]>=0.15.0",
+    "faker>=40.13.0",
+    "gunicorn>=25.3.0",
+    "google-api-python-client>=2.194.0",
+    "google-auth-httplib2>=0.3.1",
+    "google-auth-oauthlib>=1.3.1",
     "httpx>=0.28.1",
     "jinja2>=3.1.6",
-    "model-bakery>=1.20.4",
-    "packaging>=24.2",
-    "psycopg[binary]>=3.2.6",
+    "model-bakery>=1.23.4",
+    "packaging>=26.0",
+    "psycopg[binary]>=3.3.3",
     "py-openapi-schema-to-json-schema>=0.0.3",
-    "sentry-sdk[django]>=2.25.1",
-    "setuptools>=78.1.0",
-    "zappa>=0.59.0",
+    "sentry-sdk[django]>=2.57.0",
+    "setuptools>=82.0.1",
+    "zappa>=0.62.1",
     "zappa-django-utils>=0.4.1",
 ]
 
 [dependency-groups]
 dev = [
-    "boto3-stubs[essential,s3,ssm]>=1.37.28",
-    "django-stubs[compatible-mypy]>=5.1.3",
-    "djangorestframework-stubs[compatible-mypy]>=3.15.3",
-    "ipython>=9.0.2",
-    "pre-commit>=4.2.0",
-    "pytest>=8.3.5",
-    "pytest-django>=4.11.1",
+    "boto3-stubs[essential,s3,ssm]>=1.42.86",
+    "django-stubs[compatible-mypy]>=6.0.2",
+    "djangorestframework-stubs[compatible-mypy]>=3.16.9",
+    "ipython>=9.12.0",
+    "pre-commit>=4.5.1",
+    "pytest>=9.0.3",
+    "pytest-django>=4.12.0",
     "pytest-socket>=0.7.0",
 ]
 deployment = [
-    "boto3>=1.37.28",
-    "django>=5.2",
-    "django-environ>=0.12.0",
+    "boto3>=1.42.86",
+    "django>=6.0.4",
+    "django-environ>=0.13.0",
     "django-storages[s3]>=1.14.6",
-    "djangorestframework>=3.16.0",
-    "setuptools>=78.1.0",
-    "zappa>=0.59.0",
+    "djangorestframework>=3.17.1",
+    "setuptools>=82.0.1",
+    "zappa>=0.62.1",
 ]
 
 [tool.uv]
 package = false
-default-groups = ["dev", "deployment"]
+default-groups = [
+    "dev",
+    "deployment",
+]
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.3.5,<9.0.0"
@@ -70,14 +73,12 @@ pytest-socket = "^0.7.0"
 faker = "^37.3.0"
 model-bakery = "^1.20.4"
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
 [tool.isort]
 profile = "black"
 line_length = 120
-known_third_party = ["rest_framework"]
+known_third_party = [
+    "rest_framework",
+]
 
 [tool.django-stubs]
 django_settings_module = "core.settings"
@@ -87,10 +88,18 @@ line-length = 120
 target-version = "py312"
 
 [tool.ruff.lint]
-fixable = ["ALL"]
+fixable = [
+    "ALL",
+]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "core.settings"
 norecursedirs = ".git migrations static template"
 python_files = "*_test.py"
 addopts = "--reuse-db --disable-socket -v"
+
+[build-system]
+requires = [
+    "hatchling",
+]
+build-backend = "hatchling.build"
