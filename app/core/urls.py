@@ -40,7 +40,8 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     # V1 API
     re_path("^v1/", include((v1_apis, "v1"), namespace="v1")),
-] + [
+    # API Docs
+    path("api/schema/v1/", SpectacularAPIView.as_view(api_version="v1"), name="v1-schema"),
     # Static files
     *static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT),
     *static(settings.STATIC_URL, document_root=settings.STATIC_ROOT),
@@ -48,7 +49,5 @@ urlpatterns = [
 
 if settings.DEBUG:
     urlpatterns += [
-        # API Docs
-        path("api/schema/v1/", SpectacularAPIView.as_view(api_version="v1"), name="v1-schema"),
         path("api/schema/v1/swagger/", SpectacularSwaggerView.as_view(url_name="v1-schema"), name="swagger-v1-ui"),
     ]
