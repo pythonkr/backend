@@ -32,6 +32,10 @@ class BaseAbstractModelQuerySet(models.QuerySet):
     def filter_active(self) -> typing.Self:
         return self.filter(deleted_at__isnull=True)
 
+    def select_related_with_user(self, *fields) -> typing.Self:
+        _fields = set(fields) | {"created_by", "updated_by", "deleted_by"}
+        return self.select_related(*_fields)
+
 
 class BaseAbstractModel(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
