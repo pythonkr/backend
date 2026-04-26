@@ -45,11 +45,13 @@ class GoogleOAuth2ViewSet(viewsets.ViewSet):
         )
 
     @decorators.action(detail=False, methods=["get"], url_path="authorize", url_name="authorize")
-    def authorize_google_oauth2(self, *args: tuple, **kwargs: dict) -> response.Response:
+    def authorize_google_oauth2(self, request: request.Request, *args, **kwargs) -> response.Response:
         if not (flow := create_oauth_flow()):
             return self._response_500("Google OAuth is not configured.")
 
-        return redirect(create_authorization_url(flow=flow))
+        url, code_verifier = create_authorization_url(flow=flow)
+        request.session["google_oauth2_code_verifier"] = code_verifier
+        return redirect(url)
 
     @decorators.action(detail=False, methods=["get"], url_path="redirect", url_name="redirect")
     def redirect_google_oauth2(self, request: request.Request, *args, **kwargs) -> response.Response:
@@ -58,6 +60,8 @@ class GoogleOAuth2ViewSet(viewsets.ViewSet):
 
         if not (flow := create_oauth_flow()):
             return self._response_500("Google OAuth is not configured.")
+
+        flow.code_verifier = request.session.pop("google_oauth2_code_verifier", None)
 
         try:
             refresh_token = fetch_credentials(flow, code).refresh_token
