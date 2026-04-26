@@ -164,6 +164,7 @@ INSTALLED_APPS = [
     "event",
     "event.presentation",
     "event.sponsor",
+    "notification",
     "admin_api",
     "participant_portal_api",
     "external_api",
@@ -197,7 +198,7 @@ ROOT_URLCONF = "core.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": ["core/templates"],
+        "DIRS": ["core/templates", "notification/templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -378,6 +379,34 @@ GOOGLE_CLOUD = types.SimpleNamespace(
     CLIENT_ID=env("GOOGLE_OAUTH_CLIENT_ID", default=""),
     CLIENT_SECRET=env("GOOGLE_OAUTH_CLIENT_SECRET", default=""),
     SCOPES=env.list("GOOGLE_OAUTH_SCOPES", default=[]),
+)
+
+# Email (Gmail OAuth2) Settings — host/port/SSL은 Gmail 전용 고정값.
+# 로컬 개발은 envfile에서 EMAIL_BACKEND를 console 백엔드로 오버라이드.
+EMAIL_BACKEND = env("EMAIL_BACKEND", default="core.email_backends.GmailOAuth2Backend")
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 465
+EMAIL_USE_SSL = True
+EMAIL_USE_TLS = False
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_TIMEOUT = env.float("EMAIL_TIMEOUT", default=30.0)
+
+# NHN Cloud Settings
+# https://docs.nhncloud.com/ko/Notification/KakaoTalk%20Bizmessage/ko/alimtalk-api-guide/
+# https://docs.nhncloud.com/ko/Notification/SMS/ko/api-guide/
+NHN_CLOUD = types.SimpleNamespace(
+    app_key=env("NHN_CLOUD_APP_KEY", default=""),
+    secret_key=env("NHN_CLOUD_SECRET_KEY", default=""),
+    kakao_alimtalk=types.SimpleNamespace(
+        base_url=env(
+            "NHN_CLOUD_KAKAO_ALIMTALK_BASE_URL", default="https://kakaotalk-bizmessage.api.nhncloudservice.com"
+        ),
+        timeout=env.float("NHN_CLOUD_KAKAO_ALIMTALK_TIMEOUT", default=30.0),
+    ),
+    sms=types.SimpleNamespace(
+        base_url=env("NHN_CLOUD_SMS_BASE_URL", default="https://sms.api.nhncloudservice.com"),
+        timeout=env.float("NHN_CLOUD_SMS_TIMEOUT", default=30.0),
+    ),
 )
 
 # Sentry Settings

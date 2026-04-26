@@ -19,7 +19,9 @@ class BaseAbstractModelQuerySet(models.QuerySet):
         return super().create(**(kwargs | {"created_by": current_user, "updated_by": current_user}))
 
     def update(self, **kwargs: dict) -> typing.Self:
-        return super().update(**(kwargs | {"updated_by": get_current_user()}))
+        if "updated_by" not in kwargs and "updated_by_id" not in kwargs:
+            kwargs |= {"updated_by": get_current_user()}
+        return super().update(**kwargs)
 
     def delete(self) -> int:  # type: ignore[override]
         return super().update(deleted_by=get_current_user(), deleted_at=Now())
