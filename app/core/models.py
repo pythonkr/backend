@@ -19,7 +19,9 @@ class BaseAbstractModelQuerySet(models.QuerySet):
         return super().create(**(kwargs | {"created_by": current_user, "updated_by": current_user}))
 
     def update(self, **kwargs: dict) -> typing.Self:
-        return super().update(**(kwargs | {"updated_by": get_current_user()}))
+        if "updated_by" not in kwargs and "updated_by_id" not in kwargs:
+            kwargs |= {"updated_by": get_current_user()}
+        return super().update(**kwargs)
 
     def delete(self) -> int:  # type: ignore[override]
         return super().update(deleted_by=get_current_user(), deleted_at=Now())
@@ -29,6 +31,10 @@ class BaseAbstractModelQuerySet(models.QuerySet):
 
     def filter_active(self) -> typing.Self:
         return self.filter(deleted_at__isnull=True)
+
+    def select_related_with_user(self, *fields) -> typing.Self:
+        _fields = set(fields) | {"created_by", "updated_by", "deleted_by"}
+        return self.select_related(*_fields)
 
 
 class BaseAbstractModel(models.Model):
