@@ -12,6 +12,9 @@ class OpenAPITag:
     ADMIN_EVENT_SPONSOR = "Admin > Event > Sponsor"
     ADMIN_JSON_SCHEMA = "Admin > JSON Schema"
     ADMIN_MODIFICATION_AUDIT = "Admin > Modification Audit"
+    ADMIN_NOTI_EMAIL = "Admin > Notification > Email"
+    ADMIN_NOTI_KAKAO_ALIMTALK = "Admin > Notification > Kakao Alimtalk"
+    ADMIN_NOTI_SMS = "Admin > Notification > SMS"
 
     PARTICIPANT_PORTAL_USER = "Participant Portal > Sign-In & Sign-Out & My Profile"
     PARTICIPANT_PORTAL_PUBLIC_FILE = "Participant Portal > Public File"
