@@ -23,7 +23,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 COPY --chown=nobody:nobody pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     apt-get update \
-    && apt-get install -y --no-install-recommends gcc libpq-dev \
+    && apt-get install -y --no-install-recommends gcc curl libpq-dev \
     && rm -rf /var/lib/apt/lists/* \
     && uv sync --no-default-groups --frozen
 
