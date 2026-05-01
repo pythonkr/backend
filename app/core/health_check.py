@@ -53,7 +53,7 @@ def readyz(request: HttpRequest) -> Response:
     )
     return Response(
         data=response_data,
-        status=http.HTTPStatus.OK if is_dbs_ok and requires_migrations else http.HTTPStatus.SERVICE_UNAVAILABLE,
+        status=http.HTTPStatus.OK if is_dbs_ok and not requires_migrations else http.HTTPStatus.SERVICE_UNAVAILABLE,
     )
 
 

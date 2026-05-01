@@ -351,7 +351,7 @@ CSRF_TRUSTED_ORIGINS = (
 # Frontend domain settings
 BACKEND_DOMAIN = env("BACKEND_DOMAIN", default="https://rest-api.pycon.kr")
 FRONTEND_DOMAIN = types.SimpleNamespace(
-    main=env("FRONTEND_MAIN_URL", default="https://pycon.kr"),
+    main=env.list("FRONTEND_MAIN_URLS", default=["https://pycon.kr"]),
     admin=env("FRONTEND_ADMIN_URL", default="https://admin.pycon.kr"),
     participant=env("FRONTEND_PARTICIPANT_URL", default="https://participant.pycon.kr"),
 )
