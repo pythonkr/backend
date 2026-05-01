@@ -121,7 +121,8 @@ class NHNCloudKakaoAlimTalkNotificationHistorySentTo(NotificationHistorySentToBa
     @property
     def payload(self) -> dict[str, Any]:
         # Kakao 외부 API는 templateParameter dict를 그대로 받으므로 로컬 render 없이 self.context 사용.
-        # (render() 자체는 admin 미리보기용으로만 사용됨.)
+        # (render() 자체는 admin 미리보기용으로만 사용됨.) 단, render를 우회하므로 외부 호출 전에 변수 누락만은 명시 검증.
+        self.assert_context_complete()
         return self.context
 
 

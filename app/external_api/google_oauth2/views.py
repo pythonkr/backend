@@ -49,14 +49,20 @@ class GoogleOAuth2ViewSet(viewsets.ViewSet):
         if not (flow := create_oauth_flow()):
             return self._response_500("Google OAuth is not configured.")
 
-        url, code_verifier = create_authorization_url(flow=flow)
+        url, code_verifier, state = create_authorization_url(flow=flow)
         request.session["google_oauth2_code_verifier"] = code_verifier
+        request.session["google_oauth2_state"] = state
         return redirect(url)
 
     @decorators.action(detail=False, methods=["get"], url_path="redirect", url_name="redirect")
     def redirect_google_oauth2(self, request: request.Request, *args, **kwargs) -> response.Response:
         if not (code := request.query_params.get("code")):
             return self._response_400("missing_code", "The 'code' query parameter is required.")
+
+        expected_state = request.session.pop("google_oauth2_state", None)
+        received_state = request.query_params.get("state")
+        if not expected_state or expected_state != received_state:
+            return self._response_400("invalid_state", "The 'state' parameter is missing or does not match.")
 
         if not (flow := create_oauth_flow()):
             return self._response_500("Google OAuth is not configured.")
