@@ -1,13 +1,17 @@
 from re import compile as re_compile
 from typing import Any, ClassVar, Self
 
-from core.external_apis.__interface__ import SendParameters
 from core.external_apis.nhn_cloud_kakao_alimtalk import NHNCloudKakaoAlimTalkClient, nhn_cloud_kakao_alimtalk_client
 from core.logger.util.django_helper import default_json_dumps
 from core.models import BaseAbstractModelQuerySet
 from django.db import models, transaction
 from django.utils import timezone
-from notification.models.base import NotificationHistoryBase, NotificationTemplateBase
+from notification.models.base import (
+    NotificationHistoryBase,
+    NotificationHistoryQuerySet,
+    NotificationHistorySentToBase,
+    NotificationTemplateBase,
+)
 from user.models import UserExt
 
 _KAKAO_VAR_RE = re_compile(r"#\{(\w+)\}")
@@ -53,7 +57,7 @@ class NHNCloudKakaoAlimTalkNotificationTemplateQuerySet(BaseAbstractModelQuerySe
                         code=code,
                         title=ext["templateName"],
                         description="",
-                        sender_key=ext["senderKey"],
+                        sent_from=ext["senderKey"],
                         data=default_json_dumps(ext),
                         created_by=system_user,
                         updated_by=system_user,
@@ -69,16 +73,16 @@ class NHNCloudKakaoAlimTalkNotificationTemplateQuerySet(BaseAbstractModelQuerySe
                     continue
 
                 new_data = default_json_dumps(ext)
-                if row.title != ext["templateName"] or row.sender_key != ext["senderKey"] or row.data != new_data:
+                if row.title != ext["templateName"] or row.sent_from != ext["senderKey"] or row.data != new_data:
                     row.title = ext["templateName"]
-                    row.sender_key = ext["senderKey"]
+                    row.sent_from = ext["senderKey"]
                     row.data = new_data
                     row.updated_at = now
                     row.updated_by = system_user
                     updated_rows.append(row)
             unblocked.bulk_update(
                 updated_rows,
-                fields=["title", "sender_key", "data", "updated_at", "updated_by"],
+                fields=["title", "sent_from", "data", "updated_at", "updated_by"],
                 batch_size=100,
             )
 
@@ -92,25 +96,9 @@ class NHNCloudKakaoAlimTalkNotificationTemplate(NotificationTemplateBase):
     variable_end: ClassVar[str] = "}"
     html_template_name: ClassVar[str] = "nhn_cloud_kakao_alimtalk_preview.html"
 
-    sender_key = models.CharField(max_length=128, null=True, blank=True)
-
     objects: NHNCloudKakaoAlimTalkNotificationTemplateQuerySet = (
         NHNCloudKakaoAlimTalkNotificationTemplateQuerySet.as_manager()  # type: ignore[misc, assignment]
     )
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["code"],
-                condition=models.Q(deleted_at__isnull=True),
-                name="uq_nhn_cloud_kakao_alimtalk_noti_template_code",
-            ),
-            models.UniqueConstraint(
-                fields=["code", "title"],
-                condition=models.Q(deleted_at__isnull=True),
-                name="uq_nhn_cloud_kakao_alimtalk_noti_template_code_title",
-            ),
-        ]
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         raise NotImplementedError(_READ_ONLY_MSG)
@@ -118,12 +106,39 @@ class NHNCloudKakaoAlimTalkNotificationTemplate(NotificationTemplateBase):
     def delete(self, *args: Any, **kwargs: Any) -> None:
         raise NotImplementedError(_READ_ONLY_MSG)
 
-    def _to_dtl(self, source: str) -> str:
+    @classmethod
+    def _to_dtl(cls, source: str) -> str:
         return _KAKAO_VAR_RE.sub(r"{{ \1 }}", source)
+
+
+class NHNCloudKakaoAlimTalkNotificationHistorySentTo(NotificationHistorySentToBase):
+    history = models.ForeignKey(
+        "NHNCloudKakaoAlimTalkNotificationHistory",
+        on_delete=models.PROTECT,
+        related_name="sent_to_list",
+    )
+
+    @property
+    def payload(self) -> dict[str, Any]:
+        # Kakao 외부 API는 templateParameter dict를 그대로 받으므로 로컬 render 없이 self.context 사용.
+        # (render() 자체는 admin 미리보기용으로만 사용됨.)
+        return self.context
+
+
+class NHNCloudKakaoAlimTalkNotificationHistoryQuerySet(
+    NotificationHistoryQuerySet["NHNCloudKakaoAlimTalkNotificationHistory", NHNCloudKakaoAlimTalkNotificationTemplate],
+):
+    pass
 
 
 class NHNCloudKakaoAlimTalkNotificationHistory(NotificationHistoryBase):
     client: ClassVar[NHNCloudKakaoAlimTalkClient] = nhn_cloud_kakao_alimtalk_client
+    template_class: ClassVar[type[NHNCloudKakaoAlimTalkNotificationTemplate]] = (
+        NHNCloudKakaoAlimTalkNotificationTemplate
+    )
+    sent_to_class: ClassVar[type[NHNCloudKakaoAlimTalkNotificationHistorySentTo]] = (
+        NHNCloudKakaoAlimTalkNotificationHistorySentTo
+    )
 
     template = models.ForeignKey(
         NHNCloudKakaoAlimTalkNotificationTemplate,
@@ -131,14 +146,6 @@ class NHNCloudKakaoAlimTalkNotificationHistory(NotificationHistoryBase):
         related_name="histories",
     )
 
-    @property
-    def template_code(self) -> str:
-        return self.template.code
-
-    def build_send_parameters(self) -> SendParameters:
-        return SendParameters(
-            payload=self.context,
-            send_to=self.send_to,
-            template_code=self.template_code,
-            sent_from=self.template.sender_key,
-        )
+    objects: NHNCloudKakaoAlimTalkNotificationHistoryQuerySet = (
+        NHNCloudKakaoAlimTalkNotificationHistoryQuerySet.as_manager()  # type: ignore[misc, assignment]
+    )
