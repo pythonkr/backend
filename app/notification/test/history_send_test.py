@@ -121,7 +121,7 @@ def test_send_fails_fast_when_context_missing_template_variables(system_user):
     assert sent_to.status == NotificationStatus.FAILED
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_history_send_iterates_all_sent_to_and_swallows_individual_failures(system_user, email_template):
     history = EmailNotificationHistory.objects.create_for_recipients(
         template=email_template,
@@ -156,7 +156,7 @@ def test_sent_to_status_summary_counts_by_status(email_template):
     assert summary == {"created": 1, "sending": 0, "sent": 1, "failed": 1}
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_history_send_logs_unexpected_errors_outside_inner_try(email_template, caplog):
     # SentTo.send() 내부 try 밖에서 발생한 예외(예: status save 실패)는 inner catch+log에 안 잡힘 →
     # _send_each가 batch를 계속 진행하면서 상위에서 추가 로깅하는지 확인.
@@ -170,7 +170,7 @@ def test_history_send_logs_unexpected_errors_outside_inner_try(email_template, c
     assert records[0].exc_info is not None
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_history_retry_skips_non_failed_sent_to(email_template):
     # FAILED 상태가 아닌 sent_to는 재시도 대상에서 제외 — 외부 호출이 발생하지 않음.
     history = _create_history(email_template)
@@ -179,7 +179,7 @@ def test_history_retry_skips_non_failed_sent_to(email_template):
     mock_client.send_message.assert_not_called()
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_history_retry_resends_failed_sent_to(email_template):
     history = _create_history(email_template)
     history.sent_to_list.update(status=NotificationStatus.FAILED)

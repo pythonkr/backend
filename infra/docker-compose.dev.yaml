@@ -3,6 +3,8 @@ name: pyconkr-backend-local
 volumes:
   postgres-data:
     driver: local
+  redis-data:
+    driver: local
 
 services:
   pyconkr-backend-postgres:
@@ -19,3 +21,12 @@ services:
 
     ports:
     - ${DATABASE_PORT}:5432
+
+  pyconkr-backend-redis:
+    image: redis:alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    ports:
+    - ${REDIS_PORT:-46379}:6379

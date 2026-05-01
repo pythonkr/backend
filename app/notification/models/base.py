@@ -169,26 +169,20 @@ class NotificationHistoryBase(BaseAbstractModel):
             counts = dict(self.sent_to_list.values("status").annotate(n=models.Count("*")).values_list("status", "n"))
         return {status.value.lower(): counts.get(status.value, 0) for status in NotificationStatus}
 
-    def _send_each(self, sent_to_qs: "models.QuerySet[NotificationHistorySentToBase]") -> None:
-        # sent_to.history reverse FK가 매번 재조회되지 않도록 self를 직접 attach (N+1 회피).
-        for sent_to in sent_to_qs:
-            sent_to.history = self
-            try:
-                sent_to.send()
-            except Exception:
-                # 내부 send()가 catch+log하지 못한 경로(상태 저장 실패 등)는 status가 FAILED로 남지 않음 — 추가 로깅.
-                if sent_to.status != NotificationStatus.FAILED:
-                    slack_logger.exception(
-                        "Batch send unexpected error: history_id=%s recipient=%s",
-                        self.id,
-                        sent_to.recipient,
-                    )
+    @transaction.atomic
+    def _dispatch(self, sent_to_qs: "models.QuerySet[NotificationHistorySentToBase]") -> None:
+        from notification.tasks import send_notification_to_recipient
+
+        if not (sent_to_ids := list(sent_to_qs.values_list("id", flat=True))):
+            return
+        label = type(self).sent_to_class._meta.label_lower
+        transaction.on_commit(lambda: [send_notification_to_recipient.delay(label, sid) for sid in sent_to_ids])
 
     def send(self) -> None:
-        self._send_each(self.sent_to_list.all())
+        self._dispatch(self.sent_to_list.all())
 
     def retry(self) -> None:
-        self._send_each(self.sent_to_list.filter(status=NotificationStatus.FAILED))
+        self._dispatch(self.sent_to_list.filter(status=NotificationStatus.FAILED))
 
 
 class NotificationHistorySentToBase(BaseAbstractModel):
