@@ -27,13 +27,13 @@ def create_oauth_flow() -> Flow | None:
 
 def create_authorization_url(
     flow: Flow, prompt: str = "consent", access_type: str = "offline", include_granted_scopes: bool = False
-) -> tuple[str, str | None]:
-    url, _ = flow.authorization_url(
+) -> tuple[str, str | None, str]:
+    url, state = flow.authorization_url(
         prompt=prompt,
         access_type=access_type,
         include_granted_scopes="true" if include_granted_scopes else "false",
     )
-    return url, flow.code_verifier
+    return url, flow.code_verifier, state
 
 
 def fetch_credentials(flow: Flow, code: str) -> Credentials:

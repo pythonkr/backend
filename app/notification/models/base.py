@@ -213,21 +213,37 @@ class NotificationHistorySentToBase(BaseAbstractModel):
             ),
         ]
 
+    def _parsed_template_data(self) -> Any:
+        try:
+            return json_loads(self.history.template_data)
+        except ValueError:
+            return self.history.template_data
+
+    def _required_template_variables(self, payload: Any) -> set[str]:
+        template_class = self.history.template_class
+        all_vars: set[str] = set()
+        _walk_strings(payload, lambda s: all_vars.update(template_class._extract_root_variables(s)) or s)
+        return all_vars
+
+    def assert_context_complete(self) -> None:
+        # render()를 거치지 않는 채널(예: Kakao templateParameter)에서도 외부 호출 전에 fail-fast 보장.
+        missing = self._required_template_variables(self._parsed_template_data()) - self.context.keys()
+        if missing:
+            raise ValueError(
+                f"Notification (template_code={self.history.template_code or '-'}) rendered "
+                f"without required context variables: {sorted(missing)}",
+            )
+
     def render(self, undef_var: UnhandledVariableHandling = UnhandledVariableHandling.RAISE) -> dict[str, Any]:
         # template_data를 JSON으로 먼저 파싱한 뒤 string value에만 Django Template을 적용 →
         # context가 JSON-special char(`"`, `\`, 줄바꿈 등)를 포함해도 결과 JSON 구조가 깨지지 않음.
         # autoescape=False — 외부 채널(SMS, Kakao templateParameter)은 raw text 기대. HTML escape이 필요한 경우는
         # template 작성자가 명시적으로 |escape 필터를 사용해야 함.
         template_class = self.history.template_class
-        try:
-            payload = json_loads(self.history.template_data)
-        except ValueError:
-            payload = self.history.template_data
+        payload = self._parsed_template_data()
 
         rendered_context = dict(self.context)
-        all_vars: set[str] = set()
-        _walk_strings(payload, lambda s: all_vars.update(template_class._extract_root_variables(s)) or s)
-        missing = all_vars - rendered_context.keys()
+        missing = self._required_template_variables(payload) - rendered_context.keys()
 
         if missing and undef_var is UnhandledVariableHandling.RAISE:
             raise ValueError(
