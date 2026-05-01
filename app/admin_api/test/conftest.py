@@ -38,7 +38,7 @@ def email_template(superuser) -> EmailNotificationTemplate:
     return EmailNotificationTemplate.objects.create(
         code="welcome",
         title="환영합니다",
-        from_address="from@example.com",
+        sent_from="from@example.com",
         data='{"title":"Hi {{ name }}","from_":"f","send_to":"{{ recipient }}","body":"Hello {{ name }}"}',
         created_by=superuser,
         updated_by=superuser,
@@ -50,7 +50,7 @@ def sms_template(superuser) -> NHNCloudSMSNotificationTemplate:
     return NHNCloudSMSNotificationTemplate.objects.create(
         code="sms-welcome",
         title="SMS 환영",
-        from_no="0212345678",
+        sent_from="0212345678",
         data='{"body":"안녕 {{ name }}님"}',
         created_by=superuser,
         updated_by=superuser,
@@ -63,7 +63,7 @@ def kakao_template(superuser) -> NHNCloudKakaoAlimTalkNotificationTemplate:
     template = NHNCloudKakaoAlimTalkNotificationTemplate(
         code="kakao-welcome",
         title="알림톡 환영",
-        sender_key="S1",
+        sent_from="S1",
         data='{"templateContent":"안녕 #{name}","buttons":[]}',
         created_by=superuser,
         updated_by=superuser,

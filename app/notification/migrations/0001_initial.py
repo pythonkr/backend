@@ -22,7 +22,7 @@ class Migration(migrations.Migration):
                 ("title", models.CharField(db_index=True, max_length=256)),
                 ("description", models.TextField(blank=True, null=True)),
                 ("data", models.TextField()),
-                ("from_address", models.EmailField(blank=False, max_length=254, null=False)),
+                ("sent_from", models.CharField(max_length=256)),
                 (
                     "created_by",
                     models.ForeignKey(
@@ -51,6 +51,9 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
+            options={
+                "abstract": False,
+            },
         ),
         migrations.CreateModel(
             name="EmailNotificationHistory",
@@ -59,7 +62,99 @@ class Migration(migrations.Migration):
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
                 ("deleted_at", models.DateTimeField(blank=True, null=True)),
-                ("send_to", models.CharField(max_length=256)),
+                ("template_data", models.TextField()),
+                ("sent_from", models.CharField(max_length=256)),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=PROTECT,
+                        related_name="%(class)s_created_by",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "deleted_by",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=PROTECT,
+                        related_name="%(class)s_deleted_by",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "updated_by",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=PROTECT,
+                        related_name="%(class)s_updated_by",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "template",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=PROTECT,
+                        related_name="histories",
+                        to="notification.emailnotificationtemplate",
+                    ),
+                ),
+            ],
+            options={
+                "abstract": False,
+            },
+        ),
+        migrations.CreateModel(
+            name="NHNCloudKakaoAlimTalkNotificationHistory",
+            fields=[
+                ("id", models.UUIDField(default=uuid4, editable=False, primary_key=True, serialize=False)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("deleted_at", models.DateTimeField(blank=True, null=True)),
+                ("template_data", models.TextField()),
+                ("sent_from", models.CharField(max_length=256)),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=PROTECT,
+                        related_name="%(class)s_created_by",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "deleted_by",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=PROTECT,
+                        related_name="%(class)s_deleted_by",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "updated_by",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=PROTECT,
+                        related_name="%(class)s_updated_by",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+            ],
+            options={
+                "abstract": False,
+            },
+        ),
+        migrations.CreateModel(
+            name="NHNCloudKakaoAlimTalkNotificationHistorySentTo",
+            fields=[
+                ("id", models.UUIDField(default=uuid4, editable=False, primary_key=True, serialize=False)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("deleted_at", models.DateTimeField(blank=True, null=True)),
+                ("recipient", models.CharField(max_length=256)),
                 ("context", models.JSONField(default=dict)),
                 (
                     "status",
@@ -94,20 +189,20 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 (
+                    "history",
+                    models.ForeignKey(
+                        on_delete=PROTECT,
+                        related_name="sent_to_list",
+                        to="notification.nhncloudkakaoalimtalknotificationhistory",
+                    ),
+                ),
+                (
                     "updated_by",
                     models.ForeignKey(
                         null=True,
                         on_delete=PROTECT,
                         related_name="%(class)s_updated_by",
                         to=settings.AUTH_USER_MODEL,
-                    ),
-                ),
-                (
-                    "template",
-                    models.ForeignKey(
-                        on_delete=PROTECT,
-                        related_name="histories",
-                        to="notification.emailnotificationtemplate",
                     ),
                 ),
             ],
@@ -126,7 +221,7 @@ class Migration(migrations.Migration):
                 ("title", models.CharField(db_index=True, max_length=256)),
                 ("description", models.TextField(blank=True, null=True)),
                 ("data", models.TextField()),
-                ("sender_key", models.CharField(blank=True, max_length=128, null=True)),
+                ("sent_from", models.CharField(max_length=256)),
                 (
                     "created_by",
                     models.ForeignKey(
@@ -155,15 +250,68 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
+            options={
+                "abstract": False,
+            },
+        ),
+        migrations.AddField(
+            model_name="nhncloudkakaoalimtalknotificationhistory",
+            name="template",
+            field=models.ForeignKey(
+                on_delete=PROTECT,
+                related_name="histories",
+                to="notification.nhncloudkakaoalimtalknotificationtemplate",
+            ),
         ),
         migrations.CreateModel(
-            name="NHNCloudKakaoAlimTalkNotificationHistory",
+            name="NHNCloudSMSNotificationHistory",
             fields=[
                 ("id", models.UUIDField(default=uuid4, editable=False, primary_key=True, serialize=False)),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
                 ("deleted_at", models.DateTimeField(blank=True, null=True)),
-                ("send_to", models.CharField(max_length=256)),
+                ("template_data", models.TextField()),
+                ("sent_from", models.CharField(max_length=256)),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=PROTECT,
+                        related_name="%(class)s_created_by",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "deleted_by",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=PROTECT,
+                        related_name="%(class)s_deleted_by",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "updated_by",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=PROTECT,
+                        related_name="%(class)s_updated_by",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+            ],
+            options={
+                "abstract": False,
+            },
+        ),
+        migrations.CreateModel(
+            name="NHNCloudSMSNotificationHistorySentTo",
+            fields=[
+                ("id", models.UUIDField(default=uuid4, editable=False, primary_key=True, serialize=False)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("deleted_at", models.DateTimeField(blank=True, null=True)),
+                ("recipient", models.CharField(max_length=256)),
                 ("context", models.JSONField(default=dict)),
                 (
                     "status",
@@ -198,6 +346,14 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 (
+                    "history",
+                    models.ForeignKey(
+                        on_delete=PROTECT,
+                        related_name="sent_to_list",
+                        to="notification.nhncloudsmsnotificationhistory",
+                    ),
+                ),
+                (
                     "updated_by",
                     models.ForeignKey(
                         null=True,
@@ -206,48 +362,10 @@ class Migration(migrations.Migration):
                         to=settings.AUTH_USER_MODEL,
                     ),
                 ),
-                (
-                    "template",
-                    models.ForeignKey(
-                        on_delete=PROTECT,
-                        related_name="histories",
-                        to="notification.nhncloudkakaoalimtalknotificationtemplate",
-                    ),
-                ),
             ],
             options={
                 "abstract": False,
             },
-        ),
-        migrations.AddConstraint(
-            model_name="emailnotificationtemplate",
-            constraint=models.UniqueConstraint(
-                condition=models.Q(("deleted_at__isnull", True)), fields=("code",), name="uq_email_noti_template_code"
-            ),
-        ),
-        migrations.AddConstraint(
-            model_name="emailnotificationtemplate",
-            constraint=models.UniqueConstraint(
-                condition=models.Q(("deleted_at__isnull", True)),
-                fields=("code", "title"),
-                name="uq_email_noti_template_code_title",
-            ),
-        ),
-        migrations.AddConstraint(
-            model_name="nhncloudkakaoalimtalknotificationtemplate",
-            constraint=models.UniqueConstraint(
-                condition=models.Q(("deleted_at__isnull", True)),
-                fields=("code",),
-                name="uq_nhn_cloud_kakao_alimtalk_noti_template_code",
-            ),
-        ),
-        migrations.AddConstraint(
-            model_name="nhncloudkakaoalimtalknotificationtemplate",
-            constraint=models.UniqueConstraint(
-                condition=models.Q(("deleted_at__isnull", True)),
-                fields=("code", "title"),
-                name="uq_nhn_cloud_kakao_alimtalk_noti_template_code_title",
-            ),
         ),
         migrations.CreateModel(
             name="NHNCloudSMSNotificationTemplate",
@@ -260,7 +378,7 @@ class Migration(migrations.Migration):
                 ("title", models.CharField(db_index=True, max_length=256)),
                 ("description", models.TextField(blank=True, null=True)),
                 ("data", models.TextField()),
-                ("from_no", models.CharField(blank=True, max_length=13, null=True)),
+                ("sent_from", models.CharField(max_length=256)),
                 (
                     "created_by",
                     models.ForeignKey(
@@ -289,15 +407,29 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
+            options={
+                "abstract": False,
+            },
+        ),
+        migrations.AddField(
+            model_name="nhncloudsmsnotificationhistory",
+            name="template",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=PROTECT,
+                related_name="histories",
+                to="notification.nhncloudsmsnotificationtemplate",
+            ),
         ),
         migrations.CreateModel(
-            name="NHNCloudSMSNotificationHistory",
+            name="EmailNotificationHistorySentTo",
             fields=[
                 ("id", models.UUIDField(default=uuid4, editable=False, primary_key=True, serialize=False)),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
                 ("deleted_at", models.DateTimeField(blank=True, null=True)),
-                ("send_to", models.CharField(max_length=256)),
+                ("recipient", models.CharField(max_length=256)),
                 ("context", models.JSONField(default=dict)),
                 (
                     "status",
@@ -332,6 +464,14 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 (
+                    "history",
+                    models.ForeignKey(
+                        on_delete=PROTECT,
+                        related_name="sent_to_list",
+                        to="notification.emailnotificationhistory",
+                    ),
+                ),
+                (
                     "updated_by",
                     models.ForeignKey(
                         null=True,
@@ -340,25 +480,72 @@ class Migration(migrations.Migration):
                         to=settings.AUTH_USER_MODEL,
                     ),
                 ),
-                (
-                    "template",
-                    models.ForeignKey(
-                        on_delete=PROTECT,
-                        related_name="histories",
-                        to="notification.nhncloudsmsnotificationtemplate",
-                    ),
-                ),
             ],
             options={
                 "abstract": False,
+                "constraints": [
+                    models.UniqueConstraint(
+                        condition=models.Q(("deleted_at__isnull", True)),
+                        fields=("history", "recipient"),
+                        name="uq_notification_emailnotificationhistorysentto_history_recipient",
+                    )
+                ],
             },
+        ),
+        migrations.AddConstraint(
+            model_name="emailnotificationtemplate",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(("deleted_at__isnull", True)),
+                fields=("code",),
+                name="uq_notification_emailnotificationtemplate_code",
+            ),
+        ),
+        migrations.AddConstraint(
+            model_name="emailnotificationtemplate",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(("deleted_at__isnull", True)),
+                fields=("code", "title"),
+                name="uq_notification_emailnotificationtemplate_code_title",
+            ),
+        ),
+        migrations.AddConstraint(
+            model_name="nhncloudkakaoalimtalknotificationhistorysentto",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(("deleted_at__isnull", True)),
+                fields=("history", "recipient"),
+                name="uq_notification_nhncloudkakaoalimtalknotificationhistorysentto_history_recipient",
+            ),
+        ),
+        migrations.AddConstraint(
+            model_name="nhncloudkakaoalimtalknotificationtemplate",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(("deleted_at__isnull", True)),
+                fields=("code",),
+                name="uq_notification_nhncloudkakaoalimtalknotificationtemplate_code",
+            ),
+        ),
+        migrations.AddConstraint(
+            model_name="nhncloudkakaoalimtalknotificationtemplate",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(("deleted_at__isnull", True)),
+                fields=("code", "title"),
+                name="uq_notification_nhncloudkakaoalimtalknotificationtemplate_code_title",
+            ),
+        ),
+        migrations.AddConstraint(
+            model_name="nhncloudsmsnotificationhistorysentto",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(("deleted_at__isnull", True)),
+                fields=("history", "recipient"),
+                name="uq_notification_nhncloudsmsnotificationhistorysentto_history_recipient",
+            ),
         ),
         migrations.AddConstraint(
             model_name="nhncloudsmsnotificationtemplate",
             constraint=models.UniqueConstraint(
                 condition=models.Q(("deleted_at__isnull", True)),
                 fields=("code",),
-                name="uq_nhn_cloud_sms_noti_template_code",
+                name="uq_notification_nhncloudsmsnotificationtemplate_code",
             ),
         ),
         migrations.AddConstraint(
@@ -366,7 +553,7 @@ class Migration(migrations.Migration):
             constraint=models.UniqueConstraint(
                 condition=models.Q(("deleted_at__isnull", True)),
                 fields=("code", "title"),
-                name="uq_nhn_cloud_sms_noti_template_code_title",
+                name="uq_notification_nhncloudsmsnotificationtemplate_code_title",
             ),
         ),
     ]

@@ -3,7 +3,11 @@ from unittest.mock import patch
 
 import pytest
 from django.urls import reverse
-from notification.models import EmailNotificationTemplate
+from notification.models import (
+    EmailNotificationHistory,
+    EmailNotificationTemplate,
+    NHNCloudSMSNotificationHistory,
+)
 from notification.models.base import NotificationStatus
 from rest_framework.test import APIClient
 
@@ -42,7 +46,7 @@ def test_template_create(api_client):
         data={
             "code": "new-tpl",
             "title": "신규",
-            "from_address": "from@example.com",
+            "sent_from": "from@example.com",
             "data": '{"title":"x","from_":"f","send_to":"r","body":"b"}',
         },
         format="json",
@@ -79,10 +83,10 @@ def test_template_destroy_soft_deletes(api_client, email_template):
 @pytest.mark.django_db
 def test_template_list_filter_by_code(api_client, superuser):
     EmailNotificationTemplate.objects.create(
-        code="welcome", title="A", from_address="a@x.com", data="{}", created_by=superuser, updated_by=superuser
+        code="welcome", title="A", sent_from="a@x.com", data="{}", created_by=superuser, updated_by=superuser
     )
     EmailNotificationTemplate.objects.create(
-        code="goodbye", title="B", from_address="a@x.com", data="{}", created_by=superuser, updated_by=superuser
+        code="goodbye", title="B", sent_from="a@x.com", data="{}", created_by=superuser, updated_by=superuser
     )
 
     response = api_client.get(reverse("v1:admin-notification-email-template-list"), {"code": "welc"})
@@ -94,10 +98,10 @@ def test_template_list_filter_by_code(api_client, superuser):
 @pytest.mark.django_db
 def test_template_list_filter_by_title(api_client, superuser):
     EmailNotificationTemplate.objects.create(
-        code="t1", title="환영합니다", from_address="a@x.com", data="{}", created_by=superuser, updated_by=superuser
+        code="t1", title="환영합니다", sent_from="a@x.com", data="{}", created_by=superuser, updated_by=superuser
     )
     EmailNotificationTemplate.objects.create(
-        code="t2", title="안녕히가세요", from_address="a@x.com", data="{}", created_by=superuser, updated_by=superuser
+        code="t2", title="안녕히가세요", sent_from="a@x.com", data="{}", created_by=superuser, updated_by=superuser
     )
 
     response = api_client.get(reverse("v1:admin-notification-email-template-list"), {"title": "환영"})
@@ -125,7 +129,6 @@ def test_render_preview_returns_html_with_text_html_content_type(api_client, ema
 
 @pytest.mark.django_db
 def test_render_preview_fills_missing_variables_with_random_placeholder(api_client, email_template):
-    # context를 비워도 missing variable에 대해 RANDOM placeholder로 채워서 항상 렌더 가능해야 함.
     response = api_client.post(
         reverse("v1:admin-notification-email-template-render-preview", kwargs={"pk": email_template.id}),
         data={"context": {}},
@@ -151,7 +154,6 @@ def test_render_preview_works_for_kakao_template(api_client, kakao_template):
 
 @pytest.mark.django_db
 def test_kakao_template_post_to_collection_is_405(api_client):
-    # Kakao는 ReadOnlyModelViewSet — collection POST(create) 미지원
     response = api_client.post(reverse("v1:admin-notification-kakao-template-list"), data={}, format="json")
     assert response.status_code == http.HTTPStatus.METHOD_NOT_ALLOWED
 
@@ -174,35 +176,99 @@ def test_kakao_template_delete_is_405(api_client, kakao_template):
     assert response.status_code == http.HTTPStatus.METHOD_NOT_ALLOWED
 
 
-# ---- create_history (POST /template/{id}/history/) --------------------------
+# ---- History create (POST /history/) ----------------------------------------
 
 
 @pytest.mark.django_db
-def test_create_history_creates_row_and_marks_sent_on_success(api_client, sms_template):
+def test_create_history_via_template_creates_sent_to_and_sends(api_client, sms_template):
     with patch("notification.models.nhn_cloud_sms.NHNCloudSMSNotificationHistory.client"):
         response = api_client.post(
-            reverse("v1:admin-notification-sms-template-create-history", kwargs={"pk": sms_template.id}),
-            data={"send_to": "01012345678", "context": {"name": "길동"}},
+            reverse("v1:admin-notification-sms-history-list"),
+            data={
+                "template": str(sms_template.id),
+                "sent_to_list": [{"recipient": "01012345678", "context": {"name": "길동"}}],
+            },
             format="json",
         )
     assert response.status_code == http.HTTPStatus.CREATED
     body = response.json()
-    assert body["status"] == NotificationStatus.SENT
-    assert body["send_to"] == "01012345678"
+    assert body["template_code"] == sms_template.code
+    assert body["sent_from"] == sms_template.sent_from
+    assert body["sent_to_status_summary"]["sent"] == 1
+    [sent_to] = body["sent_to_list"]
+    assert sent_to["recipient"] == "01012345678"
+    assert sent_to["status"] == NotificationStatus.SENT
 
 
 @pytest.mark.django_db
-def test_create_history_marks_failed_when_send_raises(api_client, sms_template):
-    # 외부 발송이 실패해도 응답은 201이고, status가 FAILED로 영속화되어 있어야 함.
+def test_create_history_marks_sent_to_failed_when_send_raises(api_client, sms_template):
     with patch("notification.models.nhn_cloud_sms.NHNCloudSMSNotificationHistory.client") as mock_client:
         mock_client.send_message.side_effect = RuntimeError("external api down")
         response = api_client.post(
-            reverse("v1:admin-notification-sms-template-create-history", kwargs={"pk": sms_template.id}),
-            data={"send_to": "01012345678", "context": {"name": "길동"}},
+            reverse("v1:admin-notification-sms-history-list"),
+            data={
+                "template": str(sms_template.id),
+                "sent_to_list": [{"recipient": "01012345678", "context": {"name": "길동"}}],
+            },
             format="json",
         )
     assert response.status_code == http.HTTPStatus.CREATED
-    assert response.json()["status"] == NotificationStatus.FAILED
+    body = response.json()
+    assert body["sent_to_status_summary"]["failed"] == 1
+    assert body["sent_to_list"][0]["status"] == NotificationStatus.FAILED
+
+
+@pytest.mark.django_db
+def test_create_history_with_multiple_recipients_and_per_recipient_context(api_client, sms_template):
+    # 한 번의 요청으로 여러 수신자에게 서로 다른 context로 발송, 결과는 같은 history로 묶여 조회됨.
+    with patch("notification.models.nhn_cloud_sms.NHNCloudSMSNotificationHistory.client") as mock_client:
+        mock_client.send_message.side_effect = [None, RuntimeError("partial fail")]
+        response = api_client.post(
+            reverse("v1:admin-notification-sms-history-list"),
+            data={
+                "template": str(sms_template.id),
+                "sent_to_list": [
+                    {"recipient": "01000000001", "context": {"name": "A"}},
+                    {"recipient": "01000000002", "context": {"name": "B"}},
+                ],
+            },
+            format="json",
+        )
+    assert response.status_code == http.HTTPStatus.CREATED
+    body = response.json()
+    assert body["sent_to_status_summary"] == {"created": 0, "sending": 0, "sent": 1, "failed": 1}
+    assert {s["recipient"] for s in body["sent_to_list"]} == {"01000000001", "01000000002"}
+
+
+@pytest.mark.django_db
+def test_create_history_templateless_email(api_client):
+    # 템플릿 없이 template_data + sent_from 직접 입력해 발송.
+    with patch("notification.models.email.EmailNotificationHistory.client"):
+        response = api_client.post(
+            reverse("v1:admin-notification-email-history-list"),
+            data={
+                "template_data": '{"title":"hi {{ name }}","from_":"f","send_to":"r","body":"b"}',
+                "sent_from": "from@example.com",
+                "sent_to_list": [{"recipient": "to@example.com", "context": {"name": "길동"}}],
+            },
+            format="json",
+        )
+    assert response.status_code == http.HTTPStatus.CREATED
+    body = response.json()
+    assert body["template"] is None
+    assert body["template_code"] == ""
+    assert body["sent_from"] == "from@example.com"
+    assert body["sent_to_status_summary"]["sent"] == 1
+
+
+@pytest.mark.django_db
+def test_create_history_kakao_requires_template(api_client):
+    response = api_client.post(
+        reverse("v1:admin-notification-kakao-history-list"),
+        data={"sent_to_list": [{"recipient": "01012345678"}]},
+        format="json",
+    )
+    assert response.status_code == http.HTTPStatus.BAD_REQUEST
 
 
 # ---- History List / Retrieve / Filter ---------------------------------------
@@ -210,7 +276,10 @@ def test_create_history_marks_failed_when_send_raises(api_client, sms_template):
 
 @pytest.fixture
 def email_history(email_template):
-    return email_template.histories.create(send_to="to@example.com", context={"name": "길동", "recipient": "x"})
+    return EmailNotificationHistory.objects.create_for_recipients(
+        template=email_template,
+        recipients=[{"recipient": "to@example.com", "context": {"name": "길동", "recipient": "x"}}],
+    )
 
 
 @pytest.mark.django_db
@@ -224,10 +293,12 @@ def test_history_list_returns_rows(api_client, email_history):
 @pytest.mark.django_db
 def test_history_list_filter_by_template(api_client, email_template, superuser):
     other_template = EmailNotificationTemplate.objects.create(
-        code="other", title="X", from_address="a@x.com", data="{}", created_by=superuser, updated_by=superuser
+        code="other", title="X", sent_from="a@x.com", data="{}", created_by=superuser, updated_by=superuser
     )
-    matching = email_template.histories.create(send_to="t@x", context={})
-    other_template.histories.create(send_to="t@x", context={})
+    matching = EmailNotificationHistory.objects.create_for_recipients(
+        template=email_template, recipients=[{"recipient": "t@x"}]
+    )
+    EmailNotificationHistory.objects.create_for_recipients(template=other_template, recipients=[{"recipient": "t@x"}])
 
     response = api_client.get(reverse("v1:admin-notification-email-history-list"), {"template": str(email_template.id)})
     assert response.status_code == http.HTTPStatus.OK
@@ -238,11 +309,14 @@ def test_history_list_filter_by_template(api_client, email_template, superuser):
 @pytest.mark.django_db
 def test_history_list_filter_by_created_by_username(api_client, email_template, superuser):
     # API 경로로 history를 만들어야 BaseAbstractModelQuerySet.create()의 get_current_user()가
-    # 인증된 superuser를 created_by로 잡음 (fixture에서 직접 .create()하면 thread_local이 비어있음).
+    # 인증된 superuser를 created_by로 잡음.
     with patch("notification.models.email.EmailNotificationHistory.client"):
         api_client.post(
-            reverse("v1:admin-notification-email-template-create-history", kwargs={"pk": email_template.id}),
-            data={"send_to": "to@example.com", "context": {"name": "x", "recipient": "y"}},
+            reverse("v1:admin-notification-email-history-list"),
+            data={
+                "template": str(email_template.id),
+                "sent_to_list": [{"recipient": "to@example.com", "context": {"name": "x", "recipient": "y"}}],
+            },
             format="json",
         )
 
@@ -253,68 +327,34 @@ def test_history_list_filter_by_created_by_username(api_client, email_template, 
     assert len(response.json()) == 1
 
 
-# ---- History PATCH (SENDING → FAILED 만 허용) -------------------------------
-
-
-@pytest.mark.django_db
-def test_history_patch_allows_sending_to_failed(api_client, email_history):
-    email_history.status = NotificationStatus.SENDING
-    email_history.save(update_fields=["status"])
-
-    response = api_client.patch(
-        reverse("v1:admin-notification-email-history-detail", kwargs={"pk": email_history.id}),
-        data={"status": NotificationStatus.FAILED},
-        format="json",
-    )
-    assert response.status_code == http.HTTPStatus.OK
-    email_history.refresh_from_db()
-    assert email_history.status == NotificationStatus.FAILED
-
-
-@pytest.mark.django_db
-def test_history_patch_rejects_other_transitions(api_client, email_history):
-    # CREATED → FAILED 같은 임의 전이는 거부되어야 함.
-    response = api_client.patch(
-        reverse("v1:admin-notification-email-history-detail", kwargs={"pk": email_history.id}),
-        data={"status": NotificationStatus.FAILED},
-        format="json",
-    )
-    assert response.status_code == http.HTTPStatus.BAD_REQUEST
-
-
-@pytest.mark.django_db
-def test_history_patch_rejects_sending_to_sent(api_client, email_history):
-    email_history.status = NotificationStatus.SENDING
-    email_history.save(update_fields=["status"])
-    response = api_client.patch(
-        reverse("v1:admin-notification-email-history-detail", kwargs={"pk": email_history.id}),
-        data={"status": NotificationStatus.SENT},
-        format="json",
-    )
-    assert response.status_code == http.HTTPStatus.BAD_REQUEST
-
-
 # ---- History Retry ----------------------------------------------------------
 
 
 @pytest.mark.django_db
-def test_retry_succeeds_on_failed_history(api_client, email_history):
-    email_history.status = NotificationStatus.FAILED
-    email_history.save(update_fields=["status"])
+def test_retry_resends_only_failed_sent_to(api_client, email_history):
+    # 한 history 안에 SENT/FAILED가 섞여 있을 때 retry는 FAILED만 재시도.
+    extra = EmailNotificationHistory.objects.create_for_recipients(
+        template=email_history.template,
+        recipients=[{"recipient": "extra@example.com"}],
+    )
+    # email_history의 sent_to 1개를 FAILED로, extra의 sent_to를 SENT로 설정 (격리 검증용)
+    email_history.sent_to_list.update(status=NotificationStatus.FAILED)
+    extra.sent_to_list.update(status=NotificationStatus.SENT)
 
-    with patch("notification.models.email.EmailNotificationHistory.client"):
+    with patch("notification.models.email.EmailNotificationHistory.client") as mock_client:
         response = api_client.post(
             reverse("v1:admin-notification-email-history-retry", kwargs={"pk": email_history.id})
         )
     assert response.status_code == http.HTTPStatus.OK
+    assert mock_client.send_message.call_count == 1  # FAILED 1개만 재시도됨
+
     email_history.refresh_from_db()
-    assert email_history.status == NotificationStatus.SENT
+    assert email_history.sent_to_list.get().status == NotificationStatus.SENT
 
 
 @pytest.mark.django_db
-def test_retry_keeps_status_failed_when_send_raises(api_client, email_history):
-    email_history.status = NotificationStatus.FAILED
-    email_history.save(update_fields=["status"])
+def test_retry_keeps_sent_to_failed_when_send_raises(api_client, email_history):
+    email_history.sent_to_list.update(status=NotificationStatus.FAILED)
 
     with patch("notification.models.email.EmailNotificationHistory.client") as mock_client:
         mock_client.send_message.side_effect = RuntimeError("still down")
@@ -322,15 +362,19 @@ def test_retry_keeps_status_failed_when_send_raises(api_client, email_history):
             reverse("v1:admin-notification-email-history-retry", kwargs={"pk": email_history.id})
         )
     assert response.status_code == http.HTTPStatus.OK
-    email_history.refresh_from_db()
-    assert email_history.status == NotificationStatus.FAILED
+    sent_to = email_history.sent_to_list.get()
+    assert sent_to.status == NotificationStatus.FAILED
 
 
 @pytest.mark.django_db
-def test_retry_rejects_non_failed_history(api_client, email_history):
-    # 기본 상태(CREATED)는 retry 대상이 아님.
-    response = api_client.post(reverse("v1:admin-notification-email-history-retry", kwargs={"pk": email_history.id}))
-    assert response.status_code == http.HTTPStatus.BAD_REQUEST
+def test_retry_noop_when_no_failed_sent_to(api_client, email_history):
+    # 기본 상태(CREATED)는 retry 대상이 아님 → 200 + 외부 호출 없음.
+    with patch("notification.models.email.EmailNotificationHistory.client") as mock_client:
+        response = api_client.post(
+            reverse("v1:admin-notification-email-history-retry", kwargs={"pk": email_history.id})
+        )
+    assert response.status_code == http.HTTPStatus.OK
+    mock_client.send_message.assert_not_called()
 
 
 # ---- 채널 간 격리 -----------------------------------------------------------
@@ -338,7 +382,10 @@ def test_retry_rejects_non_failed_history(api_client, email_history):
 
 @pytest.mark.django_db
 def test_email_history_endpoint_does_not_return_sms_histories(api_client, sms_template):
-    sms_template.histories.create(send_to="01012345678", context={"name": "길동"})
+    NHNCloudSMSNotificationHistory.objects.create_for_recipients(
+        template=sms_template,
+        recipients=[{"recipient": "01012345678", "context": {"name": "길동"}}],
+    )
 
     response = api_client.get(reverse("v1:admin-notification-email-history-list"))
     assert response.status_code == http.HTTPStatus.OK

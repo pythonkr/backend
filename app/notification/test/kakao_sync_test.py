@@ -44,7 +44,7 @@ def test_sync_creates_new_external_templates(mock_nhn_client):
     assert Template.objects.filter_active().count() == 1
     row = Template.objects.get(code="T1")
     assert row.title == "Hi"
-    assert row.sender_key == "S1"
+    assert row.sent_from == "S1"
 
 
 @pytest.mark.django_db
@@ -53,7 +53,7 @@ def test_sync_updates_changed_templates(system_user, mock_nhn_client):
     existing = Template(
         code="X",
         title="OLD",
-        sender_key="S1",
+        sent_from="S1",
         description="",
         data='{"templateCode":"X","templateName":"OLD","senderKey":"S1","templateContent":"old","status":"TSC03"}',
         created_by=system_user,
@@ -90,7 +90,7 @@ def test_sync_soft_deletes_missing_templates(system_user, mock_nhn_client):
             Template(
                 code="GONE",
                 title="g",
-                sender_key="S1",
+                sent_from="S1",
                 description="",
                 data="{}",
                 created_by=system_user,

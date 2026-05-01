@@ -20,7 +20,7 @@ def template(system_user):
     return EmailNotificationTemplate.objects.create(
         code="t",
         title="t",
-        from_address="a@b.c",
+        sent_from="a@b.c",
         data='{"title":"x","from_":"f","send_to":"r","body":"b"}',
         created_by=system_user,
         updated_by=system_user,
