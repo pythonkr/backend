@@ -44,6 +44,10 @@ local-setup:
 local-api: local-collectstatic
 	@ENV_PATH=envfile/.env.local uv run python app/manage.py runserver 8000
 
+# Run local Celery worker (requires `make docker-compose-up` for redis)
+local-worker:
+	@cd app && ENV_PATH=../envfile/.env.local uv run celery -A core worker -l INFO --concurrency=4
+
 # Run django collectstatic
 local-collectstatic:
 	@ENV_PATH=envfile/.env.local uv run python app/manage.py collectstatic --noinput

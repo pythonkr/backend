@@ -179,7 +179,7 @@ def test_kakao_template_delete_is_405(api_client, kakao_template):
 # ---- History create (POST /history/) ----------------------------------------
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_create_history_via_template_creates_sent_to_and_sends(api_client, sms_template):
     with patch("notification.models.nhn_cloud_sms.NHNCloudSMSNotificationHistory.client"):
         response = api_client.post(
@@ -200,7 +200,7 @@ def test_create_history_via_template_creates_sent_to_and_sends(api_client, sms_t
     assert sent_to["status"] == NotificationStatus.SENT
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_create_history_marks_sent_to_failed_when_send_raises(api_client, sms_template):
     with patch("notification.models.nhn_cloud_sms.NHNCloudSMSNotificationHistory.client") as mock_client:
         mock_client.send_message.side_effect = RuntimeError("external api down")
@@ -218,7 +218,7 @@ def test_create_history_marks_sent_to_failed_when_send_raises(api_client, sms_te
     assert body["sent_to_list"][0]["status"] == NotificationStatus.FAILED
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_create_history_with_multiple_recipients_and_per_recipient_context(api_client, sms_template):
     # 한 번의 요청으로 여러 수신자에게 서로 다른 context로 발송, 결과는 같은 history로 묶여 조회됨.
     with patch("notification.models.nhn_cloud_sms.NHNCloudSMSNotificationHistory.client") as mock_client:
@@ -240,7 +240,7 @@ def test_create_history_with_multiple_recipients_and_per_recipient_context(api_c
     assert {s["recipient"] for s in body["sent_to_list"]} == {"01000000001", "01000000002"}
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_create_history_templateless_email(api_client):
     # 템플릿 없이 template_data + sent_from 직접 입력해 발송.
     with patch("notification.models.email.EmailNotificationHistory.client"):
@@ -306,7 +306,7 @@ def test_history_list_filter_by_template(api_client, email_template, superuser):
     assert ids == [str(matching.id)]
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_history_list_filter_by_created_by_username(api_client, email_template, superuser):
     # API 경로로 history를 만들어야 BaseAbstractModelQuerySet.create()의 get_current_user()가
     # 인증된 superuser를 created_by로 잡음.
@@ -330,7 +330,7 @@ def test_history_list_filter_by_created_by_username(api_client, email_template, 
 # ---- History Retry ----------------------------------------------------------
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_retry_resends_only_failed_sent_to(api_client, email_history):
     # 한 history 안에 SENT/FAILED가 섞여 있을 때 retry는 FAILED만 재시도.
     extra = EmailNotificationHistory.objects.create_for_recipients(
@@ -352,7 +352,7 @@ def test_retry_resends_only_failed_sent_to(api_client, email_history):
     assert email_history.sent_to_list.get().status == NotificationStatus.SENT
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_retry_keeps_sent_to_failed_when_send_raises(api_client, email_history):
     email_history.sent_to_list.update(status=NotificationStatus.FAILED)
 
