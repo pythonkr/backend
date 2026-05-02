@@ -6,7 +6,6 @@ readme = "README.md"
 requires-python = "==3.12.*"
 dependencies = [
     "argon2-cffi>=25.1.0",
-    "awslambdaric>=4.0.0",
     "boto3 (>=1.37.37,<2.0.0)",
     "celery[redis]>=5.5.0",
     "django>=6.0.4",
@@ -35,13 +34,11 @@ dependencies = [
     "py-openapi-schema-to-json-schema>=0.0.3",
     "sentry-sdk[django]>=2.57.0",
     "setuptools>=82.0.1",
-    "zappa>=0.62.1",
-    "zappa-django-utils>=0.4.1",
 ]
 
 [dependency-groups]
 dev = [
-    "boto3-stubs[essential,s3,ssm]>=1.42.86",
+    "boto3-stubs[essential,s3]>=1.42.86",
     "django-stubs[compatible-mypy]>=6.0.2",
     "djangorestframework-stubs[compatible-mypy]>=3.16.9",
     "ipython>=9.12.0",
@@ -57,7 +54,6 @@ deployment = [
     "django-storages[s3]>=1.14.6",
     "djangorestframework>=3.17.1",
     "setuptools>=82.0.1",
-    "zappa>=0.62.1",
 ]
 
 [tool.uv]

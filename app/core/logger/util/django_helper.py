@@ -1,14 +1,10 @@
 import contextlib
 import functools
 import json
-import types
 
 from django.http.request import HttpRequest, RawPostDataException
 from django.http.response import HttpResponseBase
 from rest_framework.request import Request
-
-PLACEHOLDER_AWS_REQUEST_ID = "00000000-0000-0000-0000-000000000000"
-PLACEHOLDER_AWS_LAMBDA_CONTEXT = types.SimpleNamespace(AWS_REQUEST_ID=PLACEHOLDER_AWS_REQUEST_ID)
 
 default_json_dumps = functools.partial(
     json.dumps,
@@ -60,10 +56,3 @@ def get_response_log_data(response: HttpResponseBase) -> dict[str, int | str | d
         "headers": dict(response.headers),
         "body": response_body,
     }
-
-
-def get_aws_request_id_from_request(request: HttpRequest) -> str:
-    lambda_context = request.META.get("lambda.context", PLACEHOLDER_AWS_LAMBDA_CONTEXT)
-    if aws_request_id := getattr(lambda_context, "AWS_REQUEST_ID", None):
-        return aws_request_id
-    return getattr(lambda_context, "aws_request_id", PLACEHOLDER_AWS_REQUEST_ID)

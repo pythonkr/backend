@@ -1,39 +1,12 @@
 import os
 import pathlib
-import traceback
 import types
 import typing
 
-import boto3
 import corsheaders.defaults
 import environ
 import sentry_sdk
-import sentry_sdk.integrations.aws_lambda
 import sentry_sdk.integrations.django
-
-if typing.TYPE_CHECKING:
-    import mypy_boto3_ssm
-
-is_aws_lambda = os.environ.get("AWS_LAMBDA_FUNCTION_NAME") is not None
-if is_aws_lambda and (project_name := os.environ.get("PROJECT_NAME")) and (stage := os.environ.get("API_STAGE")):
-    print("Running in AWS Lambda environment. Trying to load environment variables from AWS SSM Parameter Store.")
-    try:
-        ssm_client: "mypy_boto3_ssm.SSMClient" = boto3.client("ssm")
-        next_token = ""  # nosec: B105
-        while next_token is not None:
-            result = ssm_client.get_parameters_by_path(
-                Path=f"/{project_name}/{stage}",
-                MaxResults=10,
-                **({"NextToken": next_token} if next_token else {}),
-            )
-            os.environ.update({p["Name"].split("/")[-1]: p["Value"] for p in result["Parameters"]})
-            next_token = result.get("NextToken")
-        print("Successfully loaded environment variables from AWS SSM Parameter Store.")
-    except Exception as e:
-        print(
-            "Failed to load environment variables from AWS SSM Parameter Store. Traceback: \n"
-            + "".join(traceback.format_exception(e))
-        )
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = pathlib.Path(__file__).resolve().parent.parent
@@ -69,18 +42,12 @@ LOGGING = {
     "formatters": {
         "basic": {"format": "%(asctime)s:%(module)s:%(levelname)s:%(message)s", "datefmt": "%Y-%m-%d %H:%M:%S"},
         "slack": {"()": "core.logger.formatter.slack.SlackJsonFormatter"},
-        "cloudwatch": {"()": "core.logger.formatter.cloudwatch.CloudWatchJsonFormatter"},
     },
     "handlers": {
         "console": {
             "level": LOG_LEVEL,
             "class": "logging.StreamHandler",
             "formatter": "basic",
-        },
-        "cloudwatch": {
-            "level": LOG_LEVEL,
-            "class": "logging.StreamHandler",
-            "formatter": "cloudwatch",
         },
         "slack": {
             "level": LOG_LEVEL,
@@ -90,26 +57,12 @@ LOGGING = {
     },
     "loggers": {
         "django.db.backends": ({"level": LOG_LEVEL, "handlers": ["console"]} if IS_LOCAL else {}),
-        "cloudwatch_logger": {"level": LOG_LEVEL, "handlers": ["cloudwatch"], "propagate": True},
+        "request_logger": {"level": LOG_LEVEL, "handlers": ["console"], "propagate": True},
         "slack_logger": ({"level": LOG_LEVEL, "handlers": ["slack"]} if SLACK.token and SLACK.channel else {}),
     },
 }
 
-# Zappa Settings
 API_STAGE = env("API_STAGE", default="prod")
-ADDITIONAL_TEXT_MIMETYPES: list[str] = []
-ASYNC_RESPONSE_TABLE = ""
-AWS_BOT_EVENT_MAPPING: dict[str, str] = {}
-AWS_EVENT_MAPPING: dict[str, str] = {}
-BASE_PATH = None
-BINARY_SUPPORT = True
-COGNITO_TRIGGER_MAPPING: dict[str, str] = {}
-CONTEXT_HEADER_MAPPINGS: dict[str, str] = {}
-DJANGO_SETTINGS = "core.settings"
-DOMAIN = None
-ENVIRONMENT_VARIABLES: dict[str, str] = {}
-EXCEPTION_HANDLER = None
-PROJECT_NAME = "PyConKR-backend"
 
 ALLOWED_HOSTS = ["*"]
 
@@ -153,8 +106,6 @@ INSTALLED_APPS = [
     "django_filters",
     # simple-history
     "simple_history",
-    # zappa
-    "zappa_django_utils",
     # For Shell Plus
     "django_extensions",
     # django-app
@@ -456,7 +407,6 @@ if SENTRY_DSN := env("SENTRY_DSN", default=""):
         profiles_sample_rate=SENTRY_PROFILES_SAMPLE_RATE,
         send_default_pii=True,
         integrations=[
-            sentry_sdk.integrations.aws_lambda.AwsLambdaIntegration(),
             sentry_sdk.integrations.django.DjangoIntegration(),
         ],
     )

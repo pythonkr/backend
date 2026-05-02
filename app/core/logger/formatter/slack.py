@@ -24,8 +24,7 @@ class SlackJsonFormatter(logging.Formatter):
             {
                 "type": "section",
                 "fields": [
-                    {"type": "mrkdwn", "text": "*Timestamp*\n```2024-07-20T21:24:20.296Z```"},
-                    {"type": "mrkdwn", "text": "*AWS Request ID*\n```00000000-0000-0000-0000-000000000000```"}
+                    {"type": "mrkdwn", "text": "*Timestamp*\n```2024-07-20T21:24:20.296Z```"}
                 ]
             },
             {"type": "section", "text": {"type": "mrkdwn", "text": "*key1*\n```\"value1\"```"}},
@@ -60,7 +59,6 @@ class SlackJsonFormatter(logging.Formatter):
         if self.usesTime():
             record.asctime = self.formatTime(record, self.datefmt)
 
-        aws_request_id = getattr(record, "aws_request_id", "00000000-0000-0000-0000-000000000000")
         header_text = (
             f":pencil: 로그 [{record.levelname}]"
             if record.levelname != "ERROR"
@@ -75,7 +73,6 @@ class SlackJsonFormatter(logging.Formatter):
                 blocks.SlackSectionParentBlock(
                     fields=[
                         blocks.SlackCodeChildBlock(title="Timestamp", text=time_text),
-                        blocks.SlackCodeChildBlock(title="AWS Request ID", text=aws_request_id),
                     ],
                 ),
             ]

@@ -3,7 +3,6 @@ PROJECT_DIR := $(dir $(MKFILE_PATH))
 
 # Set additional build args for docker image build using make arguments
 IMAGE_NAME := pycon_backend
-LAMBDA_CONTAINER_NAME = $(IMAGE_NAME)_lambda_container
 SERVER_CONTAINER_NAME = $(IMAGE_NAME)_server_container
 
 ifeq ($(DOCKER_DEBUG),true)
@@ -13,25 +12,6 @@ else
 	DOCKER_MID_BUILD_OPTIONS =
 	DOCKER_END_BUILD_OPTIONS =
 endif
-
-AWS_LAMBDA_READYZ_PAYLOAD = '{\
-  "resource": "/readyz/",\
-  "path": "/readyz/",\
-  "httpMethod": "GET",\
-  "requestContext": {\
-    "resourcePath": "/readyz/",\
-    "httpMethod": "GET",\
-    "path": "/readyz/"\
-  },\
-  "headers": {"accept": "application/json"},\
-  "multiValueHeaders": {"accept": ["application/json"]},\
-  "queryStringParameters": null,\
-  "multiValueQueryStringParameters": null,\
-  "pathParameters": null,\
-  "stageVariables": null,\
-  "body": null,\
-  "isBase64Encoded": false\
-}'
 
 # =============================================================================
 # Local development commands
@@ -100,43 +80,6 @@ hooks-lint:
 
 lint: hooks-lint  # alias
 
-
-# =============================================================================
-# Zappa related commands
-zappa-export:
-	uv run zappa save-python-settings-file
-
-# =============================================================================
-# Docker related commands (Lambda)
-
-# Lambda Docker image build
-docker-lambda-build:
-	@docker build \
-		-f ./infra/lambda.Dockerfile -t $(IMAGE_NAME):lambda \
-		--build-arg GIT_HASH=$(shell git rev-parse HEAD) \
-		--build-arg IMAGE_BUILD_DATETIME=$(shell date +%Y-%m-%d_%H:%M:%S) \
-		$(DOCKER_MID_BUILD_OPTIONS) $(PROJECT_DIR) $(DOCKER_END_BUILD_OPTIONS)
-
-docker-lambda-run: docker-compose-up
-	@(docker stop $(LAMBDA_CONTAINER_NAME) || true && docker rm $(LAMBDA_CONTAINER_NAME) || true) > /dev/null 2>&1
-	@docker run -d --rm \
-		-p 48000:8080 \
-		--env-file envfile/.env.local --env-file envfile/.env.docker \
-		--name $(LAMBDA_CONTAINER_NAME) \
-		$(IMAGE_NAME):lambda
-
-docker-lambda-readyz:
-	curl -X POST http://localhost:48000/2015-03-31/functions/function/invocations -d $(AWS_LAMBDA_READYZ_PAYLOAD) | jq '.body | fromjson'
-
-docker-lambda-test: docker-lambda-run docker-lambda-readyz
-
-docker-lambda-build-and-test: docker-lambda-build docker-lambda-test
-
-docker-lambda-stop:
-	docker stop $(LAMBDA_CONTAINER_NAME) || true
-
-docker-lambda-rm: docker-lambda-stop
-	docker rm $(LAMBDA_CONTAINER_NAME) || true
 
 # =============================================================================
 # Docker related commands (Server)

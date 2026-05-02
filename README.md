@@ -33,21 +33,20 @@ make local-api
 ```
 
 마지막으로, Docker로도 API 서버를 실행할 수 있습니다.  
-단, 이때 API 서버는 AWS Lambda에서 요청을 처리하는 것과 동일하게 동작하므로, API Gateway가 Lambda를 호출할때처럼 `/functions/function/invocations` route에 특정한 Payload로 요청해야 합니다. (Makefile의 `docker-readyz`를 참고하세요.)  
 이 방식은 로컬에서 간단한 smoke test 용도로 유용합니다.
 ```bash
 # Docker 이미지 빌드
-make docker-build
+make docker-server-build
 
 # Docker 컨테이너 실행
-make docker-run
+make docker-server-run
 
 # Docker 컨테이너 종료
-make docker-stop
+make docker-server-stop
 
 # Docker 컨테이너 삭제
-make docker-rm
+make docker-server-rm
 
 # Docker로 간단한 smoke test
-make docker-test
+make docker-server-test
 ```
