@@ -68,7 +68,6 @@ repos:
   #         - drf-spectacular
   #         - drf-standardized-errors
   #         - djangorestframework-stubs[compatible-mypy]
-  #         - zappa-django-utils
   - repo: https://github.com/astral-sh/uv-pre-commit
     rev: 0.6.12
     hooks:
@@ -96,7 +95,6 @@ repos:
 #         - drf-spectacular
 #         - drf-standardized-errors
 #         - djangorestframework-stubs[compatible-mypy]
-#         - zappa-django-utils
 #       args:
 #         - --no-strict-optional
 #         - --ignore-missing-imports
