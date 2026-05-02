@@ -1,9 +1,11 @@
 from urllib.parse import urljoin
 
-from core.const.google_api import GOOGLE_OAUTH2_AUTH_URI, GOOGLE_OAUTH2_TOKEN_URI
+from core.const.google_api import GOOGLE_OAUTH2_AUTH_URI, GOOGLE_OAUTH2_TOKEN_INFO_URI, GOOGLE_OAUTH2_TOKEN_URI
 from django.conf import settings
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
+from httpx import get as httpx_get
+from httpx import post as httpx_post
 from rest_framework.reverse import reverse
 
 
@@ -48,4 +50,29 @@ def create_credentials(refresh_token: str) -> Credentials:
             "client_id": settings.GOOGLE_CLOUD.CLIENT_ID,
             "client_secret": settings.GOOGLE_CLOUD.CLIENT_SECRET,
         }
+    )
+
+
+def fetch_access_token(refresh_token: str, timeout: float = 10.0) -> dict:
+    return (
+        httpx_post(
+            url=GOOGLE_OAUTH2_TOKEN_URI,
+            data={
+                "client_id": settings.GOOGLE_CLOUD.CLIENT_ID,
+                "client_secret": settings.GOOGLE_CLOUD.CLIENT_SECRET,
+                "refresh_token": refresh_token,
+                "grant_type": "refresh_token",
+            },
+            timeout=timeout,
+        )
+        .raise_for_status()
+        .json()
+    )
+
+
+def fetch_token_info(access_token: str, timeout: float = 10.0) -> dict:
+    return (
+        httpx_get(url=GOOGLE_OAUTH2_TOKEN_INFO_URI, params={"access_token": access_token}, timeout=timeout)
+        .raise_for_status()
+        .json()
     )
