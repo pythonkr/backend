@@ -15,6 +15,7 @@ class OpenAPITag:
     ADMIN_NOTI_EMAIL = "Admin > Notification > Email"
     ADMIN_NOTI_KAKAO_ALIMTALK = "Admin > Notification > Kakao Alimtalk"
     ADMIN_NOTI_SMS = "Admin > Notification > SMS"
+    ADMIN_EXT_API_GOOGLE_OAUTH2 = "Admin > External API > Google OAuth2"
 
     PARTICIPANT_PORTAL_USER = "Participant Portal > Sign-In & Sign-Out & My Profile"
     PARTICIPANT_PORTAL_PUBLIC_FILE = "Participant Portal > Public File"

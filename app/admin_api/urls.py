@@ -9,6 +9,7 @@ from admin_api.views.event.presentation import (
     RoomScheduleAdminViewSet,
 )
 from admin_api.views.event.sponsor import SponsorAdminViewSet, SponsorTagAdminViewSet, SponsorTierAdminViewSet
+from admin_api.views.external_api.google_oauth2 import GoogleOAuth2AdminViewSet
 from admin_api.views.file import PublicFileAdminViewSet
 from admin_api.views.modification_audit import ModificationAuditAdminViewSet
 from admin_api.views.notification import (
@@ -79,6 +80,9 @@ admin_notification_sms_router.register(
     "history", NHNCloudSMSNotificationHistoryAdminViewSet, basename="admin-notification-sms-history"
 )
 
+admin_external_api_google_router = routers.SimpleRouter()
+admin_external_api_google_router.register("oauth2", GoogleOAuth2AdminViewSet, basename="admin-google-oauth2")
+
 urlpatterns = [
     path("cms/", include(admin_cms_router.urls)),
     path("file/", include(admin_file_router.urls)),
@@ -88,4 +92,5 @@ urlpatterns = [
     path("notification/email/", include(admin_notification_email_router.urls)),
     path("notification/kakao-alimtalk/", include(admin_notification_kakao_router.urls)),
     path("notification/sms/", include(admin_notification_sms_router.urls)),
+    path("external-api/google/", include(admin_external_api_google_router.urls)),
 ]
