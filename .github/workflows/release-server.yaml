@@ -1,8 +1,8 @@
 name: Release-Server
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
 
 on:
   workflow_dispatch:
@@ -54,8 +54,7 @@ jobs:
       - name: Get current date, repo name and release tag version
         id: info
         run: |
-          LATEST_TAG=$(git tag -l --sort=-creatordate | head -n 1)
-          echo "TAG=$(uv run python ./.github/scripts/get_new_version.py --current=$LATEST_TAG ${{ env.BUMP_RULE }})" >> "$GITHUB_OUTPUT"
+          echo "TAG=$(uv run python ./.github/scripts/get_new_version.py --cleanup-invalid ${{ env.BUMP_RULE }})" >> "$GITHUB_OUTPUT"
           echo "date=$(date +'%Y-%m-%d_%H:%M:%S')" >> "$GITHUB_OUTPUT"
           echo "repository_name=$(echo ${{ github.repository }} | sed -e 's/${{ github.repository_owner }}\///')" >> "$GITHUB_OUTPUT"
 
