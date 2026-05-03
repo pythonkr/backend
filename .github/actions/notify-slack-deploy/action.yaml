@@ -1,0 +1,46 @@
+name: Notify Slack of deploy result
+description: Send a Slack chat.postMessage reflecting the calling job's status. The status emoji ('성공 :tada:', '취소 :no_entry:', '실패 :rotating_light:') is auto-appended to the header — the caller supplies the prefix.
+
+inputs:
+  slack-token:
+    description: Slack bot token (xoxb-...)
+    required: true
+  slack-channel:
+    description: Slack channel ID
+    required: true
+  header-prefix:
+    description: Header text shown before the auto-appended status emoji (e.g. "backend 1.2.3 버전 Build & Push")
+    required: true
+  section-text:
+    description: Section body in mrkdwn. Caller can reference job.status / step outputs to vary by outcome.
+    required: false
+    default: GitHub Action 바로가기
+
+runs:
+  using: composite
+  steps:
+    - name: Notify Slack
+      uses: slackapi/slack-github-action@v3
+      with:
+        method: chat.postMessage
+        token: ${{ inputs.slack-token }}
+        payload: |
+          channel: "${{ inputs.slack-channel }}"
+          blocks:
+            - type: header
+              text:
+                type: plain_text
+                text: "${{ inputs.header-prefix }} ${{ job.status == 'success' && '성공 :tada:' || job.status == 'cancelled' && '취소 :no_entry:' || '실패 :rotating_light:' }}"
+                emoji: true
+            - type: section
+              text:
+                type: mrkdwn
+                text: "${{ inputs.section-text }}"
+              accessory:
+                type: button
+                text:
+                  type: plain_text
+                  text: "${{ github.run_id }}"
+                value: github_action
+                url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                action_id: button-action

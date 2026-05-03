@@ -125,12 +125,7 @@ dependencies = [
 
 [package.dev-dependencies]
 deployment = [
-    { name = "boto3" },
-    { name = "django" },
-    { name = "django-environ" },
-    { name = "django-storages", extra = ["s3"] },
-    { name = "djangorestframework" },
-    { name = "setuptools" },
+    { name = "packaging" },
 ]
 dev = [
     { name = "boto3-stubs", extra = ["essential", "s3"] },
@@ -177,14 +172,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-deployment = [
-    { name = "boto3", specifier = ">=1.42.86" },
-    { name = "django", specifier = ">=6.0.4" },
-    { name = "django-environ", specifier = ">=0.13.0" },
-    { name = "django-storages", extras = ["s3"], specifier = ">=1.14.6" },
-    { name = "djangorestframework", specifier = ">=3.17.1" },
-    { name = "setuptools", specifier = ">=82.0.1" },
-]
+deployment = [{ name = "packaging", specifier = ">=26.0" }]
 dev = [
     { name = "boto3-stubs", extras = ["essential", "s3"], specifier = ">=1.42.86" },
     { name = "django-stubs", extras = ["compatible-mypy"], specifier = ">=6.0.2" },
