@@ -14,7 +14,7 @@ on:
         type: choice
         options:
           - dev
-          - prod
+          - prd
   push:
     branches:
       - "main"
@@ -28,7 +28,6 @@ jobs:
       BUMP_RULE: ${{ (github.event_name == 'workflow_dispatch' && inputs.WORKFLOW_PHASE || 'dev') == 'dev' && '--stage' || '' }}
 
     steps:
-      # Checkout source codes
       - name: Checkout source codes
         uses: actions/checkout@v4
         with:
@@ -56,11 +55,10 @@ jobs:
         id: info
         run: |
           LATEST_TAG=$(git tag -l --sort=-creatordate | head -n 1)
-          echo "::set-output name=TAG::$(python ./.github/scripts/get_new_version.py --current=$LATEST_TAG ${{ env.BUMP_RULE }})"
-          echo "::set-output name=date::$(date +'%Y-%m-%d_%H:%M:%S')"
-          echo "::set-output name=repository_name::$(echo ${{ github.repository }} | sed -e 's/${{ github.repository_owner }}\///')"
+          echo "TAG=$(uv run python ./.github/scripts/get_new_version.py --current=$LATEST_TAG ${{ env.BUMP_RULE }})" >> "$GITHUB_OUTPUT"
+          echo "date=$(date +'%Y-%m-%d_%H:%M:%S')" >> "$GITHUB_OUTPUT"
+          echo "repository_name=$(echo ${{ github.repository }} | sed -e 's/${{ github.repository_owner }}\///')" >> "$GITHUB_OUTPUT"
 
-      # Build and Push Docker image to Docker Hub
       - name: Build and Push Docker image to Docker Hub
         uses: docker/build-push-action@v5
         with:
@@ -79,73 +77,37 @@ jobs:
             GIT_HASH=${{ github.sha }}
             IMAGE_BUILD_DATETIME=${{ steps.info.outputs.date }}
 
-      # Create git tag
       - name: Create and push git tag
         run: |
           git tag ${{ steps.info.outputs.TAG }}
           git push origin ${{ steps.info.outputs.TAG }}
 
-      # Notify to Slack (Success)
-      - name: Notify deployment to Slack
-        if: failure() || cancelled()
-        uses: slackapi/slack-github-action@v1.26.0
+      # Trigger infrastructure repo to bump tag and run ansible deploy.
+      - name: Generate infrastructure deploy token
+        id: deploy-token
+        uses: actions/create-github-app-token@v3
         with:
-          channel-id: ${{ vars.SLACK_DEPLOYMENT_ALERT_CHANNEL }}
-          payload: |
-            {
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "${{ steps.info.outputs.repository_name }} ${{ steps.info.outputs.TAG }} 버전 Build & Push 실패 :rotating_light: (${{ job.status }})",
-                    "emoji": true
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {"type": "mrkdwn", "text": "GitHub Action 바로가기"},
-                  "accessory": {
-                    "type": "button",
-                    "text": {"type": "plain_text", "text": "${{ github.run_id }}"},
-                    "value": "github_action",
-                    "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-                    "action_id": "button-action"
-                  }
-                }
-              ]
-            }
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          client-id: ${{ vars.DEPLOY_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DEPLOY_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ secrets.INFRA_REPO_NAME }}
 
-      # Notify to Slack (Failure)
-      - name: Notify deployment to Slack
-        uses: slackapi/slack-github-action@v1.26.0
-        with:
-          channel-id: ${{ vars.SLACK_DEPLOYMENT_ALERT_CHANNEL }}
-          payload: |
-            {
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "${{ steps.info.outputs.repository_name }} ${{ steps.info.outputs.TAG }} 버전 Build & Push 성공 :tada:",
-                    "emoji": true
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {"type": "mrkdwn", "text": "GitHub Action 바로가기"},
-                  "accessory": {
-                    "type": "button",
-                    "text": {"type": "plain_text", "text": "${{ github.run_id }}"},
-                    "value": "github_action",
-                    "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-                    "action_id": "button-action"
-                  }
-                }
-              ]
-            }
+      - name: Trigger infrastructure deploy
         env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          GH_TOKEN: ${{ steps.deploy-token.outputs.token }}
+          INFRA_REPO: ${{ github.repository_owner }}/${{ secrets.INFRA_REPO_NAME }}
+          SERVICE: backend-${{ env.API_STAGE }}
+          IMAGE_TAG: ${{ steps.info.outputs.TAG }}
+        run: |
+          gh api "repos/$INFRA_REPO/dispatches" \
+            --method POST \
+            -f event_type=bump-image \
+            -f "client_payload[service]=$SERVICE" \
+            -f "client_payload[image_tag]=$IMAGE_TAG"
+
+      - uses: ./.github/actions/notify-slack-deploy
+        if: always()
+        with:
+          slack-token: ${{ secrets.SLACK_BOT_TOKEN }}
+          slack-channel: ${{ vars.SLACK_DEPLOYMENT_ALERT_CHANNEL }}
+          header-prefix: "${{ steps.info.outputs.repository_name }} ${{ steps.info.outputs.TAG }} 버전 Build & Push"

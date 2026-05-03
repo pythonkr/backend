@@ -48,12 +48,7 @@ dev = [
     "pytest-socket>=0.7.0",
 ]
 deployment = [
-    "boto3>=1.42.86",
-    "django>=6.0.4",
-    "django-environ>=0.13.0",
-    "django-storages[s3]>=1.14.6",
-    "djangorestframework>=3.17.1",
-    "setuptools>=82.0.1",
+    "packaging>=26.0",
 ]
 
 [tool.uv]
