@@ -9,7 +9,16 @@ from notification.models import (
     NHNCloudSMSNotificationHistory,
 )
 from notification.models.base import NotificationStatus
+from notification.models.nhn_cloud_kakao_alimtalk import NHNCloudKakaoAlimTalkNotificationTemplateQuerySet
 from rest_framework.test import APIClient
+
+
+@pytest.fixture
+def mock_kakao_sync():
+    # admin viewset.get_queryset()이 호출하는 sync_with_nhn_cloud를 가로채서 외부 호출을 막고 호출 여부를 검증.
+    with patch.object(NHNCloudKakaoAlimTalkNotificationTemplateQuerySet, "sync_with_nhn_cloud") as m:
+        yield m
+
 
 # ---- Auth -------------------------------------------------------------------
 
@@ -139,7 +148,7 @@ def test_render_preview_fills_missing_variables_with_random_placeholder(api_clie
 
 
 @pytest.mark.django_db
-def test_render_preview_works_for_kakao_template(api_client, kakao_template):
+def test_render_preview_works_for_kakao_template(api_client, kakao_template, mock_kakao_sync):
     response = api_client.post(
         reverse("v1:admin-notification-kakao-template-render-preview", kwargs={"pk": kakao_template.id}),
         data={"context": {"name": "길동"}},
@@ -147,6 +156,7 @@ def test_render_preview_works_for_kakao_template(api_client, kakao_template):
     )
     assert response.status_code == http.HTTPStatus.OK
     assert "길동" in response.content.decode()
+    assert mock_kakao_sync.called
 
 
 # ---- Kakao 읽기 전용 ---------------------------------------------------------
@@ -174,6 +184,45 @@ def test_kakao_template_delete_is_405(api_client, kakao_template):
         reverse("v1:admin-notification-kakao-template-detail", kwargs={"pk": kakao_template.id})
     )
     assert response.status_code == http.HTTPStatus.METHOD_NOT_ALLOWED
+
+
+# ---- Kakao 읽기 시 NHN Cloud sync ------------------------------------------
+# admin이 list/retrieve/render_preview 진입 시 외부 템플릿 변경사항을 즉시 반영해야 한다.
+
+
+@pytest.mark.django_db
+def test_kakao_template_list_triggers_sync(api_client, mock_kakao_sync):
+    response = api_client.get(reverse("v1:admin-notification-kakao-template-list"))
+    assert response.status_code == http.HTTPStatus.OK
+    assert mock_kakao_sync.called
+
+
+@pytest.mark.django_db
+def test_kakao_template_retrieve_triggers_sync(api_client, kakao_template, mock_kakao_sync):
+    response = api_client.get(reverse("v1:admin-notification-kakao-template-detail", kwargs={"pk": kakao_template.id}))
+    assert response.status_code == http.HTTPStatus.OK
+    assert mock_kakao_sync.called
+
+
+@pytest.mark.django_db
+def test_kakao_template_write_methods_do_not_trigger_sync(api_client, kakao_template, mock_kakao_sync):
+    # 405 경로는 액션 바인딩이 없어 get_queryset이 호출되지 않으므로 sync도 발생하지 않아야 함.
+    api_client.post(reverse("v1:admin-notification-kakao-template-list"), data={}, format="json")
+    api_client.patch(
+        reverse("v1:admin-notification-kakao-template-detail", kwargs={"pk": kakao_template.id}),
+        data={"title": "x"},
+        format="json",
+    )
+    api_client.delete(reverse("v1:admin-notification-kakao-template-detail", kwargs={"pk": kakao_template.id}))
+    assert not mock_kakao_sync.called
+
+
+@pytest.mark.django_db
+def test_kakao_template_list_propagates_sync_failure(api_client, mock_kakao_sync):
+    # sync 실패는 try/except로 삼키지 않고 그대로 전파되어야 한다 (운영자가 즉시 인지 가능).
+    mock_kakao_sync.side_effect = RuntimeError("nhn cloud down")
+    with pytest.raises(RuntimeError, match="nhn cloud down"):
+        api_client.get(reverse("v1:admin-notification-kakao-template-list"))
 
 
 # ---- History create (POST /history/) ----------------------------------------
