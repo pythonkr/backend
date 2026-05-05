@@ -69,6 +69,11 @@ class NHNCloudKakaoAlimTalkNotificationTemplateAdminViewSet(_NotiTemplateAdminAc
     serializer_class = NHNCloudKakaoAlimTalkNotificationTemplateAdminSerializer
     queryset = NHNCloudKakaoAlimTalkNotificationTemplate.objects.filter_active().select_related_with_user()
 
+    def get_queryset(self):
+        if self.action in TEMPLATE_READ_METHODS:
+            NHNCloudKakaoAlimTalkNotificationTemplate.objects.sync_with_nhn_cloud()
+        return super().get_queryset()
+
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_NOTI_SMS]) for m in TEMPLATE_CRUD_METHODS})
 class NHNCloudSMSNotificationTemplateAdminViewSet(_NotiTemplateAdminActionMixin, ModelViewSet):
