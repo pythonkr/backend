@@ -1,6 +1,7 @@
 from enum import StrEnum, auto
 from json import loads as json_loads
 from logging import getLogger
+from traceback import format_exc
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, NotRequired, TypedDict, TypeVar
 from uuid import uuid4
 
@@ -196,6 +197,7 @@ class NotificationHistorySentToBase(BaseAbstractModel):
         default=NotificationStatus.CREATED,
         db_index=True,
     )
+    failure_reason = models.TextField(null=True, blank=True)
 
     class Meta:
         abstract = True
@@ -276,13 +278,15 @@ class NotificationHistorySentToBase(BaseAbstractModel):
 
     def send(self) -> None:
         self.status = NotificationStatus.SENDING
-        self.save(update_fields=["status"])
+        self.failure_reason = None
+        self.save(update_fields=["status", "failure_reason"])
 
         try:
             self.history.client.send_message(data=self.build_send_parameters())
         except Exception:
             self.status = NotificationStatus.FAILED
-            self.save(update_fields=["status"])
+            self.failure_reason = format_exc()
+            self.save(update_fields=["status", "failure_reason"])
             slack_logger.exception(
                 "Notification send failed: history_id=%s template_code=%s recipient=%s",
                 self.history.id,

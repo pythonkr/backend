@@ -265,6 +265,7 @@ def test_create_history_marks_sent_to_failed_when_send_raises(api_client, sms_te
     body = response.json()
     assert body["sent_to_status_summary"]["failed"] == 1
     assert body["sent_to_list"][0]["status"] == NotificationStatus.FAILED
+    assert "external api down" in body["sent_to_list"][0]["failure_reason"]
 
 
 @pytest.mark.django_db(transaction=True)
@@ -424,6 +425,66 @@ def test_retry_noop_when_no_failed_sent_to(api_client, email_history):
         )
     assert response.status_code == http.HTTPStatus.OK
     mock_client.send_message.assert_not_called()
+
+
+# ---- History Render SentTo As HTML -----------------------------------------
+
+
+@pytest.mark.django_db
+def test_render_sent_to_as_html_returns_html_with_rendered_context(api_client, email_history):
+    sent_to = email_history.sent_to_list.get()
+    response = api_client.get(
+        reverse(
+            "v1:admin-notification-email-history-render-sent-to-as-html",
+            kwargs={"pk": email_history.id, "sent_to_id": sent_to.id},
+        )
+    )
+    assert response.status_code == http.HTTPStatus.OK
+    assert response["Content-Type"].startswith("text/html")
+    body = response.content.decode()
+    assert body.lstrip().startswith("<html")
+    # email_history fixture의 context (name="길동")가 template_data를 거쳐 HTML에 반영되어야 함.
+    assert "Hi 길동" in body
+    assert "Hello 길동" in body
+
+
+@pytest.mark.django_db
+def test_render_sent_to_as_html_uses_history_template_data_snapshot(api_client, email_history, email_template):
+    # History.template_data는 발송 시점의 snapshot이므로, 이후 Template.data를 바꿔도
+    # 기존 sent_to의 렌더 결과는 영향을 받지 않아야 한다.
+    sent_to = email_history.sent_to_list.get()
+    url = reverse(
+        "v1:admin-notification-email-history-render-sent-to-as-html",
+        kwargs={"pk": email_history.id, "sent_to_id": sent_to.id},
+    )
+
+    before = api_client.get(url).content.decode()
+
+    email_template.data = '{"title":"DIFFERENT {{ name }}","from_":"X","send_to":"Y","body":"CHANGED {{ name }}"}'
+    email_template.save()
+
+    after = api_client.get(url).content.decode()
+    assert before == after
+    assert "Hi 길동" in after
+    assert "Hello 길동" in after
+    assert "DIFFERENT" not in after
+    assert "CHANGED" not in after
+
+
+@pytest.mark.django_db
+def test_render_sent_to_as_html_404_when_sent_to_belongs_to_other_history(api_client, email_history, email_template):
+    other = EmailNotificationHistory.objects.create_for_recipients(
+        template=email_template,
+        recipients=[{"recipient": "other@example.com", "context": {"name": "다른", "recipient": "y"}}],
+    )
+    other_sent_to = other.sent_to_list.get()
+    response = api_client.get(
+        reverse(
+            "v1:admin-notification-email-history-render-sent-to-as-html",
+            kwargs={"pk": email_history.id, "sent_to_id": other_sent_to.id},
+        )
+    )
+    assert response.status_code == http.HTTPStatus.NOT_FOUND
 
 
 # ---- 채널 간 격리 -----------------------------------------------------------

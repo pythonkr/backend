@@ -22,8 +22,8 @@ from rest_framework import serializers
 
 class _NotiHistorySentToAdminSerializerBase(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
     class Meta:
-        fields = COMMON_ADMIN_FIELDS + ("recipient", "context", "status")
-        read_only_fields = (*COMMON_ADMIN_FIELDS, "status")
+        fields = COMMON_ADMIN_FIELDS + ("recipient", "context", "status", "failure_reason")
+        read_only_fields = (*COMMON_ADMIN_FIELDS, "status", "failure_reason")
 
 
 class EmailNotificationHistorySentToAdminSerializer(_NotiHistorySentToAdminSerializerBase):
