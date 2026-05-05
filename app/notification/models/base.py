@@ -171,19 +171,22 @@ class NotificationHistoryBase(BaseAbstractModel):
         return {status.value.lower(): counts.get(status.value, 0) for status in NotificationStatus}
 
     @transaction.atomic
-    def _dispatch(self, sent_to_qs: "models.QuerySet[NotificationHistorySentToBase]") -> None:
+    def _dispatch(self, sent_to_qs: "models.QuerySet[NotificationHistorySentToBase]", *, force: bool = False) -> None:
         from notification.tasks import send_notification_to_recipient
 
-        if not (sent_to_ids := list(sent_to_qs.values_list("id", flat=True))):
+        if not (ids := list(sent_to_qs.values_list("id", flat=True))):
             return
         label = type(self).sent_to_class._meta.label_lower
-        transaction.on_commit(lambda: [send_notification_to_recipient.delay(label, sid) for sid in sent_to_ids])
+        transaction.on_commit(lambda: [send_notification_to_recipient.delay(label, sid, force=force) for sid in ids])
 
     def send(self) -> None:
         self._dispatch(self.sent_to_list.all())
 
-    def retry(self) -> None:
-        self._dispatch(self.sent_to_list.filter(status=NotificationStatus.FAILED))
+    def retry(self, statuses: list[NotificationStatus], sent_to_id: str | None = None) -> None:
+        qs = self.sent_to_list.filter(status__in=statuses)
+        if sent_to_id is not None:
+            qs = qs.filter(pk=sent_to_id)
+        self._dispatch(qs, force=True)
 
 
 class NotificationHistorySentToBase(BaseAbstractModel):

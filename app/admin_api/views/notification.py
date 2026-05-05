@@ -8,6 +8,7 @@ from admin_api.serializers.notification import (
     NHNCloudKakaoAlimTalkNotificationTemplateAdminSerializer,
     NHNCloudSMSNotificationHistoryAdminSerializer,
     NHNCloudSMSNotificationTemplateAdminSerializer,
+    NotificationHistoryRetryRequestAdminSerializer,
     NotificationTemplateRenderRequestAdminSerializer,
 )
 from core.const.tag import OpenAPITag
@@ -33,7 +34,7 @@ from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 
 TEMPLATE_READ_METHODS = ["list", "retrieve", "render_preview"]
 TEMPLATE_CRUD_METHODS = TEMPLATE_READ_METHODS + ["create", "update", "partial_update", "destroy"]
-HISTORY_METHODS = ["list", "retrieve", "create", "retry", "render_sent_to_as_html"]
+HISTORY_METHODS = ["list", "retrieve", "create", "retry", "retry_sent_to", "render_sent_to_as_html"]
 
 
 # ---- Template -----------------------------------------------------------
@@ -91,9 +92,23 @@ class _NotiHistoryAdminViewSetBase(CreateModelMixin, ListModelMixin, RetrieveMod
     filterset_class = NotificationHistoryAdminFilterSet
 
     @action(detail=True, methods=["post"], url_path="retry")
-    def retry(self, *args: tuple, **kwargs: dict) -> Response:
+    def retry(self, request: Request, *args: tuple, **kwargs: dict) -> Response:
+        query = NotificationHistoryRetryRequestAdminSerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+
         serializer = self.get_serializer(instance=self.get_object())
-        serializer.retry()
+        serializer.retry(statuses=query.validated_data["status"])
+        return Response(data=serializer.data)
+
+    @action(detail=True, methods=["post"], url_path=r"sent-to/(?P<sent_to_id>[^/.]+)/retry")
+    def retry_sent_to(self, request: Request, sent_to_id: str, *args: tuple, **kwargs: dict) -> Response:
+        query = NotificationHistoryRetryRequestAdminSerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+
+        history = self.get_object()
+        get_object_or_404(history.sent_to_list.all(), pk=sent_to_id, status__in=query.validated_data["status"])
+        serializer = self.get_serializer(instance=history)
+        serializer.retry(statuses=query.validated_data["status"], sent_to_id=sent_to_id)
         return Response(data=serializer.data)
 
     @extend_schema(responses=build_html_responses(names=["Notification History SentTo Render As HTML"]))
