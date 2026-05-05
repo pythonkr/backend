@@ -62,6 +62,36 @@ def test_sent_to_failure_transitions_to_failed_and_propagates(email_template):
 
 
 @pytest.mark.django_db
+def test_sent_to_failure_records_traceback_in_failure_reason(email_template):
+    history = _create_history(email_template)
+    sent_to = history.sent_to_list.get()
+    with patch.object(EmailNotificationHistory, "client") as mock_client:
+        mock_client.send_message.side_effect = RuntimeError("kaboom-xyz")
+        with pytest.raises(RuntimeError):
+            sent_to.send()
+    sent_to.refresh_from_db()
+    assert sent_to.failure_reason is not None
+    assert "RuntimeError" in sent_to.failure_reason
+    assert "kaboom-xyz" in sent_to.failure_reason
+    assert "Traceback" in sent_to.failure_reason
+
+
+@pytest.mark.django_db
+def test_sent_to_retry_clears_previous_failure_reason(email_template):
+    history = _create_history(email_template)
+    sent_to = history.sent_to_list.get()
+    sent_to.status = NotificationStatus.FAILED
+    sent_to.failure_reason = "previous failure"
+    sent_to.save(update_fields=["status", "failure_reason"])
+
+    with patch.object(EmailNotificationHistory, "client"):
+        sent_to.send()
+    sent_to.refresh_from_db()
+    assert sent_to.status == NotificationStatus.SENT
+    assert sent_to.failure_reason is None
+
+
+@pytest.mark.django_db
 def test_sent_to_failure_logs_to_slack_logger(email_template, caplog):
     history = _create_history(email_template, recipient="bad@example.com")
     sent_to = history.sent_to_list.get()

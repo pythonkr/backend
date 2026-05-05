@@ -96,3 +96,28 @@ def test_task_logs_unexpected_error_when_inner_save_fails(sent_to, caplog):
     records = [r for r in caplog.records if "Batch send unexpected" in r.getMessage()]
     assert len(records) == 1
     assert records[0].exc_info is not None
+
+
+@pytest.mark.django_db
+def test_task_records_failure_reason_on_external_failure(sent_to):
+    with patch.object(EmailNotificationHistory, "client") as mock_client:
+        mock_client.send_message.side_effect = RuntimeError("boom-task")
+        with pytest.raises(RuntimeError):
+            send_notification_to_recipient(LABEL, sent_to.id)
+    sent_to.refresh_from_db()
+    assert sent_to.status == NotificationStatus.FAILED
+    assert sent_to.failure_reason is not None
+    assert "boom-task" in sent_to.failure_reason
+
+
+@pytest.mark.django_db
+def test_task_records_failure_reason_when_inner_save_fails(sent_to):
+    # send() 내부 save() 자체가 망가졌을 때, task의 outer fallback이 queryset.update()로
+    # status=FAILED와 failure_reason을 기록해야 한다.
+    with patch.object(EmailNotificationHistorySentTo, "save", side_effect=RuntimeError("db down")):
+        with pytest.raises(RuntimeError, match="db down"):
+            send_notification_to_recipient(LABEL, sent_to.id)
+    sent_to.refresh_from_db()
+    assert sent_to.status == NotificationStatus.FAILED
+    assert sent_to.failure_reason is not None
+    assert "db down" in sent_to.failure_reason

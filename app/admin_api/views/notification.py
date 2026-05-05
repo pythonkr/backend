@@ -24,6 +24,7 @@ from notification.models import (
     NHNCloudSMSNotificationTemplate,
 )
 from rest_framework.decorators import action
+from rest_framework.generics import get_object_or_404
 from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveModelMixin
 from rest_framework.renderers import StaticHTMLRenderer
 from rest_framework.request import Request
@@ -32,7 +33,7 @@ from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 
 TEMPLATE_READ_METHODS = ["list", "retrieve", "render_preview"]
 TEMPLATE_CRUD_METHODS = TEMPLATE_READ_METHODS + ["create", "update", "partial_update", "destroy"]
-HISTORY_METHODS = ["list", "retrieve", "create", "retry"]
+HISTORY_METHODS = ["list", "retrieve", "create", "retry", "render_sent_to_as_html"]
 
 
 # ---- Template -----------------------------------------------------------
@@ -94,6 +95,16 @@ class _NotiHistoryAdminViewSetBase(CreateModelMixin, ListModelMixin, RetrieveMod
         serializer = self.get_serializer(instance=self.get_object())
         serializer.retry()
         return Response(data=serializer.data)
+
+    @extend_schema(responses=build_html_responses(names=["Notification History SentTo Render As HTML"]))
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path=r"sent-to/(?P<sent_to_id>[^/.]+)/render",
+        renderer_classes=[StaticHTMLRenderer],
+    )
+    def render_sent_to_as_html(self, request: Request, sent_to_id: str, *args: tuple, **kwargs: dict) -> Response:
+        return Response(data=get_object_or_404(self.get_object().sent_to_list.all(), pk=sent_to_id).render_as_html())
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_NOTI_EMAIL]) for m in HISTORY_METHODS})
