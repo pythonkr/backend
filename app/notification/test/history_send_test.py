@@ -201,21 +201,21 @@ def test_history_send_logs_unexpected_errors_outside_inner_try(email_template, c
 
 
 @pytest.mark.django_db(transaction=True)
-def test_history_retry_skips_non_failed_sent_to(email_template):
-    # FAILED 상태가 아닌 sent_to는 재시도 대상에서 제외 — 외부 호출이 발생하지 않음.
-    history = _create_history(email_template)
+def test_history_retry_skips_non_matching_status(email_template):
+    # statuses에 포함되지 않는 status의 sent_to는 재시도 대상에서 제외 — 외부 호출이 발생하지 않음.
+    history = _create_history(email_template)  # 기본 status는 CREATED.
     with patch.object(EmailNotificationHistory, "client") as mock_client:
-        history.retry()
+        history.retry(statuses=[NotificationStatus.FAILED])
     mock_client.send_message.assert_not_called()
 
 
 @pytest.mark.django_db(transaction=True)
-def test_history_retry_resends_failed_sent_to(email_template):
+def test_history_retry_resends_matching_status(email_template):
     history = _create_history(email_template)
     history.sent_to_list.update(status=NotificationStatus.FAILED)
 
     with patch.object(EmailNotificationHistory, "client"):
-        history.retry()
+        history.retry(statuses=[NotificationStatus.FAILED])
     sent_to = history.sent_to_list.get()
     assert sent_to.status == NotificationStatus.SENT
 

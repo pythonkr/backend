@@ -77,6 +77,17 @@ def test_task_skips_sent_row_to_prevent_duplicate_send(sent_to):
 
 
 @pytest.mark.django_db
+def test_task_force_bypasses_status_guard(sent_to):
+    sent_to.status = NotificationStatus.SENT
+    sent_to.save(update_fields=["status"])
+    with patch.object(EmailNotificationHistory, "client") as mock_client:
+        send_notification_to_recipient(LABEL, sent_to.id, force=True)
+    mock_client.send_message.assert_called_once()
+    sent_to.refresh_from_db()
+    assert sent_to.status == NotificationStatus.SENT
+
+
+@pytest.mark.django_db
 def test_task_marks_failed_and_propagates_external_failure(sent_to):
     with patch.object(EmailNotificationHistory, "client") as mock_client:
         mock_client.send_message.side_effect = RuntimeError("api down")

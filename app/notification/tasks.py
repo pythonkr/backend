@@ -6,10 +6,10 @@ from notification.models.base import NotificationStatus, slack_logger
 
 
 @shared_task(ignore_result=True)
-def send_notification_to_recipient(model_label: str, sent_to_id: str) -> None:
+def send_notification_to_recipient(model_label: str, sent_to_id: str, force: bool = False) -> None:
     sent_to_class = apps.get_model(model_label)
     sent_to = sent_to_class.objects.select_related("history").get(pk=sent_to_id)
-    if sent_to.status not in (NotificationStatus.CREATED, NotificationStatus.FAILED):
+    if not force and sent_to.status not in (NotificationStatus.CREATED, NotificationStatus.FAILED):
         return
 
     try:

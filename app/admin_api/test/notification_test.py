@@ -427,6 +427,139 @@ def test_retry_noop_when_no_failed_sent_to(api_client, email_history):
     mock_client.send_message.assert_not_called()
 
 
+# ---- History Retry SentTo ---------------------------------------------------
+
+
+@pytest.mark.django_db(transaction=True)
+def test_retry_sent_to_only_resends_specified_sent_to(api_client, email_history, email_template):
+    # 같은 history에 FAILED sent_to가 여러 개 있어도 retry_sent_to는 지정된 1건만 재시도.
+    extra = EmailNotificationHistory.objects.create_for_recipients(
+        template=email_template,
+        recipients=[
+            {"recipient": "a@example.com", "context": {"name": "a", "recipient": "x"}},
+            {"recipient": "b@example.com", "context": {"name": "b", "recipient": "x"}},
+        ],
+    )
+    extra.sent_to_list.update(status=NotificationStatus.FAILED)
+    target = extra.sent_to_list.order_by("recipient").first()
+
+    with patch("notification.models.email.EmailNotificationHistory.client") as mock_client:
+        response = api_client.post(
+            reverse(
+                "v1:admin-notification-email-history-retry-sent-to",
+                kwargs={"pk": extra.id, "sent_to_id": target.id},
+            )
+        )
+    assert response.status_code == http.HTTPStatus.OK
+    assert mock_client.send_message.call_count == 1
+    target.refresh_from_db()
+    assert target.status == NotificationStatus.SENT
+    other = extra.sent_to_list.exclude(pk=target.pk).get()
+    assert other.status == NotificationStatus.FAILED
+
+
+@pytest.mark.django_db(transaction=True)
+def test_retry_sent_to_404_when_status_not_in_filter(api_client, email_history):
+    # 지정된 sent_to의 status가 요청 status에 포함되지 않으면 404.
+    sent_to = email_history.sent_to_list.get()  # 기본 status는 CREATED, default 필터는 [FAILED].
+    with patch("notification.models.email.EmailNotificationHistory.client") as mock_client:
+        response = api_client.post(
+            reverse(
+                "v1:admin-notification-email-history-retry-sent-to",
+                kwargs={"pk": email_history.id, "sent_to_id": sent_to.id},
+            )
+        )
+    assert response.status_code == http.HTTPStatus.NOT_FOUND
+    mock_client.send_message.assert_not_called()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_retry_with_status_query_resends_matching_statuses(api_client, email_template):
+    # ?status=CREATED&status=FAILED → 둘 다 재발송, SENT는 제외.
+    history = EmailNotificationHistory.objects.create_for_recipients(
+        template=email_template,
+        recipients=[
+            {"recipient": "a@example.com", "context": {"name": "a", "recipient": "x"}},
+            {"recipient": "b@example.com", "context": {"name": "b", "recipient": "x"}},
+            {"recipient": "c@example.com", "context": {"name": "c", "recipient": "x"}},
+        ],
+    )
+    by_recipient = {s.recipient: s for s in history.sent_to_list.all()}
+    history.sent_to_list.filter(pk=by_recipient["a@example.com"].pk).update(status=NotificationStatus.SENT)
+    history.sent_to_list.filter(pk=by_recipient["b@example.com"].pk).update(status=NotificationStatus.FAILED)
+    # c@는 CREATED 그대로
+
+    with patch("notification.models.email.EmailNotificationHistory.client") as mock_client:
+        response = api_client.post(
+            reverse("v1:admin-notification-email-history-retry", kwargs={"pk": history.id})
+            + "?status=CREATED&status=FAILED"
+        )
+    assert response.status_code == http.HTTPStatus.OK
+    assert mock_client.send_message.call_count == 2
+    assert history.sent_to_list.get(pk=by_recipient["a@example.com"].pk).status == NotificationStatus.SENT
+
+
+@pytest.mark.django_db(transaction=True)
+def test_retry_with_status_query_force_resends_sent(api_client, email_template):
+    # ?status=SENT → admin retry 경로는 task 가드를 우회해 실제 재발송이 일어남.
+    history = EmailNotificationHistory.objects.create_for_recipients(
+        template=email_template,
+        recipients=[{"recipient": "a@example.com", "context": {"name": "a", "recipient": "x"}}],
+    )
+    history.sent_to_list.update(status=NotificationStatus.SENT)
+
+    with patch("notification.models.email.EmailNotificationHistory.client") as mock_client:
+        response = api_client.post(
+            reverse("v1:admin-notification-email-history-retry", kwargs={"pk": history.id}) + "?status=SENT"
+        )
+    assert response.status_code == http.HTTPStatus.OK
+    assert mock_client.send_message.call_count == 1
+
+
+@pytest.mark.django_db
+def test_retry_with_invalid_status_query_returns_400(api_client, email_history):
+    response = api_client.post(
+        reverse("v1:admin-notification-email-history-retry", kwargs={"pk": email_history.id}) + "?status=BOGUS"
+    )
+    assert response.status_code == http.HTTPStatus.BAD_REQUEST
+
+
+@pytest.mark.django_db(transaction=True)
+def test_retry_sent_to_with_status_query_respects_filter(api_client, email_history):
+    # sent_to_id 대상의 status가 query에 포함되면 재시도, 아니면 404.
+    sent_to = email_history.sent_to_list.get()  # 기본 status는 CREATED.
+    url = reverse(
+        "v1:admin-notification-email-history-retry-sent-to",
+        kwargs={"pk": email_history.id, "sent_to_id": sent_to.id},
+    )
+
+    with patch("notification.models.email.EmailNotificationHistory.client") as mock_client:
+        # CREATED가 query에 없으면 404
+        response = api_client.post(url + "?status=FAILED")
+        assert response.status_code == http.HTTPStatus.NOT_FOUND
+        assert mock_client.send_message.call_count == 0
+        # CREATED 포함하면 발송 O
+        response = api_client.post(url + "?status=CREATED&status=FAILED")
+        assert response.status_code == http.HTTPStatus.OK
+        assert mock_client.send_message.call_count == 1
+
+
+@pytest.mark.django_db
+def test_retry_sent_to_404_when_sent_to_belongs_to_other_history(api_client, email_history, email_template):
+    other = EmailNotificationHistory.objects.create_for_recipients(
+        template=email_template,
+        recipients=[{"recipient": "other@example.com", "context": {"name": "다른", "recipient": "y"}}],
+    )
+    other_sent_to = other.sent_to_list.get()
+    response = api_client.post(
+        reverse(
+            "v1:admin-notification-email-history-retry-sent-to",
+            kwargs={"pk": email_history.id, "sent_to_id": other_sent_to.id},
+        )
+    )
+    assert response.status_code == http.HTTPStatus.NOT_FOUND
+
+
 # ---- History Render SentTo As HTML -----------------------------------------
 
 

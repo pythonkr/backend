@@ -14,7 +14,12 @@ from notification.models import (
     NHNCloudSMSNotificationHistorySentTo,
     NHNCloudSMSNotificationTemplate,
 )
-from notification.models.base import NotificationHistoryBase, NotificationTemplateBase, UnhandledVariableHandling
+from notification.models.base import (
+    NotificationHistoryBase,
+    NotificationStatus,
+    NotificationTemplateBase,
+    UnhandledVariableHandling,
+)
 from rest_framework import serializers
 
 # ---- SentTo nested ----------------------------------------------------------
@@ -79,11 +84,11 @@ class _NotiHistoryAdminSerializerBase(BaseAbstractSerializer, JsonSchemaSerializ
         history.refresh_from_db()
         return history
 
-    def retry(self) -> None:
+    def retry(self, statuses: list[NotificationStatus], sent_to_id: str | None = None) -> None:
         if not (self.instance and self.instance.pk):
             raise ValueError("인스턴스가 저장된 후에만 retry할 수 있습니다.")
 
-        self.instance.retry()
+        self.instance.retry(sent_to_id=sent_to_id, statuses=statuses)
         self.instance.refresh_from_db()
 
 
@@ -169,3 +174,14 @@ class NHNCloudSMSNotificationTemplateAdminSerializer(_NotiTemplateAdminSerialize
 
 class NotificationTemplateRenderRequestAdminSerializer(serializers.Serializer):
     context = serializers.JSONField(required=False, default=dict)
+
+
+# ---- Query params -----------------------------------------------------------
+
+
+class NotificationHistoryRetryRequestAdminSerializer(serializers.Serializer):
+    status = serializers.ListField(
+        child=serializers.ChoiceField(choices=NotificationStatus.choices),
+        required=False,
+        default=[NotificationStatus.FAILED],
+    )
