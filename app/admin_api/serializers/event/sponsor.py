@@ -14,7 +14,7 @@ class SponsorTierAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, s
 class SponsorTagAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
     class Meta:
         model = SponsorTag
-        fields = COMMON_ADMIN_FIELDS + ("event", "name_ko", "name_en")
+        fields = COMMON_ADMIN_FIELDS + ("event", "name_ko", "name_en", "color")
 
 
 class SponsorAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):

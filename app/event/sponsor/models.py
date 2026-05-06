@@ -3,6 +3,7 @@ import contextlib
 import functools
 
 from core.models import BaseAbstractModel, MarkdownField
+from core.validators import HEX_COLOR_VALIDATOR
 from django.db import models
 from event.models import Event
 
@@ -77,6 +78,7 @@ class SponsorTierSponsorRelation(models.Model):
 class SponsorTag(BaseAbstractModel):
     event = models.ForeignKey(Event, on_delete=models.PROTECT)
     name = models.CharField(max_length=256)
+    color = models.CharField(max_length=7, blank=True, default="", validators=[HEX_COLOR_VALIDATOR])
 
     class Meta:
         ordering = ["name"]

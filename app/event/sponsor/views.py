@@ -13,7 +13,7 @@ class SponsorTierViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     queryset = SponsorTier.objects.filter_active().prefetch_related(
         models.Prefetch(
             lookup="sponsors",
-            queryset=Sponsor.objects.filter_active().select_related("logo"),
+            queryset=Sponsor.objects.filter_active().select_related("logo").prefetch_related("tags"),
             to_attr="_prefetched_active_sponsors",
         )
     )
