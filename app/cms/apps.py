@@ -9,9 +9,10 @@ class CmsConfig(AppConfig):
     def ready(self):
         importlib.import_module("cms.translation")
 
-        from cms.models import Page, Section, Sitemap
+        from cms.models import DomainGroup, Page, Section, Sitemap
         from simple_history import register
 
         register(Page)
         register(Sitemap)
         register(Section)
+        register(DomainGroup)
