@@ -370,6 +370,39 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_SOFT_TIME_LIMIT = 60
 CELERY_TASK_TIME_LIMIT = 90
 
+# PortOne Settings
+PORTONE = types.SimpleNamespace(
+    api_url=env("PORTONE_API_URL", default="https://api.iamport.kr"),
+    ip_list=env.list(
+        "PORTONE_IP_LIST",
+        default=[
+            "52.78.100.19",
+            "52.78.48.223",
+            "52.78.5.241",  # (Webhook Test Only)
+        ],
+    ),
+    imp_key=env("PORTONE_IMP_KEY", default="imp_key"),
+    imp_secret=env("PORTONE_IMP_SECRET", default="imp_secret"),
+)
+
+# NHN KCP Settings
+NHN_KCP = types.SimpleNamespace(
+    pg_api_cert=env.str("NHN_KCP_PG_API_CERT", default=""),
+    pg_api_private_key=env.str("NHN_KCP_PG_API_PRIVATE_KEY", default=""),
+    pg_api_password=env.str("NHN_KCP_PG_API_PASSWORD", default=""),
+)
+
+# Shop Settings
+SHOP = types.SimpleNamespace(
+    order_scancode_salt=env("ORDER_SCANCODE_SALT", default="local_order_scancode_salt"),
+    refund_authorizer_secret_key=env("REFUND_AUTHORIZER_SECRET_KEY", default="local_refund_authorizer_secret_key"),
+)
+
+# External API Key Settings (등록 데스크 등)
+EXT_API_KEYS = {
+    "registration_desk": env("API_KEY_REGISTRATION_DESK", default=None),
+}
+
 # Sentry Settings
 if SENTRY_DSN := env("SENTRY_DSN", default=""):
     SENTRY_TRACES_SAMPLE_RATE = env.float("SENTRY_TRACES_SAMPLE_RATE", default=1.0)

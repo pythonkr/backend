@@ -1,0 +1,74 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+from django.conf import settings
+from drf_spectacular.extensions import OpenApiAuthenticationExtension
+from drf_spectacular.openapi import AutoSchema
+from rest_framework.authentication import BaseAuthentication
+from rest_framework.permissions import BasePermission
+from rest_framework.request import Request
+from rest_framework.views import APIView
+
+if TYPE_CHECKING:
+    from user.models import UserExt
+
+INVALID_API_KEY_MESSAGE = "API Key가 올바르지 않습니다."
+
+
+class APIKeyAuthentication(BaseAuthentication):
+    @staticmethod
+    def _get_or_create_api_key_user(api_key: str) -> "UserExt":
+        from user.models import UserExt
+
+        username = f"API_KEY_USER_{api_key.upper()}"
+        email = f"api_key_user_{api_key.lower()}@pycon.kr"
+
+        if api_key_user := UserExt.objects.filter(username=username).first():
+            return api_key_user
+
+        api_key_user = UserExt.objects.create_user(
+            username=username,
+            email=email,
+            password=None,
+        )
+        api_key_user.set_unusable_password()
+        api_key_user.save()
+
+        return api_key_user
+
+    def authenticate(self, request: Request) -> tuple["UserExt", None] | None:
+        api_key = request.headers.get("x-api-key", "")
+        api_secret = request.headers.get("x-api-secret", "")
+
+        if api_key.lower() in settings.EXT_API_KEYS and api_secret == settings.EXT_API_KEYS.get(api_key.lower()):
+            return self._get_or_create_api_key_user(api_key), None
+
+        return None
+
+
+class APIKeyAuthenticationScheme(OpenApiAuthenticationExtension):  # type: ignore[no-untyped-call]
+    target_class = APIKeyAuthentication
+    name: list[str] = ["API Key", "API Secret"]
+
+    def get_security_definition(self, auto_schema: AutoSchema) -> list[dict[str, str]]:
+        return [
+            {"type": "apiKey", "in": "header", "name": "x-api-key"},
+            {"type": "apiKey", "in": "header", "name": "x-api-secret"},
+        ]
+
+
+class APIKeyPermission(BasePermission):
+    name: str = ""
+    message = INVALID_API_KEY_MESSAGE
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        api_key = request.headers.get("x-api-key", "")
+        return api_key.lower() == self.name and request.user.is_authenticated
+
+    def has_object_permission(self, request: Request, view: APIView, obj: Any) -> bool:
+        return self.has_permission(request, view)
+
+
+class RegistrationDeskAPIKeyPermission(APIKeyPermission):
+    name = "registration_desk"
