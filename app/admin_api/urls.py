@@ -1,4 +1,4 @@
-from admin_api.views.cms import PageAdminViewSet, SitemapAdminViewSet
+from admin_api.views.cms import DomainGroupAdminViewSet, PageAdminViewSet, SitemapAdminViewSet
 from admin_api.views.event.event import EventAdminViewSet
 from admin_api.views.event.presentation import (
     PresentationAdminViewSet,
@@ -29,6 +29,7 @@ admin_user_router.register("userext", UserAdminViewSet, basename="admin-user")
 admin_user_router.register("organization", OrganizationAdminViewSet, basename="admin-organization")
 
 admin_cms_router = routers.SimpleRouter()
+admin_cms_router.register("domain-group", DomainGroupAdminViewSet, basename="admin-domain-group")
 admin_cms_router.register("sitemap", SitemapAdminViewSet, basename="admin-sitemap")
 admin_cms_router.register("page", PageAdminViewSet, basename="admin-page")
 
