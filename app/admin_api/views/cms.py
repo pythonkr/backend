@@ -32,6 +32,9 @@ class DomainGroupAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     queryset = DomainGroup.objects.filter_active().select_related_with_user()
 
     def perform_destroy(self, instance: DomainGroup) -> None:
+        if DomainGroup.objects.filter_active().count() <= 1:
+            raise exceptions.ValidationError("마지막 DomainGroup은 삭제할 수 없습니다.")
+
         active = list(instance.sitemaps.filter_active())
         is_lone_root = (
             len(active) == 1 and active[0].parent_sitemap_id is None and not active[0].children.filter_active().exists()

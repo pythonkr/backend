@@ -211,8 +211,16 @@ def test_updating_non_empty_group_does_not_create_extra_sitemap(api_client, supe
 # ---- DomainGroup destroy ----------------------------------------------------
 
 
+@pytest.fixture
+def guard_group(superuser):
+    # destroy 테스트들이 "마지막 그룹 삭제 불가" 규칙에 걸리지 않도록 별도의 그룹을 시드.
+    return DomainGroup.objects.create(
+        name="guard", domains=["guard.pycon.kr"], created_by=superuser, updated_by=superuser
+    )
+
+
 @pytest.mark.django_db
-def test_destroy_domain_group_with_lone_root_succeeds_leaving_page(api_client, superuser):
+def test_destroy_domain_group_with_lone_root_succeeds_leaving_page(api_client, superuser, guard_group):
     # lone root만 함께 삭제. Page/Section은 보존 (dangling이 되더라도 의도적 삭제 회피로 안전성 우선).
     group = DomainGroup.objects.create(name="A", domains=["a.pycon.kr"], created_by=superuser, updated_by=superuser)
     page = Page.objects.create(title="A", subtitle="A", created_by=superuser, updated_by=superuser)
@@ -235,7 +243,7 @@ def test_destroy_domain_group_with_lone_root_succeeds_leaving_page(api_client, s
 
 
 @pytest.mark.django_db
-def test_destroy_domain_group_with_multiple_sitemaps_rejected(api_client, superuser):
+def test_destroy_domain_group_with_multiple_sitemaps_rejected(api_client, superuser, guard_group):
     group = DomainGroup.objects.create(name="A", domains=["a.pycon.kr"], created_by=superuser, updated_by=superuser)
     Sitemap.objects.create(name="r1", domain_group=group, route_code="", created_by=superuser, updated_by=superuser)
     Sitemap.objects.create(
@@ -250,7 +258,7 @@ def test_destroy_domain_group_with_multiple_sitemaps_rejected(api_client, superu
 
 
 @pytest.mark.django_db
-def test_destroy_domain_group_with_sitemap_having_children_rejected(api_client, superuser):
+def test_destroy_domain_group_with_sitemap_having_children_rejected(api_client, superuser, guard_group):
     group = DomainGroup.objects.create(name="A", domains=["a.pycon.kr"], created_by=superuser, updated_by=superuser)
     parent = Sitemap.objects.create(
         name="parent", domain_group=group, route_code="", created_by=superuser, updated_by=superuser
@@ -269,6 +277,16 @@ def test_destroy_domain_group_with_sitemap_having_children_rejected(api_client, 
 
     group.refresh_from_db()
     assert group.deleted_at is None
+
+
+@pytest.mark.django_db
+def test_destroy_last_domain_group_rejected(api_client, domain_group):
+    # 유일한 그룹은 삭제 불가
+    assert DomainGroup.objects.filter_active().count() == 1
+    response = api_client.delete(reverse("v1:admin-domain-group-detail", kwargs={"pk": domain_group.id}))
+    assert response.status_code == http.HTTPStatus.BAD_REQUEST
+    domain_group.refresh_from_db()
+    assert domain_group.deleted_at is None
 
 
 # ---- Sitemap admin serializer exposes domain_group --------------------------
