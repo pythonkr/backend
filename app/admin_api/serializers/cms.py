@@ -1,16 +1,68 @@
 import re
 
-from cms.models import Page, Section, Sitemap
+from cms.models import DomainGroup, Page, Section, Sitemap
+from core.const.regex import HOSTNAME_REGEX
 from core.const.serializer import COMMON_ADMIN_FIELDS
 from core.serializer.base_abstract_serializer import BaseAbstractSerializer
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
+from django.db import IntegrityError, transaction
 from rest_framework import serializers
+
+
+class DomainGroupAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
+    # DRF가 ArrayField를 자동 매핑하면 inner CharField의 validator를 raw input(정규화 전)에 적용해 정상 입력도 거부됨.
+    # 이를 막기 위해 inner validator 없는 ListField로 재정의하고, 정규화 + format 검증 + 그룹 간 중복 검증을 validate_domains에서 명시적으로 수행.
+    domains = serializers.ListField(child=serializers.CharField(), allow_empty=False)
+
+    class Meta:
+        model = DomainGroup
+        fields = COMMON_ADMIN_FIELDS + ("name", "domains")
+
+    def validate_domains(self, value: list[str]) -> list[str]:
+        if not (normalized := list({c for v in value if (c := v.strip().lower())})):
+            raise serializers.ValidationError("도메인 목록이 비어있을 수 없습니다.")
+
+        if invalid := [d for d in normalized if not HOSTNAME_REGEX.match(d)]:
+            raise serializers.ValidationError(
+                [
+                    f"`{d}` 도메인이 올바른 호스트 형식이 아닙니다 (스킴/포트/경로/쿼리는 포함할 수 없습니다)."
+                    for d in invalid
+                ]
+            )
+
+        overlap_qs = DomainGroup.objects.filter_active().filter(domains__overlap=normalized)
+        if self.instance and self.instance.pk:
+            overlap_qs = overlap_qs.exclude(pk=self.instance.pk)
+
+        if conflict := overlap_qs.first():
+            shared = sorted(set(normalized) & set(conflict.domains))
+            err_msg = f"`{', '.join(shared)}` 도메인이 이미 `{conflict.name}` 그룹에 등록되어 있습니다."
+            raise serializers.ValidationError(err_msg)
+
+        return normalized
+
+    @transaction.atomic
+    def save(self, **kwargs):
+        try:
+            instance = super().save(**kwargs)
+        except IntegrityError as e:
+            # DB-level overlap trigger가 race condition을 잡아낸 경우 (app-level 검사가 통과한 동시 요청).
+            if "cms_domaingroup_domains_no_overlap" in str(e):
+                raise serializers.ValidationError({"domains": "도메인이 이미 다른 그룹에 등록되어 있습니다."}) from e
+            raise
+
+        if not instance.sitemaps.filter_active().exists():
+            page = Page.objects.create(title=instance.name, subtitle=instance.name)
+            Section.objects.create(page=page, order=0, body="")
+            Sitemap.objects.create(domain_group=instance, name=instance.name, route_code="", page=page)
+        return instance
 
 
 class SitemapAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
     class Meta:
         model = Sitemap
         fields = COMMON_ADMIN_FIELDS + (
+            "domain_group",
             "parent_sitemap",
             "route_code",
             "order",

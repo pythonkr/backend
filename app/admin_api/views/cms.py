@@ -2,8 +2,13 @@ from __future__ import annotations
 
 import typing
 
-from admin_api.serializers.cms import PageAdminSerializer, SectionAdminSerializer, SitemapAdminSerializer
-from cms.models import Page, Section, Sitemap
+from admin_api.serializers.cms import (
+    DomainGroupAdminSerializer,
+    PageAdminSerializer,
+    SectionAdminSerializer,
+    SitemapAdminSerializer,
+)
+from cms.models import DomainGroup, Page, Section, Sitemap
 from core.const.tag import OpenAPITag
 from core.permissions import IsSuperUser
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
@@ -14,9 +19,32 @@ from drf_standardized_errors.openapi_serializers import (
     ValidationErrorResponseSerializer,
     ValidationErrorSerializer,
 )
-from rest_framework import decorators, request, response, status, viewsets
+from rest_framework import decorators, exceptions, request, response, status, viewsets
 
 ADMIN_METHODS = ["list", "retrieve", "create", "update", "partial_update", "destroy"]
+
+
+@extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_CMS]) for m in ADMIN_METHODS})
+class DomainGroupAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+    http_method_names = ["get", "post", "patch", "delete"]
+    serializer_class = DomainGroupAdminSerializer
+    permission_classes = [IsSuperUser]
+    queryset = DomainGroup.objects.filter_active().select_related_with_user()
+
+    def perform_destroy(self, instance: DomainGroup) -> None:
+        active = list(instance.sitemaps.filter_active())
+        is_lone_root = (
+            len(active) == 1 and active[0].parent_sitemap_id is None and not active[0].children.filter_active().exists()
+        )
+        if active and not is_lone_root:
+            raise exceptions.ValidationError(
+                "DomainGroup 하위에 Sitemap이 있어 삭제할 수 없습니다. 먼저 Sitemap을 정리해주세요."
+            )
+
+        with transaction.atomic():
+            if is_lone_root:
+                active[0].delete()
+            instance.delete()
 
 
 class SectionData(typing.TypedDict):
@@ -32,7 +60,8 @@ class SitemapAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = SitemapAdminSerializer
     permission_classes = [IsSuperUser]
-    queryset = Sitemap.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")
+    queryset = Sitemap.objects.filter_active().select_related_with_user("domain_group")
+    filterset_fields = ["domain_group"]
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_CMS]) for m in ADMIN_METHODS})
