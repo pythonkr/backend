@@ -20,6 +20,7 @@ from admin_api.views.notification import (
     NHNCloudSMSNotificationHistoryAdminViewSet,
     NHNCloudSMSNotificationTemplateAdminViewSet,
 )
+from admin_api.views.shop.order_notifications import OrderNotificationAdminViewSet
 from admin_api.views.shop.orders import OrderAdminViewSet
 from admin_api.views.shop.products import (
     CategoryGroupAdminViewSet,
@@ -94,6 +95,9 @@ admin_external_api_google_router.register("oauth2", GoogleOAuth2AdminViewSet, ba
 
 admin_shop_router = routers.SimpleRouter()
 admin_shop_router.register("orders", OrderAdminViewSet, basename="admin-shop-order")
+admin_shop_router.register(
+    "order-notifications", OrderNotificationAdminViewSet, basename="admin-shop-order-notification"
+)
 admin_shop_router.register("products", ProductAdminViewSet, basename="admin-shop-product")
 admin_shop_router.register("tags", TagAdminViewSet, basename="admin-shop-tag")
 admin_shop_router.register("category-groups", CategoryGroupAdminViewSet, basename="admin-shop-category-group")
