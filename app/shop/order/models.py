@@ -1,23 +1,16 @@
 from __future__ import annotations
 
-import base64
-import contextlib
 import datetime
 import functools
-import hashlib
-import hmac
 import typing
 
 from core.const.shop_error_messages import NotRefundableErrorMessages
 from core.models import BaseAbstractModel, BaseAbstractModelQuerySet
-from core.util.strutil import uuid_to_b64
-from django.conf import settings
+from core.scancode_mixin import ScanCodeMixin
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.db.models.manager import BaseManager
-from rest_framework.reverse import reverse
-from shop.payment_history.models import PaymentHistory
-from shortuuid import decode, encode
+from shop.payment_history.models import PURCHASED_STATUSES, PaymentHistory
 from simple_history.models import HistoricalRecords
 
 UserModel = get_user_model()
@@ -30,8 +23,50 @@ class OrderQuerySet(BaseAbstractModelQuerySet):
     def filter_has_no_payment_histories(self) -> models.QuerySet[Order]:
         return self.filter_active().filter(~models.Exists(PaymentHistory.objects.filter(order=models.OuterRef("id"))))
 
+    def filter_purchased_by(self, user: UserModel) -> models.QuerySet[Order]:
+        """결제 완료/부분환불/환불된 (terminal status) 주문을 user 별로 필터."""
+        return (
+            self.filter_active()
+            .select_related("customer_info")
+            .prefetch_related(
+                models.Prefetch(
+                    lookup="products",
+                    queryset=OrderProductRelation.objects.filter_active()
+                    .select_related("product")
+                    .prefetch_related(
+                        models.Prefetch(
+                            lookup="options",
+                            queryset=OrderProductOptionRelation.objects.filter_active().select_related(
+                                "product_option_group",
+                                "product_option",
+                            ),
+                        ),
+                    ),
+                ),
+                models.Prefetch(
+                    "payment_histories",
+                    queryset=PaymentHistory.objects.filter_active().order_by("-created_at"),
+                    to_attr="_payment_histories_by_latest",
+                ),
+            )
+            .annotate(
+                current_status=(
+                    PaymentHistory.objects.filter(order_id=models.OuterRef("id"), status__in=PURCHASED_STATUSES)
+                    .order_by("-created_at")
+                    .values_list("status", flat=True)[:1]
+                ),
+            )
+            .filter(user=user, current_status__in=PURCHASED_STATUSES)
+            .order_by("-created_at")
+        )
 
-class Order(BaseAbstractModel):
+    def filter_in_last_six_months(self) -> models.QuerySet[Order]:
+        return self.filter(created_at__gte=datetime.date.today() - datetime.timedelta(days=183))
+
+
+class Order(ScanCodeMixin, BaseAbstractModel):
+    scancode_prefix = "order"
+
     user = models.ForeignKey(UserModel, on_delete=models.PROTECT)
     name = models.TextField()
 
@@ -42,7 +77,7 @@ class Order(BaseAbstractModel):
     prefetchs = {
         "_payment_histories_by_latest": models.Prefetch(
             "payment_histories",
-            queryset=PaymentHistory.objects.order_by("-created_at"),
+            queryset=PaymentHistory.objects.filter_active().order_by("-created_at"),
             to_attr="_payment_histories_by_latest",
         ),
     }
@@ -104,24 +139,6 @@ class Order(BaseAbstractModel):
         return self.current_status == PaymentHistoryStatus.pending
 
     @property
-    def short_id(self) -> str:
-        """
-        주문 ID를 base64로 인코딩한 문자열을 반환. QR 코드 생성에 사용됩니다.
-        (주문 ID의 길이를 줄여 QR 코드를 단순화하기 위함 - 길이가 길면 QR 코드가 복잡해짐)
-        """
-        return uuid_to_b64(self.id)
-
-    @property
-    def scancode_token(self) -> str:
-        salted_order_id = f"{self.id}{settings.SHOP.order_scancode_salt}".encode()
-        return hashlib.sha256(salted_order_id).hexdigest()
-
-    @property
-    def scancode_path(self) -> str:
-        base_path = reverse("v1:orders-retrieve-scancode", kwargs={"order_id": self.id})
-        return f"{base_path}?token={self.scancode_token}"
-
-    @property
     def not_fully_refundable_reason(self) -> str | None:
         """
         주문 전체의 환불이 불가능한 사유를 반환합니다.
@@ -173,7 +190,9 @@ class Order(BaseAbstractModel):
         return None
 
 
-class OrderProductRelation(BaseAbstractModel):
+class OrderProductRelation(ScanCodeMixin, BaseAbstractModel):
+    scancode_prefix = "opr"
+
     class OrderProductStatus(models.TextChoices):
         pending = "pending", "결제 대기 중"
         paid = "paid", "결제 완료"
@@ -196,48 +215,6 @@ class OrderProductRelation(BaseAbstractModel):
 
     def __str__(self) -> str:
         return f"[{self.order}] {self.product} ({self.get_status_display()})"
-
-    @functools.cached_property
-    def short_id(self) -> str:
-        return encode(self.id)
-
-    @functools.cached_property
-    def salt(self) -> str:
-        hmac_result = hmac.new(settings.SHOP.order_scancode_salt.encode(), self.id.bytes, hashlib.sha256).digest()
-        return base64.urlsafe_b64encode(hmac_result).decode("utf-8").rstrip("=")
-
-    @functools.cached_property
-    def scancode_token(self) -> str:
-        return f"opr:{self.short_id}:{self.salt}"
-
-    @functools.cached_property
-    def scancode_path(self) -> str:
-        return f"{reverse('v1:order-products-scancode-list')}?token={self.scancode_token}"
-
-    @classmethod
-    def from_short_id(cls, short_id: str) -> OrderProductRelation | None:
-        with contextlib.suppress(ValueError):
-            return cls.objects.filter(id=decode(short_id)).first()
-
-        return None
-
-    @classmethod
-    def from_scancode_token(cls, scancode_token: str) -> OrderProductRelation | None:
-        splitted_token = scancode_token.split(":")
-        if len(splitted_token) != 3:
-            return None
-
-        prefix, short_id, salt = splitted_token
-        if prefix != "opr":
-            return None
-
-        if not (short_id and salt):
-            return None
-
-        if (opr := cls.from_short_id(short_id)) and opr.salt == salt:
-            return opr
-
-        return None
 
     @property
     def not_refundable_reason(self) -> str | None:

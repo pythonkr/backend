@@ -1,6 +1,6 @@
 import typing
 
-from core.const.regex import UUID_V4_REGEX
+from core.const.regex import UUID_V4_PATTERN
 from core.const.shop_error_messages import CartNotOrderableErrorMessages
 from core.const.tag import OpenAPITag
 from core.external_apis.portone.client import PortOneException, portone_client
@@ -11,12 +11,12 @@ from django.utils.decorators import method_decorator
 from drf_spectacular.openapi import OpenApiParameter, OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from drf_standardized_errors.openapi_serializers import ErrorResponse403Serializer, ValidationErrorResponseSerializer
-from rest_framework import mixins, permissions, renderers, request, response, serializers, status, viewsets
+from rest_framework import mixins, renderers, request, response, serializers, status, viewsets
 from rest_framework.decorators import action
 from shop.order.models import CustomerInfo, Order, OrderProductOptionRelation, OrderProductRelation, OrderQuerySet
-from shop.order.serializers.dto import OrderDto, OrderProductScanCodeDto, SingleProductCartDto
+from shop.order.serializers.dto import OrderDto, SingleProductCartDto
 from shop.order.serializers.validator import OptionProductOptionCustomResponseModifyRequestSerializer
-from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
+from shop.payment_history.models import PaymentHistory
 from shop.serializers.cart_validation import (
     CartOrderableCheckSerializer,
     CustomerInfoCheckSerializer,
@@ -26,15 +26,6 @@ from shop.serializers.cart_validation import (
 )
 from shop.serializers.refund import OrderProductRefundSerializer, OrderTotalRefundSerializer
 from user.models import UserExt
-
-
-class ScanCodeError(Exception):
-    msg: str
-    code: int
-
-    def __init__(self, msg: str, code: int) -> None:
-        self.msg = msg
-        self.code = code
 
 
 @method_decorator(
@@ -75,15 +66,12 @@ class OrderViewSet(
     viewsets.GenericViewSet,
 ):
     lookup_url_kwarg = "order_id"
+    lookup_value_regex = UUID_V4_PATTERN
     serializer_class = OrderDto
     queryset = Order.objects.select_related("customer_info")
 
     def get_queryset(self) -> models.QuerySet[Order]:
         base_qs = typing.cast(OrderQuerySet, self.queryset)
-
-        if self.action == "retrieve_scancode":
-            # 주문용 QR 코드 페이지는 로그인 없이도 접근 가능해야 합니다, 그러므로 로그인 검사 전에 return합니다.
-            return base_qs.filter_has_payment_histories().distinct()
 
         if not isinstance(self.request.user, UserExt):
             return Order.objects.none()
@@ -235,55 +223,6 @@ class OrderViewSet(
         return response.Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
-        summary="주문 사용을 위한 QR 코드 페이지",
-        tags=[OpenAPITag.SHOP_ORDER],
-        parameters=[
-            OpenApiParameter(
-                name="token",
-                type=OpenApiTypes.UUID,
-                location=OpenApiParameter.QUERY,
-                required=True,
-            ),
-        ],
-        responses=(
-            build_html_responses(names=["QR 코드가 포함된 HTML"], status_code=status.HTTP_200_OK)
-            | build_html_responses(names=["인증 실패 HTML"], status_code=status.HTTP_403_FORBIDDEN)
-            | build_html_responses(
-                names=["주문을 찾을 수 없는 경우", "주문이 환불된 경우"], status_code=status.HTTP_404_NOT_FOUND
-            )
-        ),
-    )
-    @action(
-        detail=True,
-        methods=["GET"],
-        url_path="scancode",
-        authentication_classes=[],
-        permission_classes=[permissions.AllowAny],
-        renderer_classes=[renderers.TemplateHTMLRenderer],
-    )
-    def retrieve_scancode(
-        self, request: request.Request, order_id: str, *args: tuple[typing.Any], **kwargs: dict[str, typing.Any]
-    ) -> response.Response:
-        """주문에 대한 QR 코드 데이터를 생성하고, QR코드가 포함된 렌더링 된 HTML을 응답합니다."""
-        try:
-            if not UUID_V4_REGEX.match(order_id):
-                raise ScanCodeError(msg="주문을 찾을 수 없습니다.", code=status.HTTP_404_NOT_FOUND)
-            if not (order := self.get_queryset().filter(id=order_id).first()):
-                raise ScanCodeError(msg="주문을 찾을 수 없습니다.", code=status.HTTP_404_NOT_FOUND)
-            if order.current_status == PaymentHistoryStatus.refunded:
-                raise ScanCodeError(msg="전체 환불된 주문은 사용하실 수 없습니다.", code=status.HTTP_404_NOT_FOUND)
-            if not ((token := request.GET.get("token")) and token == order.scancode_token):
-                raise ScanCodeError(msg="주문 정보를 가져올 수 없습니다.", code=status.HTTP_403_FORBIDDEN)
-        except ScanCodeError as e:
-            return response.Response(data={"error_msg": e.msg}, status=e.code, template_name="scancode_error.html")
-
-        return response.Response(
-            data={"order": OrderDto(instance=order).data, "short_id": order.short_id},
-            status=status.HTTP_200_OK,
-            template_name="scancode_view.html",
-        )
-
-    @extend_schema(
         summary="NHN KCP 영수증 페이지",
         tags=[OpenAPITag.SHOP_ORDER],
         responses=(
@@ -403,50 +342,3 @@ class OrderProductViewSet(mixins.DestroyModelMixin, viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.refund()
         return response.Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class OrderProductScanCodeViewSet(viewsets.GenericViewSet):
-    queryset = (
-        OrderProductRelation.objects.select_related("product", "order")
-        .prefetch_related("options")
-        .filter(
-            models.Exists(PaymentHistory.objects.filter(order=models.OuterRef("order"))),
-            product__category__name="티켓",  # 티켓 카테고리로 필터링. 정말 싫지만 어쩔 수 없이 하드코딩
-            status__in=[
-                OrderProductRelation.OrderProductStatus.paid,
-                OrderProductRelation.OrderProductStatus.used,
-                OrderProductRelation.OrderProductStatus.refunded,
-            ],
-        )
-    )
-    serializer_class = None
-    permission_classes = [permissions.AllowAny]
-    renderer_classes = [renderers.TemplateHTMLRenderer]
-
-    @extend_schema(
-        summary="티켓을 위한 QR 코드 페이지",
-        tags=[OpenAPITag.SHOP_ORDER],
-        parameters=[
-            OpenApiParameter(name="token", type=OpenApiTypes.STR, location=OpenApiParameter.QUERY, required=True)
-        ],
-        responses=(
-            build_html_responses(names=["QR 코드가 포함된 HTML"], status_code=status.HTTP_200_OK)
-            | build_html_responses(names=["인증 실패 HTML"], status_code=status.HTTP_403_FORBIDDEN)
-        ),
-    )
-    def list(
-        self, request: request.Request, *args: tuple[typing.Any], **kwargs: dict[str, typing.Any]
-    ) -> response.Response:
-        try:
-            if not (token := request.query_params.get("token")):
-                raise ScanCodeError(msg="유효하지 않은 URL입니다.", code=status.HTTP_404_NOT_FOUND)
-            if not (opr := OrderProductRelation.from_scancode_token(token)):
-                raise ScanCodeError(msg="티켓 정보를 찾을 수 없습니다.", code=status.HTTP_403_FORBIDDEN)
-        except ScanCodeError as e:
-            return response.Response(data={"error_msg": e.msg}, status=e.code, template_name="scancode_error.html")
-
-        return response.Response(
-            data={"order_product": OrderProductScanCodeDto(instance=opr).data},
-            status=status.HTTP_200_OK,
-            template_name="order_product_scancode_view.html",
-        )
