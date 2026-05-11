@@ -1,6 +1,6 @@
 from admin_api.serializers.file import PublicFileAdmimUploadSerializer, PublicFileAdminSerializer
+from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.permissions import IsSuperUser
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from drf_spectacular import utils
 from file.models import PublicFile

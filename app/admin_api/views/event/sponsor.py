@@ -5,8 +5,8 @@ from admin_api.serializers.event.sponsor import (
     SponsorTagAdminSerializer,
     SponsorTierAdminSerializer,
 )
+from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.permissions import IsSuperUser
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from django.db import models
 from drf_spectacular.utils import extend_schema, extend_schema_view

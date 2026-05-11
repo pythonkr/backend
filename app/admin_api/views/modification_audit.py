@@ -5,8 +5,8 @@ from admin_api.serializers.modification_audit import (
     PresentationModificationAuditPreviewAdminSerializer,
     UserModificationAuditPreviewAdminSerializer,
 )
+from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.permissions import IsSuperUser
 from django.db import models
 from drf_spectacular import utils
 from drf_standardized_errors.openapi_serializers import (

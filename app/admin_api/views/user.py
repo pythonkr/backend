@@ -5,9 +5,9 @@ from admin_api.serializers.user import (
     UserAdminSerializer,
     UserAdminSignInSerializer,
 )
+from core.authz import IsSuperUser
 from core.const.account import generate_random_password
 from core.const.tag import OpenAPITag
-from core.permissions import IsSuperUser
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from django.contrib.auth import login, logout
 from drf_spectacular.utils import extend_schema, extend_schema_view

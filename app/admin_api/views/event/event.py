@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from admin_api.serializers.event.event import EventAdminSerializer
+from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.permissions import IsSuperUser
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from event.models import Event

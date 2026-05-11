@@ -9,8 +9,8 @@ from admin_api.serializers.cms import (
     SitemapAdminSerializer,
 )
 from cms.models import DomainGroup, Page, Section, Sitemap
+from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.permissions import IsSuperUser
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from django.db import transaction
 from drf_spectacular.utils import extend_schema, extend_schema_view
