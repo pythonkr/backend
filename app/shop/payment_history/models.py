@@ -1,4 +1,4 @@
-from core.models import BaseAbstractModel
+from core.models import BaseAbstractModel, BaseAbstractModelQuerySet
 from django.db import models
 
 
@@ -15,6 +15,16 @@ REFUNDABLE_STATUSES: set[PaymentHistoryStatus] = {
 }
 
 
+class PaymentHistoryQuerySet(BaseAbstractModelQuerySet):
+    def latest_per_order_field(self, field_name: str, *, outer_field: str = "id") -> "PaymentHistoryQuerySet":
+        return (
+            self.order_by("order_id", "-created_at")
+            .distinct("order_id")
+            .filter(order_id=models.OuterRef(outer_field))
+            .values(field_name)[:1]
+        )
+
+
 class PaymentHistory(BaseAbstractModel):
     order = models.ForeignKey("order.Order", on_delete=models.PROTECT, related_name="payment_histories")
     imp_id = models.CharField(max_length=256, null=True, blank=True)
@@ -23,6 +33,8 @@ class PaymentHistory(BaseAbstractModel):
         max_length=32, choices=PaymentHistoryStatus.choices, default=PaymentHistoryStatus.completed
     )
     price = models.IntegerField()
+
+    objects: PaymentHistoryQuerySet = PaymentHistoryQuerySet.as_manager()  # type: ignore[assignment, misc]
 
     def __str__(self) -> str:
         return f"{self.order} <{self.get_status_display()}> ({self.price}원) [{self.created_at.isoformat()}]"

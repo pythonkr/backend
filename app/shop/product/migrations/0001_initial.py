@@ -667,6 +667,14 @@ class Migration(migrations.Migration):
                         to=settings.AUTH_USER_MODEL,
                     ),
                 ),
+                (
+                    "tag_set",
+                    models.ManyToManyField(
+                        related_name="product_set",
+                        through="product.ProductTagRelation",
+                        to="product.tag",
+                    ),
+                ),
             ],
             options={
                 "ordering": ["category__group__priority", "category__priority", "priority", "-created_at"],

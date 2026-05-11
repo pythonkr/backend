@@ -23,6 +23,12 @@ class OpenAPITag:
     ADMIN_NOTI_KAKAO_ALIMTALK = "Admin > Notification > Kakao Alimtalk"
     ADMIN_NOTI_SMS = "Admin > Notification > SMS"
     ADMIN_EXT_API_GOOGLE_OAUTH2 = "Admin > External API > Google OAuth2"
+    ADMIN_SHOP_ORDER = "Admin > Shop > 주문"
+    ADMIN_SHOP_ORDER_REFUND = "Admin > Shop > 환불"
+    ADMIN_SHOP_PRODUCT = "Admin > Shop > 상품"
+    ADMIN_SHOP_CATEGORY = "Admin > Shop > 카테고리"
+    ADMIN_SHOP_TAG = "Admin > Shop > 태그"
+    ADMIN_SHOP_REFUND_AUTHORIZER = "Admin > Shop > 환불 승인자"
 
     PARTICIPANT_PORTAL_USER = "Participant Portal > Sign-In & Sign-Out & My Profile"
     PARTICIPANT_PORTAL_PUBLIC_FILE = "Participant Portal > Public File"
