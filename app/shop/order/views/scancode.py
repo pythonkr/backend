@@ -33,6 +33,7 @@ class _ScanCodeError(Exception):
 def _render_user(token: str) -> response.Response:
     if not (user := UserExt.from_scancode_token(token)):
         raise _ScanCodeError(msg="인증 정보를 찾을 수 없습니다.", code=status.HTTP_403_FORBIDDEN)
+    # 환불된 주문도 응답에 포함(현장 스태프의 이력 확인용). 단 모두 refunded 면 게이트.
     orders = list(Order.objects.filter_purchased_by(user).filter_in_last_six_months())
     if not any(o.current_status != PaymentHistoryStatus.refunded for o in orders):
         raise _ScanCodeError(msg="최근 6개월 이내에 결제한 주문이 없습니다.", code=status.HTTP_403_FORBIDDEN)

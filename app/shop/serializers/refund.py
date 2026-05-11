@@ -11,6 +11,7 @@ from rest_framework import serializers
 from shop.order.models import Order, OrderProductRelation
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
 from shop.product.models import Product
+from simple_history.utils import bulk_update_with_history
 
 
 def _check_totp(context: dict, totp_value: str | None) -> None:
@@ -100,11 +101,11 @@ class OrderTotalRefundSerializer(serializers.ModelSerializer):
 
         for rel in self.refund_target_prod_rels:
             rel.status = OrderProductRelation.OrderProductStatus.refunded
-            rel.save()
+        bulk_update_with_history(self.refund_target_prod_rels, OrderProductRelation, fields=["status"])
 
         PaymentHistory.objects.create(
             order=order,
-            imp_id=order.current_payment_history.imp_id,
+            imp_id=order.latest_imp_id,
             status=PaymentHistoryStatus.refunded,
             price=0,
         )

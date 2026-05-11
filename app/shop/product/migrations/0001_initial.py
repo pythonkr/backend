@@ -667,14 +667,6 @@ class Migration(migrations.Migration):
                         to=settings.AUTH_USER_MODEL,
                     ),
                 ),
-                (
-                    "tag_set",
-                    models.ManyToManyField(
-                        related_name="product_set",
-                        through="product.ProductTagRelation",
-                        to="product.tag",
-                    ),
-                ),
             ],
             options={
                 "ordering": ["category__group__priority", "category__priority", "priority", "-created_at"],
@@ -952,6 +944,15 @@ class Migration(migrations.Migration):
                 "get_latest_by": ("history_date", "history_id"),
             },
             bases=(simple_history.models.HistoricalChanges, models.Model),
+        ),
+        migrations.AddField(
+            model_name="product",
+            name="tag_set",
+            field=models.ManyToManyField(
+                related_name="product_set",
+                through="product.ProductTagRelation",
+                to="product.tag",
+            ),
         ),
         migrations.AddConstraint(
             model_name="categorygroup",

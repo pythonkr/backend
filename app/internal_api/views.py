@@ -89,10 +89,11 @@ class DeskSupportViewSet(
         parameters=[
             OpenApiParameter(
                 name="otp",
-                type=OpenApiTypes.INT,
+                type=OpenApiTypes.STR,
                 location=OpenApiParameter.QUERY,
                 allow_blank=False,
                 required=True,
+                description="환불 승인자의 6자리 TOTP 코드",
             ),
         ],
         responses={
@@ -112,7 +113,7 @@ class DeskSupportViewSet(
         """
         serializer = OrderTotalRefundSerializer(
             instance=self.get_object(),
-            data={"totp": request.GET.get("otp")},
+            data={"totp": request.query_params.get("otp")},
             context={"check_refundable_date": False},
         )
         serializer.is_valid(raise_exception=True)

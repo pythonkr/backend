@@ -9,12 +9,15 @@ from rest_framework.test import APIClient
 
 @pytest.fixture
 def domain_group(superuser):
-    return DomainGroup.objects.create(
+    obj, _ = DomainGroup.objects.get_or_create(
         name="2025년 PyConKR 홈페이지",
-        domains=["2025.pycon.kr"],
-        created_by=superuser,
-        updated_by=superuser,
+        defaults={
+            "domains": ["2025.pycon.kr"],
+            "created_by": superuser,
+            "updated_by": superuser,
+        },
     )
+    return obj
 
 
 # ---- Auth -------------------------------------------------------------------

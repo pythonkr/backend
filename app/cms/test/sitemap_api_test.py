@@ -24,7 +24,7 @@ def test_list_view(api_client, create_sitemap):
 @pytest.mark.django_db
 def test_list_view_returns_only_matching_domain(api_client):
     group_main = DomainGroup.objects.create(name="main", domains=["pycon.kr"])
-    group_legacy = DomainGroup.objects.create(name="legacy", domains=["2025.pycon.kr"])
+    group_legacy = DomainGroup.objects.create(name="legacy", domains=["legacy.pycon.kr"])
 
     _create_sitemap("main_about", group=group_main)
     _create_sitemap("legacy_about", group=group_legacy)

@@ -270,9 +270,9 @@ class OrderViewSet(
 
 class OrderProductViewSet(mixins.DestroyModelMixin, viewsets.GenericViewSet):
     lookup_url_kwarg = "order_product_rel_id"
-    serializer_class = OrderDto
+    serializer_class = None
 
-    def get_queryset(self) -> models.QuerySet[Order]:
+    def get_queryset(self) -> models.QuerySet[OrderProductRelation]:
         if not isinstance(self.request.user, UserExt):
             return OrderProductRelation.objects.none()
 

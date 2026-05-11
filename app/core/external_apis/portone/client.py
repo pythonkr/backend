@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from logging import getLogger
+from time import time
 from traceback import format_exception
 from typing import Any, Literal
 
@@ -14,6 +15,11 @@ from .serializers import NHNKCPReceiptContext, PortOneV1ResponseSerializer
 logger = getLogger(__name__)
 
 DEFAULT_TIMEOUT = 5
+# PortOne v1 access_token 의 공식 TTL 은 발행 시점 +30분 (developers.portone.io 명시).
+# 응답에 `expired_at` (unix epoch sec) 가 포함되며, 만료 직전 재발급 race 를 막기 위한 안전 마진.
+TOKEN_REFRESH_MARGIN = timedelta(seconds=30)
+# `expired_at` 가 응답에 누락된 비정상 케이스의 보수적 fallback (공식 TTL 30분보다 짧게).
+TOKEN_FALLBACK_TTL = timedelta(minutes=5)
 RequestMethodType = Literal["GET", "OPTIONS", "HEAD", "POST", "PUT", "PATCH", "DELETE"]
 
 
@@ -29,6 +35,8 @@ class PortOneClient:
     def __init__(self, timeout: TimeoutTypes = DEFAULT_TIMEOUT) -> None:
         self._timeout = timeout
         self._client: Client | None = None
+        self._cached_token: str | None = None
+        self._cached_token_expires_at: float = 0.0
 
     @property
     def client(self) -> Client:
@@ -39,6 +47,10 @@ class PortOneClient:
 
     @property
     def _access_token(self) -> str:
+        # 만료 직전 안전 마진까지는 캐시 재사용 (PortOne 토큰 TTL 30분).
+        if self._cached_token and time() < self._cached_token_expires_at - TOKEN_REFRESH_MARGIN.total_seconds():
+            return self._cached_token
+
         response = self.client.post(
             url="/users/getToken", json={"imp_key": settings.PORTONE.imp_key, "imp_secret": settings.PORTONE.imp_secret}
         )
@@ -47,14 +59,17 @@ class PortOneClient:
             resp_serializer = PortOneV1ResponseSerializer.from_response(response)
             resp_serializer.is_valid(raise_exception=True)
 
-            if not (access_token := resp_serializer.validated_data["response"]["access_token"]):
+            resp = resp_serializer.validated_data["response"]
+            if not (access_token := resp.get("access_token")):
                 raise ValueError("PortOne access_token 값이 존재하지 않습니다.")
-
-            return access_token
 
         except Exception as e:
             logger.error(format_exception(e))
             raise PortOneException("PortOne AccessToken 획득에 실패했습니다.") from e
+
+        self._cached_token = access_token
+        self._cached_token_expires_at = float(resp.get("expired_at") or (time() + TOKEN_FALLBACK_TTL.total_seconds()))
+        return access_token
 
     def _request(
         self,

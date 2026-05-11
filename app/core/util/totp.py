@@ -1,3 +1,4 @@
+import warnings
 from base64 import b32encode
 from dataclasses import dataclass
 from hmac import new as hmac_new
@@ -21,9 +22,15 @@ class TOTPInfo:
         if self.digest not in ALLOWED_DIGESTS:
             raise ValueError(f"Unsupported digest algorithm: {self.digest}")
         if self.digest != "sha1":
-            raise Warning(f"Using {self.digest} is not recommended as Google Authenticator does not support it.")
+            warnings.warn(
+                f"Using {self.digest} is not recommended as Google Authenticator does not support it.",
+                stacklevel=2,
+            )
         if self.time_step != 30:
-            raise Warning(f"Using {self.time_step} is not recommended as Google Authenticator does not support it.")
+            warnings.warn(
+                f"Using time_step={self.time_step} is not recommended as Google Authenticator does not support it.",
+                stacklevel=2,
+            )
 
     def get_hotp(self, counter: int) -> str:
         mac = hmac_new(self.key, pack(">Q", counter), self.digest).digest()
