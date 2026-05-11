@@ -9,9 +9,7 @@ from admin_api.filtersets.shop.orders import OrderAdminFilterSet
 from admin_api.serializers.shop.orders import OrderAdminSerializer, OrderExportRequestSerializer
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.util.totp import TOTPInfo
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
-from django.conf import settings
 from django.core.files import File
 from django.db import models, transaction
 from django.http.response import StreamingHttpResponse
@@ -70,20 +68,16 @@ class OrderAdminViewSet(JsonSchemaViewSet, viewsets.ReadOnlyModelViewSet):
     @extend_schema(
         summary="주문 전체 환불 (환불 승인자 TOTP 필수)",
         tags=[OpenAPITag.ADMIN_SHOP_ORDER_REFUND],
-        parameters=[OpenApiParameter(name="otp", location=OpenApiParameter.QUERY, required=True)],
+        parameters=[OpenApiParameter(name="totp", location=OpenApiParameter.QUERY, required=True)],
         responses={status.HTTP_204_NO_CONTENT: None},
     )
     @action(detail=True, methods=["post"], url_path="refund")
     @transaction.atomic
     def refund(self, request: request.Request, pk: typing.Any = None) -> response.Response:
-        if not (otp := request.query_params.get("otp")):
-            raise exceptions.NotAuthenticated("환불 승인자의 OTP 코드가 필요합니다.")
-        if not TOTPInfo(key=settings.SHOP.refund_authorizer_secret_key.encode()).check(otp):
-            raise exceptions.PermissionDenied("OTP 코드가 올바르지 않습니다.")
-
         serializer = OrderTotalRefundSerializer(
             instance=self.get_object(),
-            data={"check_refundable_date": False},
+            data={"totp": request.query_params.get("totp")},
+            context={"check_refundable_date": False},
         )
         serializer.is_valid(raise_exception=True)
         serializer.refund()

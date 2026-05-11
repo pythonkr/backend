@@ -2,7 +2,6 @@ import typing
 
 from core.authn.api_key import APIKeyAuthentication
 from core.authz.api_key import RegistrationDeskAPIKeyPermission
-from core.const.shop_error_messages import PermissionErrorMessages
 from core.const.tag import OpenAPITag
 from django.db import models, transaction
 from django.utils.decorators import method_decorator
@@ -14,7 +13,7 @@ from drf_standardized_errors.openapi_serializers import (
 )
 from internal_api.filters import DeskSupportFilterSet
 from internal_api.serializers import DeskSupportSerializer
-from rest_framework import exceptions, mixins, request, response, status, viewsets
+from rest_framework import mixins, request, response, status, viewsets
 from shop.order.models import Order, OrderProductOptionRelation, OrderProductRelation
 from shop.payment_history.models import PaymentHistory
 from shop.serializers.refund import OrderTotalRefundSerializer
@@ -111,12 +110,10 @@ class DeskSupportViewSet(
         Order의 사용 및 환불하지 않은 상품을 refunded 상태로 변경하고, 결제 취소를 요청합니다.
         일반 전체 환불 API와의 차이점은, 환불 시간에 대한 제약이 없고, 환불 승인자의 OTP 코드가 필요하다는 점입니다.
         """
-        if not (otp := request.GET.get("otp")):
-            raise exceptions.NotAuthenticated(PermissionErrorMessages.INVALID_OTP_CODE)
-
         serializer = OrderTotalRefundSerializer(
             instance=self.get_object(),
-            data={"totp": otp, "check_refundable_date": False},
+            data={"totp": request.GET.get("otp")},
+            context={"check_refundable_date": False},
         )
         serializer.is_valid(raise_exception=True)
         serializer.refund()

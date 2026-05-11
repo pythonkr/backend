@@ -7,9 +7,8 @@ from core.external_apis.portone.client import PortOneException, portone_client
 from core.openapi.schemas import build_html_responses
 from django.conf import settings
 from django.db import models, transaction
-from django.utils.decorators import method_decorator
 from drf_spectacular.openapi import OpenApiParameter, OpenApiTypes
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from drf_standardized_errors.openapi_serializers import ErrorResponse403Serializer, ValidationErrorResponseSerializer
 from rest_framework import mixins, renderers, request, response, serializers, status, viewsets
 from rest_framework.decorators import action
@@ -28,9 +27,8 @@ from shop.serializers.refund import OrderProductRefundSerializer, OrderTotalRefu
 from user.models import UserExt
 
 
-@method_decorator(
-    name="list",
-    decorator=extend_schema(
+@extend_schema_view(
+    list=extend_schema(
         summary="주문 이력 목록 조회",
         tags=[OpenAPITag.SHOP_ORDER],
         responses={
@@ -38,10 +36,7 @@ from user.models import UserExt
             status.HTTP_403_FORBIDDEN: ErrorResponse403Serializer,
         },
     ),
-)
-@method_decorator(
-    name="retrieve",
-    decorator=extend_schema(
+    retrieve=extend_schema(
         summary="주문 이력 상세 조회",
         tags=[OpenAPITag.SHOP_ORDER],
         parameters=[
@@ -145,6 +140,7 @@ class OrderViewSet(
             status.HTTP_403_FORBIDDEN: ErrorResponse403Serializer,
         },
     )
+    @transaction.atomic
     def create(
         self, request: request.Request, *args: tuple[typing.Any], **kwargs: dict[str, typing.Any]
     ) -> response.Response:
@@ -191,7 +187,12 @@ class OrderViewSet(
             cart.name_en += f" and {len(cart_product_rels) - 1} more"
         cart.save()
 
-        portone_client.register_or_update_prepared_payment(merchant_id=str(cart.id), price=cart.first_paid_price)
+        # idempotent + forward-only — DB commit 후 비동기 호출. 실패 시 클라이언트 retry 가 자연 보상.
+        transaction.on_commit(
+            lambda: portone_client.register_or_update_prepared_payment(
+                merchant_id=str(cart.id), price=cart.first_paid_price
+            )
+        )
 
         return response.Response(data=OrderDto(instance=cart).data, status=status.HTTP_201_CREATED)
 
@@ -217,7 +218,7 @@ class OrderViewSet(
         self, request: request.Request, *args: tuple[typing.Any], **kwargs: dict[str, typing.Any]
     ) -> response.Response:
         """Order의 사용 및 환불하지 않은 상품을 refunded 상태로 변경하고, 결제 취소를 요청합니다."""
-        serializer = OrderTotalRefundSerializer(instance=self.get_object(), data={"check_refundable_date": True})
+        serializer = OrderTotalRefundSerializer(instance=self.get_object(), data={}, context={"check_totp": False})
         serializer.is_valid(raise_exception=True)
         serializer.refund()
         return response.Response(status=status.HTTP_204_NO_CONTENT)
@@ -338,7 +339,7 @@ class OrderProductViewSet(mixins.DestroyModelMixin, viewsets.GenericViewSet):
         self, request: request.Request, *args: tuple[typing.Any], **kwargs: dict[str, typing.Any]
     ) -> response.Response:
         """부분 환불을 진행합니다."""
-        serializer = OrderProductRefundSerializer(instance=self.get_object(), data={"check_refundable_date": True})
+        serializer = OrderProductRefundSerializer(instance=self.get_object(), data={}, context={"check_totp": False})
         serializer.is_valid(raise_exception=True)
         serializer.refund()
         return response.Response(status=status.HTTP_204_NO_CONTENT)

@@ -1,4 +1,3 @@
-from contextlib import suppress
 from typing import Any
 from urllib.parse import urljoin
 
@@ -9,7 +8,6 @@ from core.serializer.json_schema_serializer import JsonSchemaSerializer
 from core.serializer.read_only_serializer import ReadOnlyModelSerializer
 from core.serializer.skip_none_list_serializer import SkipNoneListSerializer
 from django.conf import settings
-from django.urls import NoReverseMatch
 from notification.channels import NotificationChannel
 from notification.models.base import Recipient
 from rest_framework import serializers
@@ -140,9 +138,7 @@ class _OrderRecipientItemSerializer(serializers.Serializer):
             )
             for o_rel in order_product_rel.options.all()
         }
-        with suppress(NoReverseMatch):
-            # Order scancode viewset 미등록 (TODO.md). 미설정 시 missing_variables 로 보고.
-            ctx["scancode_url"] = urljoin(settings.BACKEND_DOMAIN, order.scancode_path)
+        ctx["scancode_url"] = urljoin(settings.BACKEND_DOMAIN, order.scancode_path)
 
         return {"recipient": recipient, "context": ctx | self.context["context_override"]}
 

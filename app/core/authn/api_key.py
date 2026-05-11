@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from django.conf import settings
+from django.contrib.auth.hashers import make_password
 from drf_spectacular.extensions import OpenApiAuthenticationExtension
 from drf_spectacular.openapi import AutoSchema
 from rest_framework.authentication import BaseAuthentication
@@ -20,18 +21,10 @@ class APIKeyAuthentication(BaseAuthentication):
         username = f"API_KEY_USER_{api_key.upper()}"
         email = f"api_key_user_{api_key.lower()}@pycon.kr"
 
-        if api_key_user := UserExt.objects.filter(username=username).first():
-            return api_key_user
-
-        api_key_user = UserExt.objects.create_user(
+        return UserExt.objects.get_or_create(
             username=username,
-            email=email,
-            password=None,
-        )
-        api_key_user.set_unusable_password()
-        api_key_user.save()
-
-        return api_key_user
+            defaults={"email": email, "password": make_password(None)},
+        )[0]
 
     def authenticate(self, request: Request) -> tuple["UserExt", None] | None:
         api_key = request.headers.get("x-api-key", "")

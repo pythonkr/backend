@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import datetime
 import re
 import typing
 
 from core.const.shop_error_messages import OptionGroupNotModifiableErrorMessages
+from core.util.dateutil import now_aware
 from rest_framework import serializers
 from shop.order.models import OrderProductOptionRelation, OrderProductRelation
 from shop.product.models import OptionGroup
@@ -36,7 +36,7 @@ class OptionProductOptionCustomResponseModifyRequestSerializer(serializers.Seria
         if not product_option_group.response_modifiable_ends_at:
             raise serializers.ValidationError(OptionGroupNotModifiableErrorMessages.RESPONSE_NOT_MODIFIABLE)
 
-        if product_option_group.response_modifiable_ends_at < datetime.datetime.now().astimezone():
+        if product_option_group.response_modifiable_ends_at < now_aware():
             raise serializers.ValidationError(OptionGroupNotModifiableErrorMessages.RESPONSE_MODIFIABLE_ENDS_AT)
 
         if product_option_group.custom_response_pattern and not re.match(
