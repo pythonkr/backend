@@ -1,5 +1,6 @@
 import typing
 
+from django.core.exceptions import FieldDoesNotExist
 from django.db.models import Model
 from django.db.models.manager import BaseManager
 from rest_framework import serializers, settings
@@ -134,3 +135,72 @@ class NestedModelSerializer(serializers.ModelSerializer):
             field_name.set(value)
 
         return instance
+
+
+class NestedFieldSpec(typing.NamedTuple):
+    related_manager_name: str  # parent 의 reverse manager 속성명 (예: "category_set", "options")
+    child_model: type[Model]  # 자식 모델 클래스
+    parent_fk_name: str  # 자식 모델에서 parent 를 가리키는 FK 필드명 (예: "group")
+
+
+class NestedFieldModelSerializer(NestedModelSerializer):
+    def __init_subclass__(cls, **kwargs: typing.Any) -> None:
+        super().__init_subclass__(**kwargs)
+        if (meta := getattr(cls, "Meta", None)) is None:
+            return
+
+        nested_fields = getattr(meta, "nested_fields", None)
+        if not isinstance(nested_fields, dict):
+            raise TypeError(f"{cls.__name__}.Meta must define `nested_fields: dict[str, NestedFieldSpec]`.")
+
+        parent_model: type[Model] = meta.model
+        for key, spec in nested_fields.items():
+            if not hasattr(parent_model, spec.related_manager_name):
+                raise TypeError(
+                    f"{cls.__name__}.Meta.nested_fields[{key!r}]: "
+                    f"{parent_model.__name__} has no attribute {spec.related_manager_name!r}."
+                )
+            try:
+                spec.child_model._meta.get_field(spec.parent_fk_name)
+            except FieldDoesNotExist as e:
+                raise TypeError(
+                    f"{cls.__name__}.Meta.nested_fields[{key!r}]: "
+                    f"{spec.child_model.__name__} has no field {spec.parent_fk_name!r}."
+                ) from e
+
+    def create(self, validated_data: dict) -> Model:
+        nested_data = {k: validated_data.pop(k, []) or [] for k in self.Meta.nested_fields}
+        instance = super().create(validated_data)
+        self._apply_nested_sync(instance, nested_data)
+        return instance
+
+    def update(self, instance: Model, validated_data: dict) -> Model:
+        nested_data = {k: validated_data.pop(k, None) for k in self.Meta.nested_fields}
+        instance = super().update(instance, validated_data)
+        self._apply_nested_sync(instance, nested_data)
+        return instance
+
+    def _apply_nested_sync(self, instance: Model, nested_data: dict[str, list[dict] | None]) -> None:
+        for key, children_data in nested_data.items():
+            if children_data is None:
+                continue
+            spec = self.Meta.nested_fields[key]
+            rel_mgr = getattr(instance, spec.related_manager_name)
+            active_children_qs = rel_mgr.filter_active() if hasattr(rel_mgr, "filter_active") else rel_mgr.all()
+            existing = {child.id: child for child in active_children_qs}
+            provided_ids: set = set()
+
+            for child_data in (dict(d) for d in children_data):
+                child_id = child_data.pop("id", None)
+                child_data.pop(spec.parent_fk_name, None)  # FK 는 parent 로 고정, 입력값 무시
+                if child_id and (existing_child := existing.get(child_id)):
+                    for k, v in child_data.items():
+                        setattr(existing_child, k, v)
+                    existing_child.save()
+                    provided_ids.add(child_id)
+                else:
+                    spec.child_model.objects.create(**{spec.parent_fk_name: instance, **child_data})
+
+            for child_id, child in existing.items():
+                if child_id not in provided_ids:
+                    child.delete()

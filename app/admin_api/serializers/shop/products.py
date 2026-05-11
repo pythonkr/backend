@@ -1,0 +1,113 @@
+from core.const.serializer import COMMON_ADMIN_FIELDS
+from core.serializer.base_abstract_serializer import BaseAbstractSerializer
+from core.serializer.json_schema_serializer import JsonSchemaSerializer
+from core.serializer.nested_model_serializer import (
+    InstanceListSerializer,
+    NestedFieldModelSerializer,
+    NestedFieldSpec,
+    NestedModelSerializer,
+)
+from rest_framework import serializers
+from shop.product.models import Category, CategoryGroup, Option, OptionGroup, Product, Tag
+
+
+class CategoryGroupAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, NestedFieldModelSerializer):
+    class CategoryAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, NestedModelSerializer):
+        id = serializers.UUIDField(required=False, help_text="기존 Category 수정 시 PK 전달, 새로 추가 시 생략")
+
+        class Meta:
+            model = Category
+            fields = COMMON_ADMIN_FIELDS + ("group", "name", "priority")
+            list_serializer_class = InstanceListSerializer
+
+    categories = CategoryAdminSerializer(many=True, required=False, source="category_set")
+
+    class Meta:
+        model = CategoryGroup
+        fields = COMMON_ADMIN_FIELDS + ("name", "priority", "categories")
+        nested_fields = {
+            "category_set": NestedFieldSpec(
+                related_manager_name="category_set",
+                child_model=Category,
+                parent_fk_name="group",
+            ),
+        }
+
+
+class TagAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = COMMON_ADMIN_FIELDS + ("name_ko", "name_en", "stock", "max_quantity_per_user")
+
+
+class OptionGroupAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, NestedFieldModelSerializer):
+    class OptionAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, NestedModelSerializer):
+        id = serializers.UUIDField(required=False, help_text="기존 Option 수정 시 PK 전달, 새로 추가 시 생략")
+
+        class Meta:
+            model = Option
+            fields = COMMON_ADMIN_FIELDS + (
+                "group",
+                "priority",
+                "name_ko",
+                "name_en",
+                "max_quantity_per_user",
+                "additional_price",
+                "stock",
+            )
+            list_serializer_class = InstanceListSerializer
+
+    options = OptionAdminSerializer(many=True, required=False)
+
+    class Meta:
+        model = OptionGroup
+        fields = COMMON_ADMIN_FIELDS + (
+            "product",
+            "priority",
+            "name_ko",
+            "name_en",
+            "min_quantity_per_product",
+            "max_quantity_per_product",
+            "is_custom_response",
+            "custom_response_pattern",
+            "response_modifiable_ends_at",
+            "options",
+        )
+        nested_fields = {
+            "options": NestedFieldSpec(
+                related_manager_name="options",
+                child_model=Option,
+                parent_fk_name="group",
+            ),
+        }
+
+
+class ProductAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
+    option_groups = OptionGroupAdminSerializer(many=True, read_only=True)
+    tag_set = serializers.PrimaryKeyRelatedField(many=True, queryset=Tag.objects.filter_active(), required=False)
+
+    class Meta:
+        model = Product
+        fields = COMMON_ADMIN_FIELDS + (
+            "name_ko",
+            "name_en",
+            "description_ko",
+            "description_en",
+            "image",
+            "price",
+            "stock",
+            "hidden",
+            "max_quantity_per_user",
+            "visible_starts_at",
+            "visible_ends_at",
+            "orderable_starts_at",
+            "orderable_ends_at",
+            "refundable_ends_at",
+            "category",
+            "priority",
+            "donation_allowed",
+            "donation_min_price",
+            "donation_max_price",
+            "option_groups",
+            "tag_set",
+        )

@@ -125,6 +125,8 @@ class Product(BaseAbstractModel):
     donation_min_price = models.PositiveIntegerField(default=0)
     donation_max_price = models.PositiveIntegerField(default=0)
 
+    tag_set = models.ManyToManyField(to="Tag", through="ProductTagRelation", related_name="product_set")
+
     tags: BaseManager[ProductTagRelation]
     option_groups: BaseManager[OptionGroup]
 

@@ -59,7 +59,8 @@ class PatronViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     )
 
     queryset = (
-        Order.objects.annotate(
+        Order.objects.filter_active()
+        .annotate(
             current_status=Subquery(latest_status_sq, output_field=CharField()),
             has_donation_product=Exists(
                 OrderProductRelation.objects.filter(
