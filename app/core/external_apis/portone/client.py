@@ -26,10 +26,16 @@ class PortOneExceptionGroup(ExceptionGroup):
 
 
 class PortOneClient:
-    client: Client
-
     def __init__(self, timeout: TimeoutTypes = DEFAULT_TIMEOUT) -> None:
-        self.client = Client(base_url=settings.PORTONE.api_url, timeout=timeout)
+        self._timeout = timeout
+        self._client: Client | None = None
+
+    @property
+    def client(self) -> Client:
+        # httpx.Client 는 settings 를 참조하므로 첫 요청 시점까지 생성을 지연한다.
+        if self._client is None:
+            self._client = Client(base_url=settings.PORTONE.api_url, timeout=self._timeout)
+        return self._client
 
     @property
     def _access_token(self) -> str:

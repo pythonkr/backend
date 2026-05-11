@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="ko-kr">
+
+<head>
+  <meta charset="UTF-8">
+  <title>NHN KCP</title>
+</head>
+<script type="text/javascript">
+  function receipt() { document.getElementById("kcp_receipt_form").submit() }
+</script>
+
+<body onload="receipt()">
+  <form id="kcp_receipt_form" method="post" action="https://admin8.kcp.co.kr/assist/bill.BillActionNew.do">
+    <input type="hidden" name="cert_info" value="{{ cert_info }}">
+    <input type="hidden" name="sign_data" value="{{ sign_data }}">
+    <input type="hidden" name="search_data" value="{{ search_data }}">
+  </form>
+</body>
+
+</html>

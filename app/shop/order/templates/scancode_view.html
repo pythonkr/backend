@@ -1,0 +1,64 @@
+{% extends 'scancode_base.html' %}
+{% block content %}
+<h4>
+  주문 조회
+</h4>
+<div class="qrcode-container">
+  <div id="qrcode"></div>
+  <small>{{ order.id }}</small>
+</div>
+<small>행사 당일 등록 데스크에 위 QR코드를 제시해주세요.</small>
+<hr />
+<h5>주문 정보</h5>
+<table>
+  <tr>
+    <td>주문 일시</td>
+    <td>{{ order.created_at }}</td>
+  </tr>
+  <tr>
+    <td>주문 상태</td>
+    <td>{{ order.current_status }}</td>
+  </tr>
+  <tr>
+    <td>결제 금액</td>
+    <td>{{ order.current_paid_price }}원</td>
+  </tr>
+</table>
+<hr />
+<h5>상품 정보</h5>
+<table>
+  {% for product in order.products %}
+  <tr>
+    <td>
+      {{ product.product.name }}
+      <table class="option-table">
+        <tr>
+          <td>옵션</td>
+          <td>선택</td>
+        </tr>
+        {% for option in product.options %}
+        <tr>
+          <td>{{ option.product_option_group.name }}</td>
+          {% if option.product_option_group.is_custom_response %}
+            <td>{{ option.custom_response }}</td>
+          {% else %}
+            <td>{{ option.product_option.name }}</td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </table>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+<script type="text/javascript">
+  var qrcode = new QRCode("qrcode", {
+    text: "{{ short_id }}",
+    width: 192,
+    height: 192,
+    colorDark : "#000000",
+    colorLight : "#ffffff",
+    correctLevel : QRCode.CorrectLevel.H
+});
+</script>
+{% endblock %}
