@@ -155,7 +155,7 @@ class PortOneClient:
         return self._request(
             method="POST",
             route="/payments/cancel",
-            json={k: v for k, v in request_dto.items() if v},
+            json={k: v for k, v in request_dto.items() if v is not None},
             action_desc="환불 요청",
         )
 

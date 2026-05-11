@@ -2,10 +2,10 @@ import functools
 
 from core.const.shop_error_messages import PortOneWebhookFailureMessages
 from core.external_apis.portone.client import PortOneException, PortOneExceptionGroup, portone_client
-from django.db import models
+from django.db import models, transaction
 from rest_framework import serializers
 from shop.order.models import Order, OrderProductRelation, SingleProductCart
-from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
+from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus, is_legal_payment_status_transition
 
 
 class PortOneV1PaymentStatus(models.TextChoices):
@@ -83,6 +83,11 @@ class PortOneV1WebhookRequestSerializer(serializers.Serializer):
             )
         elif value == PortOneV1WebhookRequestStatus.FAILED:
             raise serializers.ValidationError(detail=PortOneWebhookFailureMessages.PURCHASE_FAILED, code="forgery")
+        elif value == PortOneV1WebhookRequestStatus.CANCELLED:
+            # TODO: 관리자 콘솔 취소 자동 처리는 미구현 — 우선 거부하고 운영자가 수동으로 환불 처리.
+            raise serializers.ValidationError(
+                detail=PortOneWebhookFailureMessages.CANCELLED_NOT_SUPPORTED, code="unsupported"
+            )
         return value
 
     def validate(self, data: dict) -> dict:
@@ -98,7 +103,7 @@ class PortOneV1WebhookRequestSerializer(serializers.Serializer):
         except (PortOneException, PortOneExceptionGroup) as e:
             raise serializers.ValidationError(detail=str(e), code="portone_error") from e
 
-        if retrieved_order_data["status"] not in (PortOneV1PaymentStatus.PAID, PortOneV1PaymentStatus.CANCELLED):
+        if retrieved_order_data["status"] != PortOneV1PaymentStatus.PAID:
             raise serializers.ValidationError(
                 detail=PortOneWebhookFailureMessages.UNEXPECTED_RETRIEVED_ORDER_STATUS, code="forgery"
             )
@@ -121,13 +126,18 @@ class PortOneV1WebhookRequestSerializer(serializers.Serializer):
 
         return data
 
+    @transaction.atomic
     def create(self, validated_data: dict) -> PaymentHistory:
-        # TODO: 결제 취소 (payment_serializer.validated_data["status"] == PortOneV1PaymentStatus.CANCELLED)인 경우,
-        #       cancellation_id를 확인하고 환불 내역을 저장하는 로직을 추가해야 합니다.
+        # CANCELLED webhook (관리자 콘솔 취소) 자동 처리는 미구현 — validate_status 에서 거부됨.
         payment_info = PortOneV1PaymentDetailSerializer(instance=self.portone_payment_info).data
+        order = self._lock_or_promote_order(validated_data["merchant_uid"])
 
-        assert (order_or_cart := self.cart_or_order)  # nosec: B101
-        order = order_or_cart.to_order() if isinstance(order_or_cart, SingleProductCart) else order_or_cart
+        # State machine — webhook retry 등 중복/불법 전이는 거부.
+        next_status = PaymentHistoryStatus.completed
+        if not is_legal_payment_status_transition(order.current_status, next_status):
+            raise serializers.ValidationError(
+                detail=PortOneWebhookFailureMessages.ILLEGAL_STATUS_TRANSITION, code="illegal_transition"
+            )
 
         for product_rel in order.products.all():
             product_rel.status = OrderProductRelation.OrderProductStatus.paid
@@ -136,9 +146,25 @@ class PortOneV1WebhookRequestSerializer(serializers.Serializer):
         return PaymentHistory.objects.create(
             order=order,
             imp_id=validated_data["imp_uid"],
-            status=PaymentHistoryStatus.completed,
+            status=next_status,
             price=payment_info["amount"],
         )
+
+    @staticmethod
+    def _lock_or_promote_order(obj_id: str) -> Order:
+        """Order 가 있으면 lock 하여 반환. SingleProductCart 만 있으면 lock + to_order() 로 승격.
+
+        동시 webhook race 시: 첫 호출이 cart lock + to_order() commit 후, 두 번째 호출은
+        cart 가 hard_delete 된 상태로 lock 해제됨 → Order 재조회에서 승격된 Order 발견.
+        """
+        if order := Order.objects.select_for_update().filter_active().filter(id=obj_id).first():
+            return order
+        if cart := SingleProductCart.objects.select_for_update().filter_active().filter(id=obj_id).first():
+            return cart.to_order()
+        # 첫 lock 시 cart 가 다른 webhook 에 의해 promote 된 경우 — Order 재조회.
+        if order := Order.objects.select_for_update().filter_active().filter(id=obj_id).first():
+            return order
+        raise serializers.ValidationError(detail=PortOneWebhookFailureMessages.ORDER_NOT_FOUND, code="forgery")
 
 
 class PortOneV1WebhookResponseSerializer(serializers.Serializer):

@@ -79,7 +79,7 @@ class TagOrderableCheckSerializer(serializers.ModelSerializer):
         if tag.leftover_stock is not None and tag.leftover_stock <= 0:
             raise serializers.ValidationError(TagNotOrderableErrorMessages.SOLDOUT.format(tag.name))
 
-        if tag.max_quantity_per_user:
+        if tag.max_quantity_per_user > 0:  # 0 = 무제한 sentinel
             match self.validation_mode:
                 case OrderableCheckSerializerMode.ADD_SINGLE_PRODUCT_TO_CART:
                     user_tagproduct_taken_count = (
@@ -221,7 +221,7 @@ class OptionOrderableCheckSerializer(serializers.Serializer):
                 )
 
         # 옵션의 최대 구매 수량이 정해져있으면, 해당 사용자가 이미 구매한 수량이 최대 구매 수량을 초과하는 경우 주문 불가능
-        if option.max_quantity_per_user:
+        if option.max_quantity_per_user > 0:  # 0 = 무제한 sentinel
             match self.validation_mode:
                 case OrderableCheckSerializerMode.ADD_SINGLE_PRODUCT_TO_CART:
                     user_option_taken_count = (
@@ -375,7 +375,7 @@ class ProductOrderableCheckSerializer(serializers.ModelSerializer):
                 )
 
         # 상품의 최대 구매 수량이 정해져있으면, 해당 사용자가 이미 담거나 구매한 수량이 최대 구매 수량을 초과하는 경우 주문 불가능
-        if product.max_quantity_per_user:
+        if product.max_quantity_per_user > 0:  # 0 = 무제한 sentinel
             match self.validation_mode:
                 case OrderableCheckSerializerMode.ADD_SINGLE_PRODUCT_TO_CART:
                     user_product_taken_count = (
@@ -556,15 +556,7 @@ class SingleProductCartOrderableCheckSerializer(ProductOrderableCheckSerializer)
         order_product_rel = super().create(validated_data)
         assert (single_product_cart := order_product_rel.single_product_cart)  # nosec: B101
 
-        # 단일 상품 장바구니에 고객 정보를 저장합니다.
-        if customer_info := CustomerInfo.objects.filter(single_product_cart=single_product_cart).first():
-            customer_info_serializer = CustomerInfoCheckSerializer(
-                instance=customer_info, data=validated_data["customer_info"]
-            )
-            customer_info_serializer.is_valid(raise_exception=True)
-            customer_info_serializer.save()
-        else:
-            CustomerInfo.objects.create(**validated_data["customer_info"], single_product_cart=single_product_cart)
+        CustomerInfo.objects.create(**validated_data["customer_info"], single_product_cart=single_product_cart)
 
         return order_product_rel
 
@@ -582,6 +574,17 @@ class CartOrderableCheckSerializer(serializers.Serializer):
 
     class Meta:
         fields = ("cart",)
+
+    def __init__(self, *args: typing.Any, **kwargs: typing.Any) -> None:
+        super().__init__(*args, **kwargs)
+        # 타인의 미결제 cart 로 결제 흐름 트리거를 방어 — request.user 의 cart 로만 lookup 한정.
+        request = self.context.get("request")
+        user = request.user if request is not None else None
+        self.fields["cart"].queryset = (
+            Order.objects.filter_has_no_payment_histories().filter(user=user)
+            if isinstance(user, UserExt)
+            else Order.objects.none()
+        )
 
     def validate(self, data: dict) -> dict:
         cart: Order = data["cart"]

@@ -5,6 +5,7 @@ import functools
 import typing
 
 from core.models import BaseAbstractModel
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models.manager import BaseManager
 from simple_history.models import HistoricalRecords
@@ -218,6 +219,14 @@ class OptionGroup(BaseAbstractModel):
 
     def __str__(self) -> str:
         return f"[{self.product.name}] {self.name}"
+
+    def clean(self) -> None:
+        # is_custom_response=True 시 패턴이 admin 계약 — 빈 답변 허용은 ".*", 비공란 강제는 ".+" 등으로 명시.
+        if self.is_custom_response and not self.custom_response_pattern:
+            raise ValidationError(
+                {"custom_response_pattern": "is_custom_response=True 일 때 custom_response_pattern 은 필수입니다."}
+            )
+        super().clean()
 
     def is_group_stock_available(self) -> bool:
         """해당 옵션 그룹의 재고가 있는지 확인합니다."""
