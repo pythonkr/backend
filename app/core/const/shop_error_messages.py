@@ -12,14 +12,6 @@ class PermissionErrorMessages:
     OTP_REQUIRED = "환불 승인자의 OTP 코드가 필요합니다."
 
 
-class DonationNotOrderableErrorMessages:
-    NOT_FOUND = (
-        "개인 후원을 시도해주셔서 감사해요! 죄송하지만 개인 후원이 아직 준비되지 않았어요...\n"
-        "준비되면 SNS에 공지 예정이에요, 그때까지 조금만 기다려주세요!\n"
-        "후원을 통해 PyCon 한국 준비 위원회와 함께해주셔서 정말 감사합니다!"
-    )
-
-
 class ProductNotOrderableErrorMessages:
     ALREADY_ORDERED = "이미 결제한 상품입니다. 다시 장바구니에 담아주세요."
     NOT_ORDERABLE_TIME = "{} 상품은 현재 구매하실 수 없습니다."
@@ -98,3 +90,5 @@ class PortOneWebhookFailureMessages:
     UNEXPECTED_RETRIEVED_ORDER_ID = "결제 ID가 일치하지 않습니다."
     UNEXPECTED_PAID_PRICE = "결제 금액이 일치하지 않습니다."
     UNSUPPORTED_CURRENCY = "지원하지 않는 통화입니다."
+    ILLEGAL_STATUS_TRANSITION = "이미 처리된 결제이거나 허용되지 않는 상태 전환입니다."
+    CANCELLED_NOT_SUPPORTED = "관리자 콘솔에서 결제 취소된 webhook 의 자동 처리는 아직 지원하지 않습니다."

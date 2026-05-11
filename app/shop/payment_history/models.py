@@ -14,6 +14,16 @@ REFUNDABLE_STATUSES: set[PaymentHistoryStatus] = {
     PaymentHistoryStatus.partial_refunded,
 }
 PURCHASED_STATUSES: set[PaymentHistoryStatus] = REFUNDABLE_STATUSES | {PaymentHistoryStatus.refunded}
+LEGAL_PAYMENT_STATUS_TRANSITIONS: dict[PaymentHistoryStatus, set[PaymentHistoryStatus]] = {
+    PaymentHistoryStatus.pending: {PaymentHistoryStatus.completed},
+    PaymentHistoryStatus.completed: {PaymentHistoryStatus.partial_refunded, PaymentHistoryStatus.refunded},
+    PaymentHistoryStatus.partial_refunded: {PaymentHistoryStatus.partial_refunded, PaymentHistoryStatus.refunded},
+    PaymentHistoryStatus.refunded: set(),  # terminal
+}
+
+
+def is_legal_payment_status_transition(current: PaymentHistoryStatus, next_: PaymentHistoryStatus) -> bool:
+    return next_ in LEGAL_PAYMENT_STATUS_TRANSITIONS.get(current, set())
 
 
 class PaymentHistoryQuerySet(BaseAbstractModelQuerySet):

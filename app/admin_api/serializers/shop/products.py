@@ -81,6 +81,18 @@ class OptionGroupAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, N
             ),
         }
 
+    def validate(self, attrs: dict) -> dict:
+        # is_custom_response=True 면 패턴이 admin 계약 — 빈 답변 허용은 ".*", 비공란 강제는 ".+" 등으로 명시.
+        is_custom_response = attrs.get("is_custom_response", getattr(self.instance, "is_custom_response", False))
+        custom_response_pattern = attrs.get(
+            "custom_response_pattern", getattr(self.instance, "custom_response_pattern", None)
+        )
+        if is_custom_response and not custom_response_pattern:
+            raise serializers.ValidationError(
+                {"custom_response_pattern": "is_custom_response=True 일 때 custom_response_pattern 은 필수입니다."}
+            )
+        return attrs
+
 
 class ProductAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
     option_groups = OptionGroupAdminSerializer(many=True, read_only=True)
