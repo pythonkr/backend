@@ -20,6 +20,8 @@ class OrderAdminFilterSet(filters.FilterSet):
     created_at_after = filters.DateTimeFilter(field_name="created_at", lookup_expr="gte")
     created_at_before = filters.DateTimeFilter(field_name="created_at", lookup_expr="lte")
 
+    product_id = filters.BaseInFilter(field_name="products__product_id", distinct=True)
+
     price_min = filters.NumberFilter(field_name="latest_price", lookup_expr="gte")
     price_max = filters.NumberFilter(field_name="latest_price", lookup_expr="lte")
 
@@ -35,6 +37,7 @@ class OrderAdminFilterSet(filters.FilterSet):
             "status",
             "created_at_after",
             "created_at_before",
+            "product_id",
             "price_min",
             "price_max",
         ]
