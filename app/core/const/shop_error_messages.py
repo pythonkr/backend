@@ -9,6 +9,7 @@ class SignInErrorMessages:
 class PermissionErrorMessages:
     INVALID_API_KEY = "API Key가 올바르지 않습니다."
     INVALID_OTP_CODE = "OTP 코드가 올바르지 않습니다."
+    OTP_REQUIRED = "환불 승인자의 OTP 코드가 필요합니다."
 
 
 class DonationNotOrderableErrorMessages:
@@ -96,3 +97,4 @@ class PortOneWebhookFailureMessages:
     UNEXPECTED_RETRIEVED_ORDER_STATUS = "예상한 결제 상태가 아닙니다."
     UNEXPECTED_RETRIEVED_ORDER_ID = "결제 ID가 일치하지 않습니다."
     UNEXPECTED_PAID_PRICE = "결제 금액이 일치하지 않습니다."
+    UNSUPPORTED_CURRENCY = "지원하지 않는 통화입니다."

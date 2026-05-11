@@ -1,9 +1,8 @@
 from core.const.tag import OpenAPITag
 from django.db.models import CharField, DecimalField, Exists, F, OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
-from django.utils.decorators import method_decorator
 from django_filters import rest_framework as filters
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import mixins, routers, serializers, status, viewsets
 from shop.order.models import Order, OrderProductOptionRelation, OrderProductRelation
 from shop.payment_history.models import REFUNDABLE_STATUSES, PaymentHistory
@@ -36,9 +35,8 @@ class PatronSerializer(serializers.ModelSerializer):
         return result | {"contribution_message": opor.custom_response if opor else ""}
 
 
-@method_decorator(
-    name="list",
-    decorator=extend_schema(
+@extend_schema_view(
+    list=extend_schema(
         summary="개인 후원자 목록",
         tags=[OpenAPITag.EXT_PATRON_API],
         responses={status.HTTP_200_OK: PatronSerializer(many=True)},

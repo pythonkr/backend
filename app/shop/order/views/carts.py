@@ -2,9 +2,8 @@ import typing
 
 from core.const.tag import OpenAPITag
 from django.db.models import Exists, OuterRef, QuerySet
-from django.utils.decorators import method_decorator
 from drf_spectacular.openapi import OpenApiParameter, OpenApiTypes
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from drf_standardized_errors.openapi_serializers import ErrorResponse403Serializer, ValidationErrorResponseSerializer
 from rest_framework import mixins, request, response, status, viewsets
 from shop.order.models import Order, OrderProductRelation
@@ -14,9 +13,8 @@ from shop.serializers.cart_validation import ProductOrderableCheckSerializer
 from user.models import UserExt
 
 
-@method_decorator(
-    name="list",
-    decorator=extend_schema(
+@extend_schema_view(
+    list=extend_schema(
         summary="장바구니 정보 조회",
         tags=[OpenAPITag.SHOP_CART],
         responses={
@@ -43,9 +41,8 @@ class CartViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         return response.Response(data={})
 
 
-@method_decorator(
-    name="create",
-    decorator=extend_schema(
+@extend_schema_view(
+    create=extend_schema(
         summary="장바구니에 상품 추가",
         tags=[OpenAPITag.SHOP_CART],
         responses={
@@ -54,10 +51,7 @@ class CartViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             status.HTTP_403_FORBIDDEN: ErrorResponse403Serializer,
         },
     ),
-)
-@method_decorator(
-    name="destroy",
-    decorator=extend_schema(
+    destroy=extend_schema(
         summary="장바구니에서 상품 제거",
         tags=[OpenAPITag.SHOP_CART],
         parameters=[

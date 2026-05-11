@@ -1,10 +1,8 @@
-import datetime
-
 from core.const.tag import OpenAPITag
+from core.util.dateutil import now_aware
 from django.db.models import Prefetch, Q, QuerySet
-from django.utils.decorators import method_decorator
 from drf_spectacular.openapi import OpenApiParameter, OpenApiTypes
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from drf_standardized_errors.openapi_serializers import ErrorResponse404Serializer
 from rest_framework import mixins, status, viewsets
 from shop.order.models import OrderProductRelation
@@ -14,17 +12,13 @@ from shop.product.serializers.dto import ProductDto
 from user.models import UserExt
 
 
-@method_decorator(
-    name="list",
-    decorator=extend_schema(
+@extend_schema_view(
+    list=extend_schema(
         summary="상품 목록 조회",
         tags=[OpenAPITag.SHOP_PRODUCT],
         responses={status.HTTP_200_OK: ProductDto(many=True)},
     ),
-)
-@method_decorator(
-    name="retrieve",
-    decorator=extend_schema(
+    retrieve=extend_schema(
         summary="상품 상세 조회",
         tags=[OpenAPITag.SHOP_PRODUCT],
         parameters=[
@@ -50,7 +44,7 @@ class ProductViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.
 
     def get_queryset(self) -> QuerySet[Product]:
         # 현재 노출 가능한 상품만 보여야 합니다.
-        now = datetime.datetime.now().astimezone()
+        now = now_aware()
         filter = Q(visible_starts_at__lte=now, visible_ends_at__gte=now, hidden=False)
 
         if self.action == "retrieve" and isinstance(self.request.user, UserExt):

@@ -1,4 +1,3 @@
-import datetime
 import enum
 import functools
 import re
@@ -16,6 +15,7 @@ from core.const.shop_error_messages import (
     TagNotOrderableErrorMessages,
 )
 from core.serializer.nested_model_serializer import InstanceListSerializer
+from core.util.dateutil import now_aware
 from django.contrib.auth.models import AnonymousUser
 from django.db import transaction
 from rest_framework import request, serializers
@@ -262,7 +262,9 @@ class OptionOrderableCheckSerializer(serializers.Serializer):
             return None
 
         # 옵션 그룹이 custom_response를 받는 경우, custom_response가 올바른 형식으로 입력되지 않은 경우 주문 불가능
-        if self.group.custom_response_pattern and not re.match(self.group.custom_response_pattern, custom_response):
+        if self.group.custom_response_pattern and not re.match(
+            self.group.custom_response_pattern, custom_response or ""
+        ):
             raise serializers.ValidationError(OptionGroupNotOrderableErrorMessages.CUSTOM_RESPONSE_PATTERN_MISMATCH)
 
         return custom_response
@@ -341,8 +343,8 @@ class ProductOrderableCheckSerializer(serializers.ModelSerializer):
 
     def validate_product(self, product: Product) -> Product:
         # 판매 시작일 & 판매 종료일 사이가 아닌 경우 주문 불가능
-        now = datetime.datetime.now().astimezone()
-        if not (product.orderable_starts_at < now < product.orderable_ends_at):
+        now = now_aware()
+        if not (product.orderable_starts_at <= now <= product.orderable_ends_at):
             raise serializers.ValidationError(ProductNotOrderableErrorMessages.NOT_ORDERABLE_TIME.format(product.name))
 
         if product.leftover_stock is not None:
@@ -593,7 +595,7 @@ class CartOrderableCheckSerializer(serializers.Serializer):
             raise serializers.ValidationError(CartNotOrderableErrorMessages.CONTAINS_PAID_PRODUCT)
 
         # 장바구니 내의 상품들 주문 금액 합계가 0원 이하거나 100만원 이상인 경우 주문 불가능
-        if 0 > cart.first_paid_price:
+        if cart.first_paid_price <= 0:
             raise serializers.ValidationError(CartNotOrderableErrorMessages.CART_PRICE_TOO_LOW)
         if cart.first_paid_price >= 1_000_000:
             raise serializers.ValidationError(CartNotOrderableErrorMessages.CART_PRICE_TOO_HIGH)

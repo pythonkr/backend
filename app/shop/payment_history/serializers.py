@@ -70,9 +70,9 @@ class PortOneV1WebhookRequestSerializer(serializers.Serializer):
     @functools.cached_property
     def cart_or_order(self) -> Order | SingleProductCart | None:
         obj_id: str = self.initial_data["merchant_uid"]
-        if order := Order.objects.filter(id=obj_id).first():
+        if order := Order.objects.filter_active().filter(id=obj_id).first():
             return order
-        if cart := SingleProductCart.objects.filter(id=obj_id).first():
+        if cart := SingleProductCart.objects.filter_active().filter(id=obj_id).first():
             return cart
         return None
 
@@ -102,6 +102,9 @@ class PortOneV1WebhookRequestSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 detail=PortOneWebhookFailureMessages.UNEXPECTED_RETRIEVED_ORDER_STATUS, code="forgery"
             )
+
+        if retrieved_order_data["currency"] != "KRW":
+            raise serializers.ValidationError(detail=PortOneWebhookFailureMessages.UNSUPPORTED_CURRENCY, code="forgery")
 
         if retrieved_order_data["merchant_uid"] != str(order.id):
             raise serializers.ValidationError(

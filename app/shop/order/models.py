@@ -7,6 +7,7 @@ import typing
 from core.const.shop_error_messages import NotRefundableErrorMessages
 from core.models import BaseAbstractModel, BaseAbstractModelQuerySet
 from core.scancode_mixin import ScanCodeMixin
+from core.util.dateutil import now_aware
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.db.models.manager import BaseManager
@@ -183,7 +184,7 @@ class Order(ScanCodeMixin, BaseAbstractModel):
         if self.current_paid_price != expected_refund_price:
             return NotRefundableErrorMessages.ORDER_REFUND_TARGET_PRICE_IS_MISMATCH
 
-        now = datetime.datetime.now().astimezone()
+        now = now_aware()
         if any(typing.cast(Product, rel.product).refundable_ends_at < now for rel in refund_target_product_relations):
             return NotRefundableErrorMessages.ONE_OF_PRODUCT_REFUND_TIME_EXPIRED
 
@@ -238,7 +239,7 @@ class OrderProductRelation(ScanCodeMixin, BaseAbstractModel):
         if self.status != OrderProductRelation.OrderProductStatus.paid:
             return NotRefundableErrorMessages.PRODUCT_STATUS_IS_NOT_PAID
 
-        if typing.cast(Product, self.product).refundable_ends_at < datetime.datetime.now().astimezone():
+        if typing.cast(Product, self.product).refundable_ends_at < now_aware():
             return NotRefundableErrorMessages.PRODUCT_REFUND_TIME_EXPIRED
 
         if (self.price + self.donation_price) == 0:
