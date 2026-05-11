@@ -16,15 +16,17 @@ def grouper(iterable: Iterable[T], n: int) -> Iterator[tuple[T, ...]]:
         yield elements
 
 
-def query_grouper(qs: Q, chunk_len: int) -> Generator[Q, Any, None]:
-    """
-    - iter_smart_chunks는 테이블의 모든 row에 대해 chunk_len만큼 loop를 돌면서 QuerySet을 반환하기에, 빈 QuerySet이 반환될 수 있고,
-    - grouper는 QuerySet을 수행하여 결과를 메모리에 올려둔 후 결과를 chunk_len만큼씩 반환하기에, 메모리 사용량이 비교적 높을 수 있습니다.
-      이에, created_at 기준으로 chunk_len만큼씩 QuerySet을 반환하는 query_grouper를 추가합니다.
-    """
-    qs = qs.order_by("created_at")
-    curr, end = 0, qs.aggregate(models.Max("id"))["created_at__max"] or 0
-    while curr < end:
-        chunk = qs.filter(id__gt=curr)[:chunk_len]
+def query_grouper(qs: Q, chunk_len: int) -> Generator[list, Any, None]:
+    """`(created_at, id)` 복합 커서로 chunk 단위 list 를 yield. 동일 created_at 인 row 도 누락 없이 처리."""
+    qs = qs.order_by("created_at", "id")
+    last_created_at, last_id = None, None
+    while True:
+        chunk_qs = qs
+        if last_created_at is not None:
+            chunk_qs = qs.filter(
+                models.Q(created_at__gt=last_created_at) | models.Q(created_at=last_created_at, id__gt=last_id),
+            )
+        if not (chunk := list(chunk_qs[:chunk_len])):
+            return
         yield chunk
-        curr = chunk.aggregate(models.Max("id"))["created_at__max"]
+        last_created_at, last_id = chunk[-1].created_at, chunk[-1].id

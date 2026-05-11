@@ -32,6 +32,7 @@ dependencies = [
     "jinja2>=3.1.6",
     "model-bakery>=1.23.4",
     "packaging>=26.0",
+    "pandas[excel, performance]>=2.2.3",
     "psycopg[binary]>=3.3.3",
     "py-openapi-schema-to-json-schema>=0.0.3",
     "sentry-sdk[django]>=2.57.0",

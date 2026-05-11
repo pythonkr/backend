@@ -3,6 +3,13 @@ class OpenAPITag:
     EVENT_PRESENTATION = "Event > Presentation"
     EVENT_SPONSOR = "Event > Sponsor"
 
+    SHOP_USER = "Shop > 고객"
+    SHOP_PRODUCT = "Shop > 상품"
+    SHOP_CART = "Shop > 장바구니"
+    SHOP_ORDER = "Shop > 주문"
+    SHOP_ORDER_REFUND = "Shop > 환불"
+    SHOP_PORTONE_WEBHOOK = "Shop > PortOne 결제 Webhook"
+
     ADMIN_ACCOUNT = "Admin > Sign-In & Sign-Out"
     ADMIN_USER = "Admin > User"
     ADMIN_CMS = "Admin > CMS"
@@ -21,3 +28,6 @@ class OpenAPITag:
     PARTICIPANT_PORTAL_PUBLIC_FILE = "Participant Portal > Public File"
     PARTICIPANT_PORTAL_PRESENTATION = "Participant Portal > Presentation"
     PARTICIPANT_PORTAL_MODIFICATION_AUDIT = "Participant Portal > Modification Audit"
+
+    EXT_REGISTRATION_DESK_API = "EXT: 등록 데스크 API"
+    EXT_PATRON_API = "EXT: 개인 후원자 API"

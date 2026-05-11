@@ -1,0 +1,47 @@
+{% extends 'scancode_base.html' %}
+{% block content %}
+<h4>
+  티켓 조회
+</h4>
+<div class="qrcode-container">
+  <div id="qrcode"></div>
+  <small>{{ order_product.id }}</small>
+</div>
+<small>행사 당일 등록 데스크에 위 QR코드를 제시해주세요.</small>
+<hr />
+<h5>상품 정보</h5>
+<table>
+  <tr>
+    <td>상품명</td>
+    <td>{{ order_product.product.name }}</td>
+  </tr>
+  <tr>
+    <td>주문 일시</td>
+    <td>{{ order_product.order.first_paid_at }}</td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <table class="option-table">
+        <tbody>
+          {% for option in order_product.options %}
+            <tr>
+              <td>{{ option.name }}</td>
+              <td>{{ option.value }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </td>
+  </tr>
+</table>
+<script type="text/javascript">
+  var qrcode = new QRCode("qrcode", {
+    text: "opr:{{ order_product.id }}",
+    width: 192,
+    height: 192,
+    colorDark : "#000000",
+    colorLight : "#ffffff",
+    correctLevel : QRCode.CorrectLevel.H
+});
+</script>
+{% endblock %}
