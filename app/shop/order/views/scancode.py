@@ -19,6 +19,7 @@ from user.models import UserExt
 
 class _ScanCodeError(Exception):
     def __init__(self, msg: str, code: int) -> None:
+        super().__init__(msg, code)
         self.msg = msg
         self.code = code
 
