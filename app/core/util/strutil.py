@@ -14,5 +14,4 @@ def uuid_to_b64(in_str: UUID | str) -> str:
 
 
 def b64_to_uuid(in_str: str) -> UUID:
-    in_str += "=" * (4 - len(in_str) % 4)
-    return UUID(bytes=urlsafe_b64decode(in_str + "=="))
+    return UUID(bytes=urlsafe_b64decode(in_str + "=" * (-len(in_str) % 4)))

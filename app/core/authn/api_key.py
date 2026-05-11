@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from hmac import compare_digest
 from typing import TYPE_CHECKING
 
 from django.conf import settings
@@ -30,10 +31,11 @@ class APIKeyAuthentication(BaseAuthentication):
         api_key = request.headers.get("x-api-key", "")
         api_secret = request.headers.get("x-api-secret", "")
 
-        if api_key.lower() in settings.EXT_API_KEYS and api_secret == settings.EXT_API_KEYS.get(api_key.lower()):
-            return self._get_or_create_api_key_user(api_key), None
-
-        return None
+        if not (expected_secret := settings.EXT_API_KEYS.get(api_key.lower())):
+            return None
+        if not compare_digest(api_secret.encode(), expected_secret.encode()):
+            return None
+        return self._get_or_create_api_key_user(api_key), None
 
 
 class APIKeyAuthenticationScheme(OpenApiAuthenticationExtension):  # type: ignore[no-untyped-call]

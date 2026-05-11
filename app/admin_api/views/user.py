@@ -15,10 +15,11 @@ from rest_framework import decorators, mixins, request, response, status, viewse
 from user.models import UserExt
 from user.models.organization import Organization
 
-ADMIN_METHODS = ["list", "retrieve", "create", "partial_update", "destroy"]
+USER_ADMIN_METHODS = ["list", "retrieve", "create", "partial_update"]
+ADMIN_METHODS = USER_ADMIN_METHODS + ["destroy"]
 
 
-@extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_USER]) for m in ADMIN_METHODS})
+@extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_USER]) for m in USER_ADMIN_METHODS})
 class UserAdminViewSet(
     mixins.RetrieveModelMixin,
     mixins.ListModelMixin,

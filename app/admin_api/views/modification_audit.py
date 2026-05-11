@@ -25,10 +25,7 @@ MODEL_SERIALIZER_MAP: dict[models.Model, type[serializers.Serializer]] = {
 }
 
 
-@utils.extend_schema_view(
-    list=utils.extend_schema(tags=[OpenAPITag.ADMIN_MODIFICATION_AUDIT]),
-    retrieve=utils.extend_schema(tags=[OpenAPITag.ADMIN_MODIFICATION_AUDIT]),
-)
+@utils.extend_schema_view(list=utils.extend_schema(tags=[OpenAPITag.ADMIN_MODIFICATION_AUDIT]))
 class ModificationAuditAdminViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = ModificationAuditResponseAdminSerializer
     permission_classes = [IsSuperUser]
