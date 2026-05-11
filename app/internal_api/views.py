@@ -58,10 +58,12 @@ class DeskSupportViewSet(
             models.Prefetch(
                 lookup="products",
                 queryset=(
-                    OrderProductRelation.objects.select_related("product").prefetch_related(
+                    OrderProductRelation.objects.filter_active()
+                    .select_related("product")
+                    .prefetch_related(
                         models.Prefetch(
                             lookup="options",
-                            queryset=OrderProductOptionRelation.objects.select_related(
+                            queryset=OrderProductOptionRelation.objects.filter_active().select_related(
                                 "product_option_group", "product_option"
                             ),
                         )
@@ -70,7 +72,7 @@ class DeskSupportViewSet(
             ),
             models.Prefetch(
                 "payment_histories",
-                queryset=PaymentHistory.objects.order_by("-created_at"),
+                queryset=PaymentHistory.objects.filter_active().order_by("-created_at"),
                 to_attr="_payment_histories_by_latest",
             ),
         )

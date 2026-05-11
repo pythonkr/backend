@@ -20,13 +20,12 @@ from rest_framework import exceptions, parsers, request, response, status, views
 from rest_framework.decorators import action
 from shop.order import exports, imports
 from shop.order.models import Order, OrderProductOptionRelation, OrderProductRelation
-from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
+from shop.payment_history.models import PURCHASED_STATUSES, REFUNDABLE_STATUSES, PaymentHistory
 from shop.product.models import Product
 from shop.serializers.refund import OrderTotalRefundSerializer
 
 logger = getLogger(__name__)
 
-REFUNDABLE_STATUSES = {PaymentHistoryStatus.completed, PaymentHistoryStatus.partial_refunded}
 ADMIN_METHODS = ["list", "retrieve"]
 
 
@@ -164,7 +163,7 @@ class OrderAdminViewSet(JsonSchemaViewSet, viewsets.ReadOnlyModelViewSet):
         product_ids = req.validated_data["product_ids"]
         include_refunded = req.validated_data["include_refunded"]
 
-        statuses = REFUNDABLE_STATUSES | {PaymentHistoryStatus.refunded} if include_refunded else REFUNDABLE_STATUSES
+        statuses = PURCHASED_STATUSES if include_refunded else REFUNDABLE_STATUSES
 
         order_qs = (
             Order.objects.annotate(current_status=PaymentHistory.objects.latest_per_order_field("status"))

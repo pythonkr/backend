@@ -27,23 +27,19 @@
 <hr />
 <h5>상품 정보</h5>
 <table>
-  {% for product in order.products %}
+  {% for item in order.items %}
   <tr>
     <td>
-      {{ product.product.name }}
+      {{ item.product.name }}
       <table class="option-table">
         <tr>
           <td>옵션</td>
           <td>선택</td>
         </tr>
-        {% for option in product.options %}
+        {% for option in item.options %}
         <tr>
-          <td>{{ option.product_option_group.name }}</td>
-          {% if option.product_option_group.is_custom_response %}
-            <td>{{ option.custom_response }}</td>
-          {% else %}
-            <td>{{ option.product_option.name }}</td>
-          {% endif %}
+          <td>{{ option.name }}</td>
+          <td>{{ option.value }}</td>
         </tr>
         {% endfor %}
       </table>
@@ -53,7 +49,7 @@
 </table>
 <script type="text/javascript">
   var qrcode = new QRCode("qrcode", {
-    text: "{{ short_id }}",
+    text: "order:{{ order.short_id }}",
     width: 192,
     height: 192,
     colorDark : "#000000",

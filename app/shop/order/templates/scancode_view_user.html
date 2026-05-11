@@ -1,4 +1,4 @@
-{% extends 'user_scancode_base.html' %}
+{% extends 'scancode_base.html' %}
 {% block content %}
 <h4>
   등록 입장 QR 코드
@@ -10,21 +10,21 @@
   </div>
   <small>행사 당일 등록 데스크에 위 QR코드를 제시해주세요.</small>
   <hr />
-  <h5>고객 정보</h5>
+  <h5>고객 정보 (가장 최근 주문 기준)</h5>
   <table>
     <tr>
       <td>성함</td>
-      <td>{{ user.name }}</td>
+      <td>{{ orders.0.customer_info.name }}</td>
     </tr>
     <tr>
       <td>E-Mail</td>
-      <td>{{ user.email }}</td>
+      <td>{{ orders.0.customer_info.email }}</td>
     </tr>
   </table>
   <hr />
   <h5>6개월 내 주문 정보</h5>
   <div class="order-info-list-container">
-    {% for order in user.orders %}
+    {% for order in orders %}
     <details class="order-info-list-item">
       <summary {% if order.current_status == "refunded" %}class="refunded"{% endif %}>{{ order.name }}</summary>
       <div class="order-info-list-item-content">
@@ -45,6 +45,19 @@
           </tbody>
         </table>
         <br />
+        <details>
+          <summary>고객 정보</summary>
+          <table class="order-item-product-table">
+            <tbody>
+              <tr><td class="min">성함</td><td>{{ order.customer_info.name }}</td></tr>
+              <tr><td class="min">E-Mail</td><td>{{ order.customer_info.email }}</td></tr>
+              <tr><td class="min">연락처</td><td>{{ order.customer_info.phone }}</td></tr>
+              {% if order.customer_info.organization %}
+                <tr><td class="min">소속</td><td>{{ order.customer_info.organization }}</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </details>
         <details>
           <summary>주문 상품 정보</summary>
           <table class="order-item-product-table">
@@ -86,7 +99,7 @@
 </div>
 <script type="text/javascript">
   var qrcode = new QRCode("qrcode", {
-    text: "{{ user.short_unique_id }}",
+    text: "user:{{ user.short_id }}",
     width: 192,
     height: 192,
     colorDark : "#000000",

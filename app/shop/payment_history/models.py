@@ -13,6 +13,7 @@ REFUNDABLE_STATUSES: set[PaymentHistoryStatus] = {
     PaymentHistoryStatus.completed,
     PaymentHistoryStatus.partial_refunded,
 }
+PURCHASED_STATUSES: set[PaymentHistoryStatus] = REFUNDABLE_STATUSES | {PaymentHistoryStatus.refunded}
 
 
 class PaymentHistoryQuerySet(BaseAbstractModelQuerySet):

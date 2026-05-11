@@ -8,7 +8,6 @@ from admin_api.serializers.shop.orders import (
     OrderSendNotificationPreviewResponseSerializer,
     OrderSendNotificationSerializer,
 )
-from admin_api.views.shop.orders import REFUNDABLE_STATUSES
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
@@ -17,7 +16,7 @@ from drf_spectacular.utils import PolymorphicProxySerializer, extend_schema, ext
 from rest_framework import request, response, status, viewsets
 from rest_framework.decorators import action
 from shop.order.models import Order, OrderProductOptionRelation, OrderProductRelation
-from shop.payment_history.models import PaymentHistory
+from shop.payment_history.models import REFUNDABLE_STATUSES, PaymentHistory
 
 ACTION_METHODS = ["preview", "send"]
 
