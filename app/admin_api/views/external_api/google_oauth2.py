@@ -2,8 +2,8 @@ from admin_api.serializers.external_api.google_oauth2 import (
     GoogleOAuth2AdminAccessTokenSerializer,
     GoogleOAuth2AdminSerializer,
 )
+from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.permissions import IsSuperUser
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from external_api.google_oauth2.models import GoogleOAuth2

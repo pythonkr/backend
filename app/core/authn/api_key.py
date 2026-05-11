@@ -1,19 +1,15 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from drf_spectacular.extensions import OpenApiAuthenticationExtension
 from drf_spectacular.openapi import AutoSchema
 from rest_framework.authentication import BaseAuthentication
-from rest_framework.permissions import BasePermission
 from rest_framework.request import Request
-from rest_framework.views import APIView
 
 if TYPE_CHECKING:
     from user.models import UserExt
-
-INVALID_API_KEY_MESSAGE = "API Key가 올바르지 않습니다."
 
 
 class APIKeyAuthentication(BaseAuthentication):
@@ -56,19 +52,3 @@ class APIKeyAuthenticationScheme(OpenApiAuthenticationExtension):  # type: ignor
             {"type": "apiKey", "in": "header", "name": "x-api-key"},
             {"type": "apiKey", "in": "header", "name": "x-api-secret"},
         ]
-
-
-class APIKeyPermission(BasePermission):
-    name: str = ""
-    message = INVALID_API_KEY_MESSAGE
-
-    def has_permission(self, request: Request, view: APIView) -> bool:
-        api_key = request.headers.get("x-api-key", "")
-        return api_key.lower() == self.name and request.user.is_authenticated
-
-    def has_object_permission(self, request: Request, view: APIView, obj: Any) -> bool:
-        return self.has_permission(request, view)
-
-
-class RegistrationDeskAPIKeyPermission(APIKeyPermission):
-    name = "registration_desk"
