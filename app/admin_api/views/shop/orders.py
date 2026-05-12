@@ -28,6 +28,33 @@ logger = getLogger(__name__)
 ADMIN_METHODS = ["list", "retrieve", "partial_update"]
 
 
+# OrderProductRelation + nested Options prefetch — `Order.products` 용.
+_OPR_PREFETCH_QS = (
+    OrderProductRelation.objects.filter_active()
+    .select_related("product")
+    .prefetch_related(
+        models.Prefetch(
+            "options",
+            queryset=OrderProductOptionRelation.objects.filter_active().select_related(
+                "product_option_group", "product_option"
+            ),
+        ),
+    )
+)
+
+# `Order.payment_histories` 용 prefetch — 최신순.
+_PAYMENT_HISTORY_PREFETCH_QS = PaymentHistory.objects.filter_active().order_by("-created_at")
+
+
+def _payment_history_created_at_subquery(*, latest: bool) -> models.Subquery:
+    """Order 별 첫/마지막 PaymentHistory.created_at scalar subquery (filter/annotate 양쪽 용)."""
+    return models.Subquery(
+        PaymentHistory.objects.filter(order_id=models.OuterRef("pk"))
+        .order_by("-created_at" if latest else "created_at")
+        .values("created_at")[:1]
+    )
+
+
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_SHOP_ORDER]) for m in ADMIN_METHODS})
 class OrderAdminViewSet(
     JsonSchemaViewSet,
@@ -46,39 +73,15 @@ class OrderAdminViewSet(
         .filter(models.Exists(OrderProductRelation.objects.filter(order=models.OuterRef("pk"))))
         .select_related_with_user("user", "customer_info")
         .prefetch_related(
-            models.Prefetch(
-                "products",
-                queryset=OrderProductRelation.objects.filter_active()
-                .select_related("product")
-                .prefetch_related(
-                    models.Prefetch(
-                        "options",
-                        queryset=OrderProductOptionRelation.objects.filter_active().select_related(
-                            "product_option_group",
-                            "product_option",
-                        ),
-                    ),
-                ),
-            ),
-            models.Prefetch(
-                "payment_histories",
-                queryset=PaymentHistory.objects.filter_active().order_by("-created_at"),
-            ),
+            models.Prefetch("products", queryset=_OPR_PREFETCH_QS),
+            models.Prefetch("payment_histories", queryset=_PAYMENT_HISTORY_PREFETCH_QS),
         )
         .annotate(
             current_status=PaymentHistory.objects.latest_per_order_field("status"),
             latest_imp_id=PaymentHistory.objects.latest_per_order_field("imp_id"),
             latest_price=PaymentHistory.objects.latest_per_order_field("price"),
-            first_paid_at=models.Subquery(
-                PaymentHistory.objects.filter(order_id=models.OuterRef("pk"))
-                .order_by("created_at")
-                .values("created_at")[:1]
-            ),
-            status_changed_at=models.Subquery(
-                PaymentHistory.objects.filter(order_id=models.OuterRef("pk"))
-                .order_by("-created_at")
-                .values("created_at")[:1]
-            ),
+            first_paid_at=_payment_history_created_at_subquery(latest=False),
+            status_changed_at=_payment_history_created_at_subquery(latest=True),
         )
         .order_by("-created_at")
     )
