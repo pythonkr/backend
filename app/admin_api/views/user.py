@@ -61,7 +61,7 @@ class UserAdminViewSet(
         serializer = UserAdminSignInSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        login(request=request, user=serializer.user)
+        login(request=request, user=serializer.user, backend="django.contrib.auth.backends.ModelBackend")
         return response.Response(data=UserAdminSerializer(serializer.user).data)
 
     @extend_schema(tags=[OpenAPITag.ADMIN_ACCOUNT], responses={status.HTTP_204_NO_CONTENT: None})
