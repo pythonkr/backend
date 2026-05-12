@@ -30,6 +30,11 @@ v1_apis: list[resolvers.URLPattern | resolvers.URLResolver] = [
     path("event/presentation/", include("event.presentation.urls")),
     path("event/sponsor/", include("event.sponsor.urls")),
     path("external-api/", include("external_api.urls")),
+    path("internal-api/", include("internal_api.urls")),
+    path("shop/orders/", include("shop.order.urls")),
+    path("shop/products/", include("shop.product.urls")),
+    path("shop/payment-histories/", include("shop.payment_history.urls")),
+    path("shop/patron/", include("shop.patron")),
 ]
 
 urlpatterns = [
@@ -38,6 +43,9 @@ urlpatterns = [
     path("livez/", core.health_check.livez),
     # Admin
     path("admin/", admin.site.urls),
+    # Django-Allauth
+    path("accounts/", include("allauth.urls")),
+    path("authn/social/", include("allauth.headless.urls")),
     # V1 API
     re_path("^v1/", include((v1_apis, "v1"), namespace="v1")),
     # API Docs

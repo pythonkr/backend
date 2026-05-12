@@ -109,6 +109,16 @@ INSTALLED_APPS = [
     "simple_history",
     # For Shell Plus
     "django_extensions",
+    # Django-Allauth
+    "allauth",
+    "allauth.account",
+    "allauth.headless",
+    "allauth.socialaccount",
+    "allauth.usersessions",
+    "allauth.socialaccount.providers.github",
+    "allauth.socialaccount.providers.google",
+    "allauth.socialaccount.providers.kakao",
+    "allauth.socialaccount.providers.naver",
     # django-app
     "user",
     "file",
@@ -116,8 +126,12 @@ INSTALLED_APPS = [
     "event",
     "event.presentation",
     "event.sponsor",
+    "shop.order",
+    "shop.product",
+    "shop.payment_history",
     "notification",
     "admin_api",
+    "internal_api",
     "participant_portal_api",
     "external_api",
     "external_api.google_oauth2",
@@ -139,6 +153,8 @@ MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     # simple-history
     "simple_history.middleware.HistoryRequestMiddleware",
+    # Django-Allauth
+    "allauth.account.middleware.AccountMiddleware",
     # Thread Local Middleware
     "core.middleware.thread_middleware.ThreadLocalMiddleware",
     # Request Response Logger
@@ -198,6 +214,48 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
+
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
+    "django.contrib.auth.hashers.ScryptPasswordHasher",
+]
+
+# Django-Allauth
+AUTHENTICATION_BACKENDS = [
+    # Django admin / 기본 로그인
+    "django.contrib.auth.backends.ModelBackend",
+    # allauth (email login 등)
+    "allauth.account.auth_backends.AuthenticationBackend",
+    # 외부 등록 데스크 등 API key 인증
+    "core.authn.api_key.APIKeyAuthentication",
+]
+
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = "https"
+ACCOUNT_LOGIN_METHODS = {"username", "email"}
+ACCOUNT_EMAIL_VERIFICATION = "none"
+ACCOUNT_ADAPTER = "core.authn.allauth_adapter.NoNewUsersAccountAdapter"
+
+SOCIALACCOUNT_ONLY = False
+SOCIALACCOUNT_AUTO_SIGNUP = True
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
+SOCIALACCOUNT_EMAIL_REQUIRED = True
+SOCIALACCOUNT_ADAPTER = "core.authn.allauth_adapter.SocialAccountLoggingAdapter"
+SOCIALACCOUNT_LOGIN_ON_GET = True
+SOCIALACCOUNT_PROVIDERS = {
+    "google": {
+        "SCOPE": ["profile", "email"],
+        "AUTH_PARAMS": {"access_type": "online"},
+    },
+}
+
+HEADLESS_ONLY = True
+HEADLESS_FRONTEND_URLS = {
+    "socialaccount_login_error": env("HEADLESS_SOCIALACCOUNT_LOGIN_ERROR_URL", default=""),
+}
 
 
 # Internationalization
@@ -369,6 +427,39 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_SOFT_TIME_LIMIT = 60
 CELERY_TASK_TIME_LIMIT = 90
+
+# PortOne Settings
+PORTONE = types.SimpleNamespace(
+    api_url=env("PORTONE_API_URL", default="https://api.iamport.kr"),
+    ip_list=env.list(
+        "PORTONE_IP_LIST",
+        default=[
+            "52.78.100.19",
+            "52.78.48.223",
+            "52.78.5.241",  # (Webhook Test Only)
+        ],
+    ),
+    imp_key=env("PORTONE_IMP_KEY", default="imp_key"),
+    imp_secret=env("PORTONE_IMP_SECRET", default="imp_secret"),
+)
+
+# NHN KCP Settings
+NHN_KCP = types.SimpleNamespace(
+    pg_api_cert=env.str("NHN_KCP_PG_API_CERT", default=""),
+    pg_api_private_key=env.str("NHN_KCP_PG_API_PRIVATE_KEY", default=""),
+    pg_api_password=env.str("NHN_KCP_PG_API_PASSWORD", default=""),
+)
+
+# Shop Settings
+SHOP = types.SimpleNamespace(
+    order_scancode_salt=env("ORDER_SCANCODE_SALT", default="local_order_scancode_salt"),
+    refund_authorizer_secret_key=env("REFUND_AUTHORIZER_SECRET_KEY", default="local_refund_authorizer_secret_key"),
+)
+
+# External API Key Settings (등록 데스크 등)
+EXT_API_KEYS = {
+    "registration_desk": env("API_KEY_REGISTRATION_DESK", default=None),
+}
 
 # Sentry Settings
 if SENTRY_DSN := env("SENTRY_DSN", default=""):

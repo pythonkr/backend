@@ -5,9 +5,9 @@ from admin_api.serializers.user import (
     UserAdminSerializer,
     UserAdminSignInSerializer,
 )
+from core.authz import IsSuperUser
 from core.const.account import generate_random_password
 from core.const.tag import OpenAPITag
-from core.permissions import IsSuperUser
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from django.contrib.auth import login, logout
 from drf_spectacular.utils import extend_schema, extend_schema_view
@@ -15,10 +15,11 @@ from rest_framework import decorators, mixins, request, response, status, viewse
 from user.models import UserExt
 from user.models.organization import Organization
 
-ADMIN_METHODS = ["list", "retrieve", "create", "partial_update", "destroy"]
+USER_ADMIN_METHODS = ["list", "retrieve", "create", "partial_update"]
+ADMIN_METHODS = USER_ADMIN_METHODS + ["destroy"]
 
 
-@extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_USER]) for m in ADMIN_METHODS})
+@extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_USER]) for m in USER_ADMIN_METHODS})
 class UserAdminViewSet(
     mixins.RetrieveModelMixin,
     mixins.ListModelMixin,
@@ -60,7 +61,7 @@ class UserAdminViewSet(
         serializer = UserAdminSignInSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        login(request=request, user=serializer.user)
+        login(request=request, user=serializer.user, backend="django.contrib.auth.backends.ModelBackend")
         return response.Response(data=UserAdminSerializer(serializer.user).data)
 
     @extend_schema(tags=[OpenAPITag.ADMIN_ACCOUNT], responses={status.HTTP_204_NO_CONTENT: None})
