@@ -59,7 +59,7 @@ class ProductViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.
         return (
             Product.objects.filter_active()
             .filter(filter)
-            .select_related("category", "category__group")
+            .select_related("category", "category__group", "image")
             .prefetch_related(
                 "tags",
                 Prefetch("option_groups", queryset=OptionGroup.objects.prefetch_related("options")),
