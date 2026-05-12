@@ -69,6 +69,16 @@ class OrderAdminViewSet(
             current_status=PaymentHistory.objects.latest_per_order_field("status"),
             latest_imp_id=PaymentHistory.objects.latest_per_order_field("imp_id"),
             latest_price=PaymentHistory.objects.latest_per_order_field("price"),
+            first_paid_at=models.Subquery(
+                PaymentHistory.objects.filter(order_id=models.OuterRef("pk"))
+                .order_by("created_at")
+                .values("created_at")[:1]
+            ),
+            status_changed_at=models.Subquery(
+                PaymentHistory.objects.filter(order_id=models.OuterRef("pk"))
+                .order_by("-created_at")
+                .values("created_at")[:1]
+            ),
         )
         .order_by("-created_at")
     )

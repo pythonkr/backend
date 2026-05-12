@@ -20,7 +20,15 @@ class OrderAdminFilterSet(filters.FilterSet):
     created_at_after = filters.DateTimeFilter(field_name="created_at", lookup_expr="gte")
     created_at_before = filters.DateTimeFilter(field_name="created_at", lookup_expr="lte")
 
+    first_paid_at_after = filters.DateTimeFilter(field_name="first_paid_at", lookup_expr="gte")
+    first_paid_at_before = filters.DateTimeFilter(field_name="first_paid_at", lookup_expr="lte")
+
+    status_changed_at_after = filters.DateTimeFilter(field_name="status_changed_at", lookup_expr="gte")
+    status_changed_at_before = filters.DateTimeFilter(field_name="status_changed_at", lookup_expr="lte")
+
     product_id = filters.BaseInFilter(field_name="products__product_id", distinct=True)
+    category_id = filters.BaseInFilter(field_name="products__product__category_id", distinct=True)
+    category_group_id = filters.BaseInFilter(field_name="products__product__category__group_id", distinct=True)
 
     price_min = filters.NumberFilter(field_name="latest_price", lookup_expr="gte")
     price_max = filters.NumberFilter(field_name="latest_price", lookup_expr="lte")
@@ -37,7 +45,13 @@ class OrderAdminFilterSet(filters.FilterSet):
             "status",
             "created_at_after",
             "created_at_before",
+            "first_paid_at_after",
+            "first_paid_at_before",
+            "status_changed_at_after",
+            "status_changed_at_before",
             "product_id",
+            "category_id",
+            "category_group_id",
             "price_min",
             "price_max",
         ]
