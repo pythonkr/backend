@@ -137,9 +137,10 @@ def _copy_shifted_users(target_cur, legacy_cur, user_id_map: dict[int, tuple[int
         """,
         [shifted_ids],
     )
-    # nickname* / image_id 는 legacy 에 없으므로 None.
+    # legacy 에는 nickname 컬럼이 없음 — username 으로 ko/en 기본값 채우기 (master nickname 은 None).
+    # image_id 도 legacy 부재.
     rows = [
-        (user_id_map[lid][0], pw, llg, sup, uname, fn, ln, em, stf, act, dj, None, None, None, None, uniq)
+        (user_id_map[lid][0], pw, llg, sup, uname, fn, ln, em, stf, act, dj, None, uname, uname, None, uniq)
         for lid, pw, llg, sup, uname, fn, ln, em, stf, act, dj, uniq in legacy_cur.fetchall()
     ]
     target_cur.executemany(
