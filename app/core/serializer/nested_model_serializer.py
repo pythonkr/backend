@@ -60,8 +60,11 @@ class InstanceListSerializer(serializers.ListSerializer):
         data = self._validate_data(data)
         ret, errors = [], []
 
+        # self.instance 가 명시적으로 set 된 경우(예: instance=tags) length 가 _validate_data 에서 검증됨 →
+        # id 미지정 시 위치 기반 매칭이 안전. parent 에서 fetch 한 경우는 length 검증 없으므로 위치 매칭 금지.
+        has_explicit_instance = self.instance is not None
         child_instances = self.instance or (
-            self.parent and self.parent.instance and getattr(self.parent.instance, self.field_name)
+            self.parent and self.parent.instance and getattr(self.parent.instance, self.source or self.field_name)
         )
         if isinstance(child_instances, BaseManager):
             child_instances = list(child_instances.all())
@@ -70,14 +73,15 @@ class InstanceListSerializer(serializers.ListSerializer):
             try:
                 self.child.initial_data = item
                 self.child.context["index"] = index
-                if child_instances:
-                    if "id" in item:
-                        target_instance = next((i for i in child_instances if str(i.id) == str(item["id"])), None)
-                        if not target_instance:
-                            raise serializers.ValidationError("유효하지 않은 ID입니다.", code="not_found")
-                        self.child.instance = target_instance
-                    else:
-                        self.child.instance = child_instances[index]
+                # 매 iteration 마다 초기화 — id 없는 항목은 create 모드로 검증.
+                self.child.instance = None
+                if child_instances and "id" in item:
+                    target_instance = next((i for i in child_instances if str(i.id) == str(item["id"])), None)
+                    if not target_instance:
+                        raise serializers.ValidationError("유효하지 않은 ID입니다.", code="not_found")
+                    self.child.instance = target_instance
+                elif child_instances and has_explicit_instance:
+                    self.child.instance = child_instances[index]
                 validated = self.run_child_validation(item)
             except serializers.ValidationError as exc:
                 errors.append(exc.detail)
@@ -103,7 +107,9 @@ class NestedModelSerializer(serializers.ModelSerializer):
         child_serializer.save()
 
     def _update_list_instances(self, field: serializers.ListSerializer, data: list[dict]) -> None:
-        if (instances := getattr(self.instance, field.field_name)) and isinstance(instances, BaseManager):
+        if (instances := getattr(self.instance, field.source or field.field_name)) and isinstance(
+            instances, BaseManager
+        ):
             instances = list(instances.all())
 
         instance_dict = {str(i.pk): i for i in instances}
