@@ -9,6 +9,7 @@ from admin_api.filtersets.shop.orders import OrderAdminFilterSet
 from admin_api.serializers.shop.orders import OrderAdminSerializer, OrderExportRequestSerializer
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
+from core.pagination import AdminPagination
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from django.core.files import File
 from django.db import models, transaction
@@ -38,6 +39,7 @@ class OrderAdminViewSet(
     http_method_names = ["get", "post", "patch"]
     serializer_class = OrderAdminSerializer
     filterset_class = OrderAdminFilterSet
+    pagination_class = AdminPagination
     permission_classes = [IsSuperUser]
     queryset = (
         Order.objects.filter_has_payment_histories()
