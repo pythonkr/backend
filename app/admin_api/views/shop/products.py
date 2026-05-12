@@ -1,3 +1,4 @@
+from admin_api.filtersets.shop.products import ProductAdminFilterSet
 from admin_api.serializers.shop.products import (
     CategoryGroupAdminSerializer,
     OptionGroupAdminSerializer,
@@ -7,7 +8,7 @@ from admin_api.serializers.shop.products import (
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
-from django.db.models import Prefetch
+from django.db.models import Count, Prefetch, Q
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import viewsets
 from shop.product.models import Category, CategoryGroup, Option, OptionGroup, Product, ProductTagRelation, Tag
@@ -27,6 +28,7 @@ class CategoryGroupAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
         .prefetch_related(
             Prefetch("category_set", queryset=Category.objects.filter_active().select_related_with_user()),
         )
+        .annotate(category_count=Count("category", filter=Q(category__deleted_at__isnull=True)))
     )
 
 
@@ -43,6 +45,7 @@ class ProductAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = ProductAdminSerializer
     permission_classes = [IsSuperUser]
+    filterset_class = ProductAdminFilterSet
     queryset = (
         Product.objects.filter_active()
         .select_related_with_user("category", "category__group")

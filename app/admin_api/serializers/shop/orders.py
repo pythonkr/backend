@@ -5,7 +5,6 @@ from admin_api.serializers.notification import HISTORY_ADMIN_SERIALIZER_BY_CHANN
 from core.const.serializer import COMMON_ADMIN_FIELDS
 from core.serializer.base_abstract_serializer import BaseAbstractSerializer
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
-from core.serializer.read_only_serializer import ReadOnlyModelSerializer
 from core.serializer.skip_none_list_serializer import SkipNoneListSerializer
 from django.conf import settings
 from notification.channels import NotificationChannel
@@ -24,7 +23,6 @@ CUSTOMER_INFO_RECIPIENT_ATTR_BY_CHANNEL = {
 
 
 class OrderAdminSerializer(
-    ReadOnlyModelSerializer,
     BaseAbstractSerializer,
     JsonSchemaSerializer,
     serializers.ModelSerializer,
@@ -37,7 +35,7 @@ class OrderAdminSerializer(
     class SimpleCustomerInfoSerializer(serializers.ModelSerializer):
         class Meta:
             model = CustomerInfo
-            read_only_fields = fields = ("name", "phone", "email", "organization")
+            fields = ("name", "phone", "email", "organization")
 
     class SimplePaymentHistorySerializer(serializers.ModelSerializer):
         class Meta:
@@ -76,7 +74,7 @@ class OrderAdminSerializer(
             read_only_fields = ("id", "product", "price", "donation_price", "options")
 
     user = SimpleUserSerializer(read_only=True)
-    customer_info = SimpleCustomerInfoSerializer(read_only=True)
+    customer_info = SimpleCustomerInfoSerializer(required=False, allow_null=True)
     products = SimpleOrderProductRelationSerializer(many=True, read_only=True)
     payment_histories = SimplePaymentHistorySerializer(many=True, read_only=True)
     first_paid_price = serializers.IntegerField(read_only=True)
@@ -100,6 +98,21 @@ class OrderAdminSerializer(
             "first_paid_at",
             "latest_imp_id",
         )
+        read_only_fields = ("name_ko", "name_en")
+
+    def update(self, instance: Order, validated_data: dict) -> Order:
+        customer_info_data = validated_data.pop("customer_info", None)
+        order = super().update(instance, validated_data)
+
+        if customer_info_data is not None:
+            if order.customer_info:
+                for field, value in customer_info_data.items():
+                    setattr(order.customer_info, field, value)
+                order.customer_info.save()
+            else:
+                CustomerInfo.objects.create(order=order, **customer_info_data)
+
+        return order
 
 
 class OrderExportRequestSerializer(JsonSchemaSerializer, serializers.Serializer):
