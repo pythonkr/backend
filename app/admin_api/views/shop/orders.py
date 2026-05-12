@@ -14,27 +14,34 @@ from django.core.files import File
 from django.db import models, transaction
 from django.http.response import StreamingHttpResponse
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema, extend_schema_view
-from rest_framework import exceptions, parsers, request, response, status, viewsets
+from rest_framework import exceptions, mixins, parsers, request, response, status, viewsets
 from rest_framework.decorators import action
 from shop.order import exports, imports
 from shop.order.models import Order, OrderProductOptionRelation, OrderProductRelation
 from shop.payment_history.models import PURCHASED_STATUSES, REFUNDABLE_STATUSES, PaymentHistory
 from shop.product.models import Product
-from shop.serializers.refund import OrderTotalRefundSerializer
+from shop.serializers.refund import OrderProductRefundSerializer, OrderTotalRefundSerializer
 
 logger = getLogger(__name__)
 
-ADMIN_METHODS = ["list", "retrieve"]
+ADMIN_METHODS = ["list", "retrieve", "partial_update"]
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_SHOP_ORDER]) for m in ADMIN_METHODS})
-class OrderAdminViewSet(JsonSchemaViewSet, viewsets.ReadOnlyModelViewSet):
-    http_method_names = ["get", "post"]
+class OrderAdminViewSet(
+    JsonSchemaViewSet,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
+):
+    http_method_names = ["get", "post", "patch"]
     serializer_class = OrderAdminSerializer
     filterset_class = OrderAdminFilterSet
     permission_classes = [IsSuperUser]
     queryset = (
-        Order.objects.filter_active()
+        Order.objects.filter_has_payment_histories()
+        .filter(models.Exists(OrderProductRelation.objects.filter(order=models.OuterRef("pk"))))
         .select_related_with_user("user", "customer_info")
         .prefetch_related(
             models.Prefetch(
@@ -54,7 +61,6 @@ class OrderAdminViewSet(JsonSchemaViewSet, viewsets.ReadOnlyModelViewSet):
             models.Prefetch(
                 "payment_histories",
                 queryset=PaymentHistory.objects.filter_active().order_by("-created_at"),
-                to_attr="_payment_histories_by_latest",
             ),
         )
         .annotate(
@@ -76,6 +82,33 @@ class OrderAdminViewSet(JsonSchemaViewSet, viewsets.ReadOnlyModelViewSet):
     def refund(self, request: request.Request, pk: typing.Any = None) -> response.Response:
         serializer = OrderTotalRefundSerializer(
             instance=self.get_object(),
+            data={"totp": request.query_params.get("totp")},
+            context={"check_refundable_date": False},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.refund()
+        return response.Response(status=status.HTTP_204_NO_CONTENT)
+
+    @extend_schema(
+        summary="주문 부분 환불 (환불 승인자 TOTP 필수)",
+        tags=[OpenAPITag.ADMIN_SHOP_ORDER_REFUND],
+        parameters=[OpenApiParameter(name="totp", location=OpenApiParameter.QUERY, required=True)],
+        responses={status.HTTP_204_NO_CONTENT: None},
+    )
+    @action(detail=True, methods=["post"], url_path=r"products/(?P<rel_id>[^/.]+)/refund")
+    @transaction.atomic
+    def refund_product(
+        self,
+        request: request.Request,
+        pk: typing.Any = None,
+        rel_id: typing.Any = None,
+    ) -> response.Response:
+        order_product_rel = OrderProductRelation.objects.filter(order_id=pk, id=rel_id).first()
+        if not order_product_rel:
+            raise exceptions.NotFound("OrderProductRelation not found.")
+
+        serializer = OrderProductRefundSerializer(
+            instance=order_product_rel,
             data={"totp": request.query_params.get("totp")},
             context={"check_refundable_date": False},
         )

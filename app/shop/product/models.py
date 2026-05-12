@@ -5,6 +5,7 @@ import functools
 import typing
 
 from core.models import BaseAbstractModel
+from core.util.dateutil import now_aware
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models.manager import BaseManager
@@ -104,6 +105,12 @@ class Tag(BaseAbstractModel):
 
 
 class Product(BaseAbstractModel):
+    class CurrentStatus(models.TextChoices):
+        HIDDEN = "hidden", "비공개"
+        OUT_OF_VISIBLE_PERIOD = "out_of_visible_period", "노출 기간 아님"
+        OUT_OF_ORDERABLE_PERIOD = "out_of_orderable_period", "판매 기간 아님"
+        ACTIVE = "active", "노출 중"
+
     name = models.TextField()
     description = models.TextField(null=True, blank=True)
     image = models.URLField(null=True, blank=True)
@@ -137,6 +144,24 @@ class Product(BaseAbstractModel):
 
     def __str__(self) -> str:
         return f"{self.category} > {self.name} ({self.price}원)"
+
+    @property
+    def current_status(self) -> "Product.CurrentStatus":
+        if self.hidden:
+            return self.CurrentStatus.HIDDEN
+
+        now = now_aware()
+        if (self.visible_starts_at and now < self.visible_starts_at) or (
+            self.visible_ends_at and now > self.visible_ends_at
+        ):
+            return self.CurrentStatus.OUT_OF_VISIBLE_PERIOD
+
+        if (self.orderable_starts_at and now < self.orderable_starts_at) or (
+            self.orderable_ends_at and now > self.orderable_ends_at
+        ):
+            return self.CurrentStatus.OUT_OF_ORDERABLE_PERIOD
+
+        return self.CurrentStatus.ACTIVE
 
     @functools.cached_property
     def leftover_stock(self) -> int | None:
