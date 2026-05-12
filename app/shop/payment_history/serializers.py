@@ -154,6 +154,10 @@ class PortOneV1WebhookRequestSerializer(serializers.Serializer):
     def _lock_or_promote_order(obj_id: str) -> Order:
         """Order 가 있으면 lock 하여 반환. SingleProductCart 만 있으면 lock + to_order() 로 승격.
 
+        모델 관계: `SingleProductCart` 는 단일 상품 장바구니의 결제 전 임시 상태이고,
+        결제가 성공하면 `to_order()` 로 같은 PK 의 `Order` 로 승격되며 cart 자체는 hard delete 된다.
+        webhook 은 `merchant_uid` (= cart/order PK) 로 호출되므로, 같은 PK 의 두 모델 중 현재 살아있는 쪽을 lock 한다.
+
         동시 webhook race 시: 첫 호출이 cart lock + to_order() commit 후, 두 번째 호출은
         cart 가 hard_delete 된 상태로 lock 해제됨 → Order 재조회에서 승격된 Order 발견.
         """
