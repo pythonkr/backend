@@ -3,6 +3,7 @@ from typing import Any
 from core.const.serializer import COMMON_ADMIN_FIELDS
 from core.serializer.base_abstract_serializer import BaseAbstractSerializer
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
+from notification.channels import NotificationChannel
 from notification.models import (
     EmailNotificationHistory,
     EmailNotificationHistorySentTo,
@@ -185,3 +186,12 @@ class NotificationHistoryRetryRequestAdminSerializer(serializers.Serializer):
         required=False,
         default=[NotificationStatus.FAILED],
     )
+
+
+# ---- Channel → response serializer 매핑 -------------------------------------
+
+HISTORY_ADMIN_SERIALIZER_BY_CHANNEL: dict[NotificationChannel, type[_NotiHistoryAdminSerializerBase]] = {
+    NotificationChannel.EMAIL: EmailNotificationHistoryAdminSerializer,
+    NotificationChannel.NHN_CLOUD_SMS: NHNCloudSMSNotificationHistoryAdminSerializer,
+    NotificationChannel.NHN_CLOUD_KAKAO_ALIMTALK: NHNCloudKakaoAlimTalkNotificationHistoryAdminSerializer,
+}

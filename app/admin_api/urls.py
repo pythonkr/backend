@@ -20,6 +20,15 @@ from admin_api.views.notification import (
     NHNCloudSMSNotificationHistoryAdminViewSet,
     NHNCloudSMSNotificationTemplateAdminViewSet,
 )
+from admin_api.views.shop.order_notifications import OrderNotificationAdminViewSet
+from admin_api.views.shop.orders import OrderAdminViewSet
+from admin_api.views.shop.products import (
+    CategoryGroupAdminViewSet,
+    OptionGroupAdminViewSet,
+    ProductAdminViewSet,
+    TagAdminViewSet,
+)
+from admin_api.views.shop.refund_authorizer import RefundAuthorizerAdminViewSet
 from admin_api.views.user import OrganizationAdminViewSet, UserAdminViewSet
 from django.urls import include, path
 from rest_framework import routers
@@ -84,6 +93,17 @@ admin_notification_sms_router.register(
 admin_external_api_google_router = routers.SimpleRouter()
 admin_external_api_google_router.register("oauth2", GoogleOAuth2AdminViewSet, basename="admin-google-oauth2")
 
+admin_shop_router = routers.SimpleRouter()
+admin_shop_router.register("orders", OrderAdminViewSet, basename="admin-shop-order")
+admin_shop_router.register(
+    "order-notifications", OrderNotificationAdminViewSet, basename="admin-shop-order-notification"
+)
+admin_shop_router.register("products", ProductAdminViewSet, basename="admin-shop-product")
+admin_shop_router.register("tags", TagAdminViewSet, basename="admin-shop-tag")
+admin_shop_router.register("category-groups", CategoryGroupAdminViewSet, basename="admin-shop-category-group")
+admin_shop_router.register("option-groups", OptionGroupAdminViewSet, basename="admin-shop-option-group")
+admin_shop_router.register("refund-authorizer", RefundAuthorizerAdminViewSet, basename="admin-shop-refund-authorizer")
+
 urlpatterns = [
     path("cms/", include(admin_cms_router.urls)),
     path("file/", include(admin_file_router.urls)),
@@ -94,4 +114,5 @@ urlpatterns = [
     path("notification/kakao-alimtalk/", include(admin_notification_kakao_router.urls)),
     path("notification/sms/", include(admin_notification_sms_router.urls)),
     path("external-api/google/", include(admin_external_api_google_router.urls)),
+    path("shop/", include(admin_shop_router.urls)),
 ]

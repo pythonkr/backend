@@ -1,0 +1,110 @@
+{% extends 'scancode_base.html' %}
+{% block content %}
+<h4>
+  등록 입장 QR 코드
+</h4>
+<div class="content-container">
+  <div class="qrcode-container">
+    <div id="qrcode"></div>
+    <small>{{ user.unique_id }}</small>
+  </div>
+  <small>행사 당일 등록 데스크에 위 QR코드를 제시해주세요.</small>
+  <hr />
+  <h5>고객 정보 (가장 최근 주문 기준)</h5>
+  <table>
+    <tr>
+      <td>성함</td>
+      <td>{{ orders.0.customer_info.name }}</td>
+    </tr>
+    <tr>
+      <td>E-Mail</td>
+      <td>{{ orders.0.customer_info.email }}</td>
+    </tr>
+  </table>
+  <hr />
+  <h5>6개월 내 주문 정보</h5>
+  <div class="order-info-list-container">
+    {% for order in orders %}
+    <details class="order-info-list-item">
+      <summary {% if order.current_status == "refunded" %}class="refunded"{% endif %}>{{ order.name }}</summary>
+      <div class="order-info-list-item-content">
+        <table>
+          <tbody>
+            <tr>
+              <td>주문 ID</td>
+              <td>{{ order.id }}</td>
+            </tr>
+            <tr>
+              <td>주문일</td>
+              <td>{{ order.first_paid_at|date:"Y-m-d H:i:s" }}</td>
+            </tr>
+            <tr>
+              <td>주문 상태</td>
+              <td>{{ order.current_status }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <br />
+        <details>
+          <summary>고객 정보</summary>
+          <table class="order-item-product-table">
+            <tbody>
+              <tr><td class="min">성함</td><td>{{ order.customer_info.name }}</td></tr>
+              <tr><td class="min">E-Mail</td><td>{{ order.customer_info.email }}</td></tr>
+              <tr><td class="min">연락처</td><td>{{ order.customer_info.phone }}</td></tr>
+              {% if order.customer_info.organization %}
+                <tr><td class="min">소속</td><td>{{ order.customer_info.organization }}</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </details>
+        <details>
+          <summary>주문 상품 정보</summary>
+          <table class="order-item-product-table">
+            <tbody>
+              {% for item in order.items %}
+                <tr>
+                  <td class="min" style="font-weight: bold">
+                    <span {% if item.status == "refunded" %}class="refunded"{% endif %}>{{ item.product.name }}</span>
+                    {% if item.status == "refunded" %} (환불됨){% endif %}
+                  </td>
+                  <td {% if item.status == "refunded" %}class="refunded"{% endif %}>
+                    {{ item.price }}원
+                    {% if item.donation_price %}(+ {{ item.donation_price }}원){% endif %}
+                  </td>
+                </tr>
+                {% if item.status != "refunded" %}
+                  {% if item.options %}
+                    {% for option in item.options %}
+                      <tr>
+                        <td class="min" colspan="2">
+                          &nbsp;└─&nbsp;
+                          <span style="font-weight:bold">{{ option.name }}</span>
+                          &nbsp;:&nbsp;
+                          {{ option.value }}
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  {% endif %}
+                {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </details>
+      </div>
+
+    </details>
+    {% endfor %}
+</div>
+</div>
+<script type="text/javascript">
+  var qrcode = new QRCode("qrcode", {
+    text: "user:{{ user.short_id }}",
+    width: 192,
+    height: 192,
+    colorDark : "#000000",
+    colorLight : "#ffffff",
+    correctLevel : QRCode.CorrectLevel.H
+});
+</script>
+{% endblock %}

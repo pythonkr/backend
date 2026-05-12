@@ -61,7 +61,7 @@ class UserPortalViewSet(viewsets.GenericViewSet):
         serializer = UserPortalSignInSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        login(request=request, user=serializer.user)
+        login(request=request, user=serializer.user, backend="django.contrib.auth.backends.ModelBackend")
         return response.Response(data=UserPortalSerializer(serializer.user).data)
 
     @extend_schema(tags=[OpenAPITag.PARTICIPANT_PORTAL_USER], responses={status.HTTP_204_NO_CONTENT: None})
