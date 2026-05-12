@@ -113,7 +113,14 @@ class Product(BaseAbstractModel):
 
     name = models.TextField()
     description = models.TextField(null=True, blank=True)
-    image = models.URLField(null=True, blank=True)
+    image = models.ForeignKey(
+        "file.PublicFile",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="대표 이미지",
+    )
 
     price = models.PositiveIntegerField()
     stock = models.IntegerField(default=0)
