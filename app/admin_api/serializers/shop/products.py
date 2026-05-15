@@ -7,6 +7,7 @@ from core.serializer.nested_model_serializer import (
     NestedFieldSpec,
     NestedModelSerializer,
 )
+from file.models import PublicFile
 from rest_framework import serializers
 from shop.product.models import Category, CategoryGroup, Option, OptionGroup, Product, Tag
 
@@ -112,6 +113,11 @@ class ProductAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, seria
     tag_set_detail = TagAdminSerializer(many=True, read_only=True, source="tag_set")
     leftover_stock = serializers.IntegerField(read_only=True, allow_null=True)
     current_status = serializers.ChoiceField(choices=Product.CurrentStatus.choices, read_only=True)
+    image = serializers.PrimaryKeyRelatedField(
+        queryset=PublicFile.objects.filter_active(),
+        allow_null=True,
+        required=False,
+    )
 
     class Meta:
         model = Product

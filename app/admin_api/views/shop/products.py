@@ -48,7 +48,7 @@ class ProductAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     filterset_class = ProductAdminFilterSet
     queryset = (
         Product.objects.filter_active()
-        .select_related_with_user("category", "category__group")
+        .select_related_with_user("category", "category__group", "image")
         .prefetch_related(
             Prefetch("tags", queryset=ProductTagRelation.objects.filter_active().select_related("tag")),
             Prefetch(

@@ -197,6 +197,9 @@ DATABASES = {
     },
 }
 
+if env.str("LEGACY_DATABASE_NAME", default=""):
+    DATABASES["legacy"] = {**DATABASES["default"], "NAME": env.str("LEGACY_DATABASE_NAME")}
+
 
 # Constance Settings
 CONSTANCE_BACKEND = "constance.backends.database.DatabaseBackend"
