@@ -46,6 +46,7 @@ def _noop_reverse(apps, schema_editor) -> None:
 
 
 class Migration(migrations.Migration):
+    atomic = True  # 다단계 operation 중간 실패 시 컬럼 추가/제거 + 데이터 이관 일괄 롤백.
     dependencies = [("file", "0001_initial"), ("product", "0001_initial")]
     operations = [
         # 1) 신규 FK 컬럼 추가

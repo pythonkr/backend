@@ -30,7 +30,7 @@ User 매핑 우선순위 (총 2,299명):
 
 from enum import StrEnum
 
-from django.db import connections, migrations
+from django.db import connections, migrations, transaction
 
 EMAIL_REWRITE_OLD = "@pycon.kr"
 EMAIL_REWRITE_NEW = "@python.or.kr"
@@ -276,7 +276,12 @@ def migrate_data(apps, schema_editor):
     if "legacy" not in connections.databases:
         return  # 개발/테스트 환경 또는 cutover 완료 후 — no-op.
 
-    with connections["legacy"].cursor() as legacy_cur, connections["default"].cursor() as target_cur:
+    # 중간 실패 시 target DB 의 모든 변경을 함께 롤백 (legacy DB 는 SELECT 만 — 롤백 불필요).
+    with (
+        transaction.atomic(using="default"),
+        connections["legacy"].cursor() as legacy_cur,
+        connections["default"].cursor() as target_cur,
+    ):
         user_id_map = _build_user_id_map(target_cur, legacy_cur)
         _copy_shifted_users(target_cur, legacy_cur, user_id_map)
         _update_matched_unique_id(target_cur, legacy_cur, user_id_map)
@@ -292,6 +297,7 @@ def migrate_data(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    atomic = True
     dependencies = [
         ("user", "0009_alter_historicaluserext_options_and_more"),
         ("order", "0001_initial"),
