@@ -143,12 +143,19 @@ class PortOneV1WebhookRequestSerializer(serializers.Serializer):
             product_rel.status = OrderProductRelation.OrderProductStatus.paid
             product_rel.save()
 
-        return PaymentHistory.objects.create(
+        payment_history = PaymentHistory.objects.create(
             order=order,
             imp_id=validated_data["imp_uid"],
             status=next_status,
             price=payment_info["amount"],
         )
+
+        # 결제 완료 알림(알림톡 + 이메일)을 트랜잭션 커밋 후 비동기로 발송.
+        from shop.payment_history.tasks import send_payment_completed_notifications
+
+        transaction.on_commit(lambda: send_payment_completed_notifications.delay(str(order.id)))
+
+        return payment_history
 
     @staticmethod
     def _lock_or_promote_order(obj_id: str) -> Order:
