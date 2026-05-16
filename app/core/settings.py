@@ -456,6 +456,16 @@ SHOP = types.SimpleNamespace(
     refund_authorizer_secret_key=env("REFUND_AUTHORIZER_SECRET_KEY", default="local_refund_authorizer_secret_key"),
 )
 
+# Notification Settings
+# 각 템플릿 코드는 NHN Cloud Console에 등록된 코드와 일치해야 합니다.
+# NHN Cloud → DB 동기화 후 해당 code로 템플릿을 조회합니다.
+NOTIFICATION = types.SimpleNamespace(
+    # TODO: NHN Cloud에 등록된 결제 완료 알림톡 템플릿 코드로 교체
+    payment_completed_alimtalk_template_code=env("PAYMENT_COMPLETED_ALIMTALK_TEMPLATE_CODE", default=""),
+    # TODO: 결제 완료 이메일 템플릿 생성 후 해당 코드로 교체
+    payment_completed_email_template_code=env("PAYMENT_COMPLETED_EMAIL_TEMPLATE_CODE", default=""),
+)
+
 # External API Key Settings (등록 데스크 등)
 EXT_API_KEYS = {
     "registration_desk": env("API_KEY_REGISTRATION_DESK", default=None),
