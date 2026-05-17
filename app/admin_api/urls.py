@@ -29,6 +29,11 @@ from admin_api.views.shop.products import (
     TagAdminViewSet,
 )
 from admin_api.views.shop.refund_authorizer import RefundAuthorizerAdminViewSet
+from admin_api.views.socialaccount import (
+    EmailAddressAdminViewSet,
+    SocialAccountAdminViewSet,
+    SocialAppAdminViewSet,
+)
 from admin_api.views.user import OrganizationAdminViewSet, UserAdminViewSet
 from django.urls import include, path
 from rest_framework import routers
@@ -104,6 +109,11 @@ admin_shop_router.register("category-groups", CategoryGroupAdminViewSet, basenam
 admin_shop_router.register("option-groups", OptionGroupAdminViewSet, basename="admin-shop-option-group")
 admin_shop_router.register("refund-authorizer", RefundAuthorizerAdminViewSet, basename="admin-shop-refund-authorizer")
 
+admin_allauth_router = routers.SimpleRouter()
+admin_allauth_router.register("social-app", SocialAppAdminViewSet, basename="admin-social-app")
+admin_allauth_router.register("social-account", SocialAccountAdminViewSet, basename="admin-social-account")
+admin_allauth_router.register("email-address", EmailAddressAdminViewSet, basename="admin-email-address")
+
 urlpatterns = [
     path("cms/", include(admin_cms_router.urls)),
     path("file/", include(admin_file_router.urls)),
@@ -115,4 +125,5 @@ urlpatterns = [
     path("notification/sms/", include(admin_notification_sms_router.urls)),
     path("external-api/google/", include(admin_external_api_google_router.urls)),
     path("shop/", include(admin_shop_router.urls)),
+    path("allauth/", include(admin_allauth_router.urls)),
 ]
