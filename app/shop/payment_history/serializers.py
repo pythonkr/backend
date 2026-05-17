@@ -6,6 +6,7 @@ from django.db import models, transaction
 from rest_framework import serializers
 from shop.order.models import Order, OrderProductRelation, SingleProductCart
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus, is_legal_payment_status_transition
+from shop.payment_history.tasks import send_payment_completed_notifications
 
 
 class PortOneV1PaymentStatus(models.TextChoices):
@@ -151,7 +152,6 @@ class PortOneV1WebhookRequestSerializer(serializers.Serializer):
         )
 
         # 결제 완료 알림(알림톡 + 이메일)을 트랜잭션 커밋 후 비동기로 발송.
-        from shop.payment_history.tasks import send_payment_completed_notifications
 
         transaction.on_commit(lambda: send_payment_completed_notifications.delay(str(order.id)))
 
