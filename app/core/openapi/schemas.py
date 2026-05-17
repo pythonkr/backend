@@ -1,3 +1,4 @@
+from core.openapi.filter_extension import DjangoFilterExtension  # noqa: F401  drf-spectacular 확장 등록
 from drf_spectacular.openapi import AutoSchema, OpenApiExample, OpenApiResponse
 from drf_spectacular.utils import OpenApiParameter
 from rest_framework import status

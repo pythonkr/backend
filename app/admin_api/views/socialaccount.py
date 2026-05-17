@@ -1,3 +1,4 @@
+from admin_api.filtersets.socialaccount import EmailAddressAdminFilterSet, SocialAccountAdminFilterSet
 from admin_api.serializers.socialaccount import (
     EmailAddressAdminSerializer,
     SocialAccountAdminSerializer,
@@ -39,7 +40,7 @@ class SocialAccountAdminViewSet(
     pagination_class = AdminPagination
     serializer_class = SocialAccountAdminSerializer
     queryset = SocialAccount.objects.all().select_related("user").order_by("-date_joined", "-id")
-    filterset_fields = ["user"]
+    filterset_class = SocialAccountAdminFilterSet
 
     def perform_destroy(self, instance: SocialAccount) -> None:
         delete_social_accounts_and_cleanup_user_emails(SocialAccount.objects.filter(pk=instance.pk))
@@ -52,4 +53,4 @@ class EmailAddressAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     permission_classes = [IsSuperUser]
     pagination_class = AdminPagination
     queryset = EmailAddress.objects.all().select_related("user").order_by("-id")
-    filterset_fields = ["user"]
+    filterset_class = EmailAddressAdminFilterSet

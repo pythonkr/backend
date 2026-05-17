@@ -1,6 +1,7 @@
 import http
 
 import pytest
+import yaml
 from allauth.account.models import EmailAddress
 from allauth.socialaccount.models import SocialAccount, SocialApp
 from django.urls import reverse
@@ -135,6 +136,74 @@ def test_social_account_list_filter_by_user(api_client, regular_user, multi_soci
 
 
 @pytest.mark.django_db
+def test_social_account_list_filter_by_provider_csv(api_client, regular_user, multi_social_user):
+    # provider choices 는 SocialApp 등록값 기반 — alice=google, bob=google+kakao 모두 매치되려면
+    # google/kakao 두 SocialApp 모두 등록되어 있어야 함.
+    SocialApp.objects.get_or_create(provider="google", defaults={"name": "Google", "client_id": "g", "secret": "g"})
+    SocialApp.objects.get_or_create(provider="kakao", defaults={"name": "Kakao", "client_id": "k", "secret": "k"})
+
+    response = api_client.get(reverse("v1:admin-social-account-list"), {"provider": "google,kakao"})
+    assert response.status_code == http.HTTPStatus.OK
+    rows = response.json()["results"]
+    assert {row["uid"] for row in rows} == {"alice-google-1", "bob-google-1", "bob-kakao-1"}
+
+
+@pytest.mark.django_db
+def test_social_account_list_filter_by_provider_unknown_rejected(api_client, regular_user, social_app):
+    # social_app fixture 가 google 만 등록 — kakao 는 SocialApp 에 없으므로 거부.
+    response = api_client.get(reverse("v1:admin-social-account-list"), {"provider": "kakao"})
+    assert response.status_code == http.HTTPStatus.BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_social_account_provider_filter_enum_exposed_in_openapi(api_client):
+    # callable choices 를 OpenAPI 스키마에 enum 으로 노출 (core.openapi.filter_extension).
+    SocialApp.objects.get_or_create(provider="google", defaults={"name": "G", "client_id": "g", "secret": "g"})
+    SocialApp.objects.get_or_create(provider="kakao", defaults={"name": "K", "client_id": "k", "secret": "k"})
+
+    response = APIClient().get("/api/schema/v1/")
+    assert response.status_code == http.HTTPStatus.OK
+    schema = yaml.safe_load(response.content)
+
+    list_path = next(p for p in schema["paths"] if p.endswith("/allauth/social-account/"))
+    params = schema["paths"][list_path]["get"]["parameters"]
+    provider = next(p for p in params if p["name"] == "provider")
+    assert provider["schema"]["items"]["enum"] == ["google", "kakao"]
+
+
+@pytest.mark.django_db
+def test_social_account_list_filter_by_uid_icontains(api_client, regular_user, multi_social_user):
+    response = api_client.get(reverse("v1:admin-social-account-list"), {"uid": "kakao"})
+    assert response.status_code == http.HTTPStatus.OK
+    rows = response.json()["results"]
+    assert {row["uid"] for row in rows} == {"bob-kakao-1"}
+
+
+@pytest.mark.django_db
+def test_social_account_list_filter_by_user_email_and_username(api_client, regular_user, multi_social_user):
+    response = api_client.get(reverse("v1:admin-social-account-list"), {"user_email": "alice@"})
+    assert response.status_code == http.HTTPStatus.OK
+    rows = response.json()["results"]
+    assert {row["uid"] for row in rows} == {"alice-google-1"}
+
+    response = api_client.get(reverse("v1:admin-social-account-list"), {"user_username": "bob"})
+    assert response.status_code == http.HTTPStatus.OK
+    rows = response.json()["results"]
+    assert {row["uid"] for row in rows} == {"bob-google-1", "bob-kakao-1"}
+
+
+@pytest.mark.django_db
+def test_social_account_list_filter_by_date_joined_range(api_client, regular_user, multi_social_user):
+    import datetime as _dt
+
+    # 미래 시점 _after 는 결과 0 건.
+    future = (_dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(days=1)).isoformat()
+    response = api_client.get(reverse("v1:admin-social-account-list"), {"date_joined_after": future})
+    assert response.status_code == http.HTTPStatus.OK
+    assert response.json()["results"] == []
+
+
+@pytest.mark.django_db
 def test_social_account_no_create_endpoint(api_client, regular_user):
     response = api_client.post(
         reverse("v1:admin-social-account-list"),
@@ -173,6 +242,55 @@ def test_email_address_list_filter_by_user(api_client, regular_user):
     assert response.status_code == http.HTTPStatus.OK
     rows = response.json()["results"]
     assert {row["email"] for row in rows} == {"alice@example.com"}
+
+
+@pytest.mark.django_db
+def test_email_address_list_filter_by_email_matches_emailaddress(api_client, regular_user, multi_social_user):
+    # EmailAddress.email substring 매칭.
+    response = api_client.get(reverse("v1:admin-email-address-list"), {"email": "alice@"})
+    assert response.status_code == http.HTTPStatus.OK
+    rows = response.json()["results"]
+    assert {row["email"] for row in rows} == {"alice@example.com"}
+
+
+@pytest.mark.django_db
+def test_email_address_list_filter_by_email_matches_user_email(api_client, regular_user):
+    # EA.email 은 alt 이지만 user.email 은 alice 라서 ?email=alice 로도 잡혀야 한다.
+    EmailAddress.objects.create(user=regular_user, email="alt@example.com", verified=False, primary=False)
+    response = api_client.get(reverse("v1:admin-email-address-list"), {"email": "alice@"})
+    assert response.status_code == http.HTTPStatus.OK
+    rows = response.json()["results"]
+    # alice 의 primary EA + alt EA (User.email join 으로 매칭) 모두 포함.
+    assert {row["email"] for row in rows} == {"alice@example.com", "alt@example.com"}
+
+
+@pytest.mark.django_db
+def test_email_address_list_filter_by_email_csv(api_client, regular_user, multi_social_user):
+    response = api_client.get(reverse("v1:admin-email-address-list"), {"email": "alice@,bob@"})
+    assert response.status_code == http.HTTPStatus.OK
+    rows = response.json()["results"]
+    assert {row["email"] for row in rows} == {"alice@example.com", "bob@example.com"}
+
+
+@pytest.mark.django_db
+def test_email_address_list_filter_by_verified_and_primary(api_client, regular_user):
+    EmailAddress.objects.create(user=regular_user, email="alt@example.com", verified=False, primary=False)
+    # verified=false
+    response = api_client.get(reverse("v1:admin-email-address-list"), {"verified": "false"})
+    assert response.status_code == http.HTTPStatus.OK
+    assert {row["email"] for row in response.json()["results"]} == {"alt@example.com"}
+    # primary=true
+    response = api_client.get(reverse("v1:admin-email-address-list"), {"primary": "true"})
+    assert response.status_code == http.HTTPStatus.OK
+    assert {row["email"] for row in response.json()["results"]} == {"alice@example.com"}
+
+
+@pytest.mark.django_db
+def test_email_address_list_filter_by_user_username(api_client, regular_user, multi_social_user):
+    response = api_client.get(reverse("v1:admin-email-address-list"), {"user_username": "bob"})
+    assert response.status_code == http.HTTPStatus.OK
+    rows = response.json()["results"]
+    assert {row["email"] for row in rows} == {"bob@example.com"}
 
 
 @pytest.mark.django_db
