@@ -74,7 +74,7 @@ def test_non_superuser_email_address_list_rejected(regular_user):
 def test_social_app_list(api_client, social_app):
     response = api_client.get(reverse("v1:admin-social-app-list"))
     assert response.status_code == http.HTTPStatus.OK
-    rows = response.json()
+    rows = response.json()["results"]
     assert any(row["id"] == social_app.id for row in rows)
 
 
@@ -130,7 +130,7 @@ def test_social_app_destroy(api_client, social_app):
 def test_social_account_list_filter_by_user(api_client, regular_user, multi_social_user):
     response = api_client.get(reverse("v1:admin-social-account-list"), {"user": str(regular_user.id)})
     assert response.status_code == http.HTTPStatus.OK
-    rows = response.json()
+    rows = response.json()["results"]
     assert {row["uid"] for row in rows} == {"alice-google-1"}
 
 
@@ -171,7 +171,7 @@ def test_social_account_destroy_last_social_cascades_to_emails(api_client, regul
 def test_email_address_list_filter_by_user(api_client, regular_user):
     response = api_client.get(reverse("v1:admin-email-address-list"), {"user": str(regular_user.id)})
     assert response.status_code == http.HTTPStatus.OK
-    rows = response.json()
+    rows = response.json()["results"]
     assert {row["email"] for row in rows} == {"alice@example.com"}
 
 
