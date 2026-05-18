@@ -459,7 +459,9 @@ SHOP = types.SimpleNamespace(
 # Notification Settings
 NOTIFICATION = types.SimpleNamespace(
     #  NHN Cloud → DB 동기화 후 해당 code로 템플릿을 조회합니다.
-    payment_completed_alimtalk_template_code=env("PAYMENT_COMPLETED_ALIMTALK_TEMPLATE_CODE", default=""),
+    payment_completed_alimtalk_template_code=env.str(
+        "PAYMENT_COMPLETED_ALIMTALK_TEMPLATE_CODE", default="pycon_2026_paid"
+    ),
     # DB에 등록된 결제 완료 이메일 템플릿 코드로 교체 완료
     payment_completed_email_template_code=env.str("PAYMENT_COMPLETED_EMAIL_TEMPLATE_CODE", default="payment_completed"),
 )
