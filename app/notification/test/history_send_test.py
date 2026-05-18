@@ -127,6 +127,30 @@ def test_history_send_parameters_uses_rendered_payload(system_user):
 
 
 @pytest.mark.django_db
+def test_email_payload_body_is_html_rendered(system_user):
+    # 이메일 발송 시 payload["body"]는 HTML 템플릿으로 렌더링된 결과여야 함.
+    tpl = EmailNotificationTemplate.objects.create(
+        code="html-body",
+        title="t",
+        sent_from="a@b.c",
+        data='{"title":"안녕 {{ name }}","body":"본문 {{ name }}"}',
+        created_by=system_user,
+        updated_by=system_user,
+    )
+    history = _create_history(tpl, context={"name": "길동"})
+    sent_to = history.sent_to_list.get()
+    payload = sent_to.payload
+
+    # title은 plain text
+    assert payload["title"] == "안녕 길동"
+    assert not payload["title"].strip().startswith("<")
+
+    # body는 HTML 렌더링 결과
+    assert payload["body"].strip().startswith("<")
+    assert "길동" in payload["body"]
+
+
+@pytest.mark.django_db
 def test_history_template_code_property_returns_template_code(email_template):
     history = _create_history(email_template)
     assert history.template_code == email_template.code

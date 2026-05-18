@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from core.external_apis.smtp_email import EmailClient, email_client
 from django.db import models
@@ -16,6 +16,12 @@ class EmailNotificationTemplate(NotificationTemplateBase):
 
 class EmailNotificationHistorySentTo(NotificationHistorySentToBase):
     history = models.ForeignKey("EmailNotificationHistory", on_delete=models.PROTECT, related_name="sent_to_list")
+
+    @property
+    def payload(self) -> dict[str, Any]:
+        rendered = self.render()
+        rendered["body"] = self.render_as_html()
+        return rendered
 
 
 class EmailNotificationHistoryQuerySet(
