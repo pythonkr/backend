@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="ko-kr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>
+      파이콘 한국 스토어 결제 완료 안내 | PyCon Korea Store — Order Confirmation
+    </title>
+  </head>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      background-color: #f5f6f8;
+      font-family:
+        &quot;Noto Sans KR&quot;,
+        -apple-system,
+        BlinkMacSystemFont,
+        &quot;Segoe UI&quot;,
+        sans-serif;
+      color: #222;
+      line-height: 1.6;
+    "
+  >
+    <table
+      role="presentation"
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      border="0"
+      style="background-color: #f5f6f8"
+    >
+      <tr>
+        <td align="center" style="padding: 16px 8px">
+          <table
+            role="presentation"
+            width="560"
+            cellpadding="0"
+            cellspacing="0"
+            border="0"
+            style="width: 100%; max-width: 560px; background-color: #ffffff"
+          >
+            <tr>
+              <td
+                align="center"
+                style="
+                  padding: 32px 24px 24px 24px;
+                  background-color: #ffffff;
+                  border-bottom: 1px solid #eef0f3;
+                "
+              >
+                <img
+                  src="https://static.pycon.kr/pycon-korea/logo/logo-192px.png"
+                  width="80"
+                  height="80"
+                  alt="Python Korea"
+                  style="
+                    display: block;
+                    margin: 0 auto 12px auto;
+                    border: 0;
+                    outline: none;
+                  "
+                />
+                <p
+                  style="
+                    font-size: 13px;
+                    letter-spacing: 0.04em;
+                    color: #6b7280;
+                    margin: 0 0 6px 0;
+                  "
+                >
+                  파이콘 한국 스토어 | PyCon Korea Store
+                </p>
+                <h1
+                  style="
+                    font-size: 20px;
+                    font-weight: 700;
+                    margin: 0;
+                    color: #231759;
+                    line-height: 1.4;
+                  "
+                >
+                  파이콘 한국과 함께해 주셔서 감사합니다.
+                </h1>
+                <p
+                  style="
+                    font-size: 13px;
+                    color: #6b7280;
+                    margin: 6px 0 0 0;
+                    line-height: 1.4;
+                  "
+                >
+                  Thank you for your order.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding: 20px 24px; border-bottom: 1px solid #eef0f3">
+                <table
+                  role="presentation"
+                  width="100%"
+                  cellpadding="0"
+                  cellspacing="0"
+                  border="0"
+                  style="font-size: 14px"
+                >
+                  <tr>
+                    <td colspan="2" style="padding: 0 0 12px 0">
+                      <h2
+                        style="
+                          font-size: 14px;
+                          font-weight: 700;
+                          color: #1f3a8a;
+                          margin: 0;
+                          text-transform: uppercase;
+                          letter-spacing: 0.06em;
+                        "
+                      >
+                        주문 정보 | ORDER INFO
+                      </h2>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th
+                      align="left"
+                      valign="top"
+                      width="40%"
+                      style="color: #6b7280; font-weight: 500; padding: 8px 0"
+                    >
+                      주문 명 (Order name)
+                    </th>
+                    <td valign="top" style="color: #111; padding: 8px 0">
+                      {{ order_name }}
+                    </td>
+                  </tr>
+                  <tr>
+                    <th
+                      align="left"
+                      valign="top"
+                      width="40%"
+                      style="color: #6b7280; font-weight: 500; padding: 8px 0"
+                    >
+                      결제 일시 (Paid at)
+                    </th>
+                    <td valign="top" style="color: #111; padding: 8px 0">
+                      {{ first_paid_at }}
+                    </td>
+                  </tr>
+                  <tr>
+                    <th
+                      align="left"
+                      valign="top"
+                      width="40%"
+                      style="color: #6b7280; font-weight: 500; padding: 8px 0"
+                    >
+                      결제 금액 (Paid amount)
+                    </th>
+                    <td valign="top" style="color: #111; padding: 8px 0">
+                      {{ first_paid_price }}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colspan="2" style="padding: 24px 0 12px 0">
+                      <h2
+                        style="
+                          font-size: 14px;
+                          font-weight: 700;
+                          color: #1f3a8a;
+                          margin: 0;
+                          text-transform: uppercase;
+                          letter-spacing: 0.06em;
+                        "
+                      >
+                        주문자 정보 | CUSTOMER INFO
+                      </h2>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th
+                      align="left"
+                      valign="top"
+                      width="40%"
+                      style="color: #6b7280; font-weight: 500; padding: 8px 0"
+                    >
+                      이름 (Name)
+                    </th>
+                    <td valign="top" style="color: #111; padding: 8px 0">
+                      {{ customer_name }}
+                    </td>
+                  </tr>
+                  <tr>
+                    <th
+                      align="left"
+                      valign="top"
+                      width="40%"
+                      style="color: #6b7280; font-weight: 500; padding: 8px 0"
+                    >
+                      이메일 (Email)
+                    </th>
+                    <td valign="top" style="color: #111; padding: 8px 0">
+                      {{ customer_email }}
+                    </td>
+                  </tr>
+                  <tr>
+                    <th
+                      align="left"
+                      valign="top"
+                      width="40%"
+                      style="color: #6b7280; font-weight: 500; padding: 8px 0"
+                    >
+                      연락처 (Phone)
+                    </th>
+                    <td valign="top" style="color: #111; padding: 8px 0">
+                      {{ customer_phone }}
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding: 20px 24px; border-bottom: 1px solid #eef0f3">
+                <h2
+                  style="
+                    font-size: 14px;
+                    font-weight: 700;
+                    color: #1f3a8a;
+                    margin: 0 0 12px 0;
+                    text-transform: uppercase;
+                    letter-spacing: 0.06em;
+                  "
+                >
+                  주문 상세 확인, 영수증, 환불 관련 안내 | ORDER &amp; REFUND
+                  INFO
+                </h2>
+                <p style="font-size: 14px; color: #555; margin: 0 0 6px 0">
+                  주문 상세 내역과 영수증, 환불 관련 안내는
+                  <a
+                    href="https://pycon.kr"
+                    style="color: #1f3a8a; text-decoration: none"
+                    >파이콘 한국 홈페이지</a
+                  >에서 확인해주세요.
+                </p>
+                <p
+                  style="
+                    font-size: 13px;
+                    color: #6b7280;
+                    margin: 0 0 16px 0;
+                    line-height: 1.5;
+                  "
+                >
+                  For more details, please visit the
+                  <a
+                    href="https://pycon.kr"
+                    style="color: #1f3a8a; text-decoration: none"
+                    >PyCon Korea homepage</a
+                  >.
+                </p>
+                <table
+                  role="presentation"
+                  cellpadding="0"
+                  cellspacing="0"
+                  border="0"
+                  align="center"
+                  style="margin: 0 auto"
+                >
+                  <tr>
+                    <td align="center">
+                      <a
+                        href="https://pycon.kr"
+                        style="
+                          display: inline-block;
+                          padding: 12px 28px;
+                          background-color: #1f3a8a;
+                          color: #ffffff;
+                          text-decoration: none;
+                          border-radius: 6px;
+                          font-size: 14px;
+                          font-weight: 600;
+                        "
+                        >파이콘 한국 홈페이지 | PyCon Korea Homepage</a
+                      >
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td
+                align="center"
+                style="
+                  padding: 20px 24px 24px 24px;
+                  background-color: #f9fafb;
+                  font-size: 12px;
+                  color: #6b7280;
+                  line-height: 1.6;
+                "
+              >
+                <p style="margin: 0">
+                  본 메일은 발신 전용입니다. 문의는
+                  <a
+                    href="mailto:pycon@pycon.kr"
+                    style="color: #1f3a8a; text-decoration: none"
+                    >pycon@pycon.kr</a
+                  >
+                  으로 부탁드립니다.
+                </p>
+                <p style="margin: 0 0 8px 0">
+                  This is a send-only email. For inquiries, please contact
+                  <a
+                    href="mailto:pycon@pycon.kr"
+                    style="color: #1f3a8a; text-decoration: none"
+                    >pycon@pycon.kr</a
+                  >.
+                </p>
+                <p style="margin: 0">
+                  &copy; 파이썬 한국 사용자 모임 (Python Korea)
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
