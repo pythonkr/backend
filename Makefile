@@ -66,7 +66,26 @@ local-reverse-migrations:
 
 # Run pytest
 local-test:
-	@ENV_PATH=envfile/.env.local cd app && uv run pytest -v
+	@cd app && ENV_PATH=../envfile/.env.local uv run pytest -v
+
+# Run pytest with coverage
+local-test-cov:
+	@cd app && ENV_PATH=../envfile/.env.local uv run pytest \
+		--cov \
+		--cov-config=../pyproject.toml \
+		--cov-report=term-missing \
+		--cov-report=html:../htmlcov \
+		--cov-report=xml:../coverage.xml
+
+# Run pytest with coverage, scoped to shop-related code
+local-test-cov-shop:
+	@cd app && ENV_PATH=../envfile/.env.local uv run pytest shop/ \
+		--cov=shop \
+		--cov=admin_api/views/shop \
+		--cov=admin_api/serializers/shop \
+		--cov=admin_api/filtersets/shop \
+		--cov-config=../pyproject.toml \
+		--cov-report=term-missing
 
 # Devtools
 hooks-install: local-setup

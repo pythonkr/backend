@@ -48,6 +48,7 @@ dev = [
     "ipython>=9.12.0",
     "pre-commit>=4.5.1",
     "pytest>=9.0.3",
+    "pytest-cov>=5.0.0",
     "pytest-django>=4.12.0",
     "pytest-socket>=0.7.0",
 ]
@@ -93,6 +94,34 @@ DJANGO_SETTINGS_MODULE = "core.settings"
 norecursedirs = ".git migrations static template"
 python_files = "*_test.py"
 addopts = "--reuse-db --disable-socket -v"
+
+[tool.coverage.run]
+source = ["."]
+branch = false
+omit = [
+    "*/migrations/*",
+    "*/test/*",
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/admin.py",
+    "manage.py",
+    "core/settings.py",
+    "core/wsgi.py",
+    "core/asgi.py",
+    "core/celery.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+precision = 1
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "\\.\\.\\.",
+]
 
 [build-system]
 requires = [
