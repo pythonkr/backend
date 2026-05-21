@@ -54,7 +54,11 @@ def email_template(db):
         code=_EMAIL_TEMPLATE_CODE,
         title="결제 완료 이메일",
         sent_from="noreply@pycon.kr",
-        data='{"title":"결제가 완료되었습니다","body":"안녕하세요 {{ name }}님, {{ phone }}, {{ email }}"}',
+        data=(
+            '{"title":"결제가 완료되었습니다",'
+            '"body":"{{ order_name }} - 안녕하세요 {{ customer_name }}님,'
+            ' {{ customer_phone }}, {{ customer_email }}"}'
+        ),
     )
 
 
@@ -98,7 +102,14 @@ def test_creates_email_history_when_template_exists(order_with_customer, email_t
     history = EmailNotificationHistory.objects.filter_active().get()
     sent_to = history.sent_to_list.get()
     assert sent_to.recipient == "customer@example.com"
-    assert sent_to.context == {"name": "홍길동", "phone": "01012345678", "email": "customer@example.com"}
+    assert sent_to.context == {
+        "order_name": "파이콘 한국 2026 티켓",
+        "first_paid_at": None,
+        "first_paid_price": 0,
+        "customer_name": "홍길동",
+        "customer_phone": "01012345678",
+        "customer_email": "customer@example.com",
+    }
     assert sent_to.status == NotificationStatus.CREATED
 
 
