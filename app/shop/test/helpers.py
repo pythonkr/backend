@@ -1,5 +1,16 @@
+from types import SimpleNamespace
+
 from core.util.totp import TOTPInfo
 from django.conf import settings
+
+
+def make_serializer_context(user, **extras) -> dict:
+    """serializer context 헬퍼 — `{"request": SimpleNamespace(user=user), **extras}` 반환.
+
+    cart_validation serializer 들이 `self.context["request"].user` 만 참조하므로 실 DRF Request 객체 불필요.
+    `mode` 등 추가 키는 kwargs 로 합쳐짐.
+    """
+    return {"request": SimpleNamespace(user=user), **extras}
 
 
 def valid_refund_totp() -> str:

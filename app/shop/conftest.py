@@ -5,7 +5,7 @@ import pytest
 from core.external_apis.portone.client import portone_client
 from shop.order.models import CustomerInfo, Order, OrderProductRelation, SingleProductCart
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
-from shop.product.models import Category, CategoryGroup, Product
+from shop.product.models import Category, CategoryGroup, Option, OptionGroup, Product, ProductTagRelation, Tag
 from user.models import UserExt
 
 # Product 모델 datetime default 인 naive datetime.min / max 는 Asia/Seoul → UTC 변환 시 Postgres timestamptz 범위 밖으로 나가 깨진다.
@@ -20,6 +20,12 @@ _COMPLETED_ORDER_IMP_ID = "imp_test_completed"
 @pytest.fixture
 def customer_user(db) -> UserExt:
     return UserExt.objects.create_user(username="buyer", email="buyer@example.com")
+
+
+@pytest.fixture
+def other_user(db) -> UserExt:
+    """`customer_user` 와 무관한 또 다른 일반 user — 권한/소유권 boundary 테스트용."""
+    return UserExt.objects.create_user(username="other", email="other@example.com")
 
 
 @pytest.fixture
@@ -45,6 +51,26 @@ def product(db) -> Product:
         orderable_ends_at=_FAR_FUTURE,
         refundable_ends_at=_FAR_FUTURE,
     )
+
+
+@pytest.fixture
+def option_group(product) -> OptionGroup:
+    """기본 옵션 그룹 — `is_custom_response=False`, 선택형. `min_quantity_per_product=0` 이라 stock 검사 우회."""
+    return OptionGroup.objects.create(product=product, name="사이즈")
+
+
+@pytest.fixture
+def option(option_group) -> Option:
+    """`option_group` 의 기본 옵션 — 무한 재고 (stock=0)."""
+    return Option.objects.create(group=option_group, name="L", additional_price=0)
+
+
+@pytest.fixture
+def tag(product) -> Tag:
+    """기본 태그 — `product` 와 ProductTagRelation 으로 연결. 무한 재고 (stock=0)."""
+    t = Tag.objects.create(name="굿즈")
+    ProductTagRelation.objects.create(product=product, tag=t)
+    return t
 
 
 @pytest.fixture
