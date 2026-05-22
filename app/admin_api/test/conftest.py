@@ -27,6 +27,11 @@ def superuser(db) -> UserExt:
 
 
 @pytest.fixture
+def customer_user(db) -> UserExt:
+    return UserExt.objects.create_user(username="buyer", email="buyer@example.com")
+
+
+@pytest.fixture
 def api_client(superuser) -> APIClient:
     client = APIClient()
     client.force_authenticate(user=superuser)

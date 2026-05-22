@@ -115,6 +115,13 @@ def mock_portone_find_payment_info():
 
 
 @pytest.fixture
+def mock_portone_req_cancel_payment():
+    """`portone_client.req_cancel_payment` 를 mock — 환불 호출 검증 / 실패 주입에 사용."""
+    with patch.object(portone_client, "req_cancel_payment") as mocked:
+        yield mocked
+
+
+@pytest.fixture
 def mocked_on_commit():
     # test transaction 은 rollback 되므로 on_commit callback 이 실제로 fire 안 됨 — 등록만 검증.
     with patch("shop.payment_history.serializers.transaction.on_commit") as mocked:

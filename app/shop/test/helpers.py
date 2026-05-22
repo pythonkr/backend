@@ -1,3 +1,12 @@
+from core.util.totp import TOTPInfo
+from django.conf import settings
+
+
+def valid_refund_totp() -> str:
+    """현재 시각 기준 유효한 환불 승인 TOTP — settings.SHOP.refund_authorizer_secret_key 와 동기화."""
+    return TOTPInfo(key=settings.SHOP.refund_authorizer_secret_key.encode()).get_totp()[0]
+
+
 def make_webhook_payload(*, merchant_uid: str, status: str = "paid", imp_uid: str = "imp_x") -> dict:
     """PortOne 이 우리 webhook 으로 보내는 request body — `PortOneV1WebhookRequestSerializer` 의 입력."""
     return {"status": status, "imp_uid": imp_uid, "merchant_uid": merchant_uid}

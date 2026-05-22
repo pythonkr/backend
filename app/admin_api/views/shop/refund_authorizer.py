@@ -1,9 +1,10 @@
 from core.authz import IsSuperUser
+from core.const.shop_error_messages import PermissionErrorMessages
 from core.const.tag import OpenAPITag
 from core.util.totp import TOTPInfo
 from django.conf import settings
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
-from rest_framework import permissions, request, response, status, viewsets
+from rest_framework import request, response, status, viewsets
 from rest_framework.decorators import action
 
 
@@ -38,8 +39,10 @@ class RefundAuthorizerAdminViewSet(viewsets.ViewSet):
             status.HTTP_400_BAD_REQUEST: {"type": "object", "properties": {"detail": {"type": "string"}}},
         },
     )
-    @action(detail=False, methods=["post"], url_path="verify", permission_classes=[permissions.IsAuthenticated])
+    @action(detail=False, methods=["post"], url_path="verify")
     def verify(self, request: request.Request) -> response.Response:
         if not (otp := request.query_params.get("otp", "")):
-            return response.Response({"detail": "otp 가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+            return response.Response(
+                {"detail": PermissionErrorMessages.OTP_REQUIRED}, status=status.HTTP_400_BAD_REQUEST
+            )
         return response.Response({"valid": self.totp.check(otp)})
