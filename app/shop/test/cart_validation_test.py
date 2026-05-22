@@ -8,13 +8,15 @@ from core.const.shop_error_messages import (
     SignInErrorMessages,
     TagNotOrderableErrorMessages,
 )
-from core.util.testutil import errors_payload
+from core.util.testutil import errors_payload, pk_does_not_exist_error
 from django.contrib.auth.models import AnonymousUser
 from freezegun import freeze_time
+from rest_framework.fields import empty
 from shop.order.models import CustomerInfo, Order, OrderProductRelation, SingleProductCart
 from shop.product.models import OptionGroup, Product
 from shop.serializers.cart_validation import (
     CartOrderableCheckSerializer,
+    CustomerInfoCheckSerializer,
     OptionOrderableCheckSerializer,
     OrderableCheckSerializerMode,
     ProductOrderableCheckSerializer,
@@ -22,6 +24,13 @@ from shop.serializers.cart_validation import (
     TagOrderableCheckSerializer,
 )
 from shop.test.helpers import make_serializer_context
+
+_VALID_CUSTOMER_INFO = {
+    "name": "홍길동",
+    "phone": "010-1234-5678",
+    "email": "buyer@example.com",
+    "organization": "",
+}
 
 
 @pytest.mark.django_db
@@ -428,16 +437,7 @@ def test_tag_passes_happy_path(customer_user, tag):
 @pytest.mark.django_db
 def test_single_product_cart_create_persists_opr_cart_and_customer_info(customer_user, product):
     serializer = SingleProductCartOrderableCheckSerializer(
-        data={
-            "product": str(product.id),
-            "options": [],
-            "customer_info": {
-                "name": "홍길동",
-                "phone": "010-1234-5678",
-                "email": "buyer@example.com",
-                "organization": "",
-            },
-        },
+        data={"product": str(product.id), "options": [], "customer_info": _VALID_CUSTOMER_INFO},
         context=make_serializer_context(customer_user),
     )
     assert serializer.is_valid()
@@ -454,16 +454,101 @@ def test_single_product_cart_create_persists_opr_cart_and_customer_info(customer
 def test_single_product_cart_forces_checkout_single_product_mode(customer_user, product):
     # context 에 mode 를 임의 override 해도 validation_mode property 가 강제로 CHECKOUT_SINGLE_PRODUCT 반환.
     serializer = SingleProductCartOrderableCheckSerializer(
-        data={
-            "product": str(product.id),
-            "options": [],
-            "customer_info": {
-                "name": "홍길동",
-                "phone": "010-1234-5678",
-                "email": "buyer@example.com",
-                "organization": "",
-            },
-        },
+        data={"product": str(product.id), "options": [], "customer_info": _VALID_CUSTOMER_INFO},
         context=make_serializer_context(customer_user, mode=OrderableCheckSerializerMode.ADD_SINGLE_PRODUCT_TO_CART),
     )
     assert serializer.validation_mode == OrderableCheckSerializerMode.CHECKOUT_SINGLE_PRODUCT
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "expected_detail", "expected_code"),
+    [
+        ("name", empty, "이 필드는 필수 항목입니다.", "required"),
+        ("phone", empty, "이 필드는 필수 항목입니다.", "required"),
+        ("email", empty, "이 필드는 필수 항목입니다.", "required"),
+        ("organization", empty, "이 필드는 필수 항목입니다.", "required"),
+        ("name", None, "이 필드는 null일 수 없습니다.", "null"),
+        ("phone", None, "이 필드는 null일 수 없습니다.", "null"),
+        ("email", None, "이 필드는 null일 수 없습니다.", "null"),
+        ("organization", None, "이 필드는 null일 수 없습니다.", "null"),
+        ("name", "", "이 필드는 blank일 수 없습니다.", "blank"),
+        ("phone", "", "이 필드는 blank일 수 없습니다.", "blank"),
+        ("email", "", "이 필드는 blank일 수 없습니다.", "blank"),
+        ("phone", "01012345678", "이 값은 요구되는 패턴과 일치하지 않습니다.", "invalid"),
+        ("email", "not-an-email", "유효한 이메일 주소를 입력하세요.", "invalid"),
+    ],
+)
+def test_customer_info_field_rejections(field, value, expected_detail, expected_code):
+    payload = {**_VALID_CUSTOMER_INFO}
+    if value is empty:
+        del payload[field]
+    else:
+        payload[field] = value
+    serializer = CustomerInfoCheckSerializer(data=payload)
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {
+        field: [{"detail": expected_detail, "code": expected_code}],
+    }
+
+
+def test_customer_info_allows_blank_organization_uniquely():
+    # 4 필드 중 organization 만 allow_blank=True — 의도된 차이 (협회 미소속 사용자).
+    serializer = CustomerInfoCheckSerializer(data={**_VALID_CUSTOMER_INFO, "organization": ""})
+    assert serializer.is_valid()
+
+
+def test_customer_info_passes_happy_path():
+    serializer = CustomerInfoCheckSerializer(data=_VALID_CUSTOMER_INFO)
+    assert serializer.is_valid()
+
+
+@pytest.mark.django_db
+def test_product_orderable_rejects_soft_deleted_product(customer_user, product):
+    # queryset=Product.objects.filter(deleted_at__isnull=True) — soft-delete 된 product PK 는 매칭 0건.
+    product.delete()
+
+    serializer = ProductOrderableCheckSerializer(
+        data={"product": str(product.id), "options": []}, context=make_serializer_context(customer_user)
+    )
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {"product": [pk_does_not_exist_error(product.id)]}
+
+
+@pytest.mark.django_db
+def test_product_orderable_rejects_negative_donation_price(customer_user, product):
+    serializer = ProductOrderableCheckSerializer(
+        data={"product": str(product.id), "options": [], "donation_price": -1},
+        context=make_serializer_context(customer_user),
+    )
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {
+        "donation_price": [{"detail": "이 값이 0보다 크거나 같은지 확인하세요.", "code": "min_value"}],
+    }
+
+
+@pytest.mark.django_db
+def test_product_orderable_rejects_null_options(customer_user, product):
+    serializer = ProductOrderableCheckSerializer(
+        data={"product": str(product.id), "options": None}, context=make_serializer_context(customer_user)
+    )
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {
+        "options": [{"detail": "이 필드는 null일 수 없습니다.", "code": "null"}],
+    }
+
+
+@pytest.mark.django_db
+def test_option_orderable_rejects_soft_deleted_group(customer_user, option_group):
+    # validate_product_option 의 self.group 은 deleted_at 무관 lookup 이라 OPTION_NOT_SELECTED 가 부수 발생할 수
+    # 있음 — is_custom_response=True 로 그 분기를 우회해 queryset 필터 단독 검증.
+    option_group.is_custom_response = True
+    option_group.custom_response_pattern = r"^.*$"
+    option_group.save()
+    option_group.delete()
+
+    serializer = OptionOrderableCheckSerializer(
+        data={"product_option_group": str(option_group.id), "product_option": None, "custom_response": None},
+        context=make_serializer_context(customer_user),
+    )
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {"product_option_group": [pk_does_not_exist_error(option_group.id)]}

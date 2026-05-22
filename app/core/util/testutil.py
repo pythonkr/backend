@@ -11,3 +11,8 @@ def errors_payload(errors: dict | list) -> dict | list:
     if isinstance(errors, list):
         return [_err(e) for e in errors]
     return {k: [_err(e) for e in v] for k, v in errors.items()}
+
+
+def pk_does_not_exist_error(pk) -> dict:
+    """`PrimaryKeyRelatedField` 의 `does_not_exist` 에러 페이로드 — queryset 필터 boundary 테스트용."""
+    return {"detail": f'유효하지 않은 pk "{pk}" - 객체가 존재하지 않습니다.', "code": "does_not_exist"}

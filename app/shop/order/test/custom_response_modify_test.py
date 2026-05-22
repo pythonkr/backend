@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 from core.const.shop_error_messages import OptionGroupNotModifiableErrorMessages
-from core.util.testutil import errors_payload
+from core.util.testutil import errors_payload, pk_does_not_exist_error
 from freezegun import freeze_time
 from shop.order.models import OrderProductOptionRelation, OrderProductRelation
 from shop.order.serializers.validator import OptionProductOptionCustomResponseModifyRequestSerializer
@@ -128,3 +128,39 @@ def test_modify_save_persists_new_custom_response(paid_custom_option_relation):
 
     paid_custom_option_relation.refresh_from_db()
     assert paid_custom_option_relation.custom_response == "updated"
+
+
+@pytest.mark.django_db
+def test_modify_rejects_refunded_opr_option_via_queryset_filter(paid_custom_option_relation):
+    # OPR status 를 refunded 로 변경 → queryset 의 status=paid 필터에서 빠짐 → PK 매칭 0건.
+    opr = paid_custom_option_relation.order_product_relation
+    opr.status = OrderProductRelation.OrderProductStatus.refunded
+    opr.save()
+
+    serializer = OptionProductOptionCustomResponseModifyRequestSerializer(
+        data={"order_product_option_relation": str(paid_custom_option_relation.id), "custom_response": "x"},
+        context={"order_product_rel": opr},
+    )
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {
+        "order_product_option_relation": [pk_does_not_exist_error(paid_custom_option_relation.id)],
+    }
+
+
+@pytest.mark.django_db
+def test_modify_rejects_non_custom_response_group_option_via_queryset_filter(completed_order, product):
+    # is_custom_response=False 그룹의 option 은 queryset 의 is_custom_response=True 필터에서 빠짐.
+    plain_group = OptionGroup.objects.create(product=product, name="plain", is_custom_response=False)
+    rel = OrderProductOptionRelation.objects.create(
+        order_product_relation=completed_order.products.first(),
+        product_option_group=plain_group,
+    )
+
+    serializer = OptionProductOptionCustomResponseModifyRequestSerializer(
+        data={"order_product_option_relation": str(rel.id), "custom_response": "x"},
+        context={"order_product_rel": rel.order_product_relation},
+    )
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {
+        "order_product_option_relation": [pk_does_not_exist_error(rel.id)],
+    }
