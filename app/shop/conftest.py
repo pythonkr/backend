@@ -1,8 +1,10 @@
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 from core.external_apis.portone.client import portone_client
+from django.test import override_settings
 from rest_framework.test import APIClient
 from shop.order.models import CustomerInfo, Order, OrderProductOptionRelation, OrderProductRelation, SingleProductCart
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
@@ -11,11 +13,33 @@ from user.models import UserExt
 
 # Product 모델 datetime default 인 naive datetime.min / max 는 Asia/Seoul → UTC 변환 시 Postgres timestamptz 범위 밖으로 나가 깨진다.
 # fixture 는 항상 tz-aware 명시값으로 생성.
-_FAR_PAST = datetime(2020, 1, 1, tzinfo=timezone.utc)
-_FAR_FUTURE = datetime(2099, 12, 31, tzinfo=timezone.utc)
+FAR_PAST = datetime(2020, 1, 1, tzinfo=timezone.utc)
+FAR_FUTURE = datetime(2099, 12, 31, tzinfo=timezone.utc)
 
 # 같은 주문의 PaymentHistory 는 동일 PortOne 거래에서 파생되므로 imp_id 가 공유된다.
 _COMPLETED_ORDER_IMP_ID = "imp_test_completed"
+
+# webhook IP allowlist 통과용 — webhook 테스트는 이 IP 를 REMOTE_ADDR 로 사용.
+WEBHOOK_WHITELISTED_IP = "1.2.3.4"
+
+
+@pytest.fixture(autouse=True)
+def _portone_settings():
+    """shop 전체 테스트 — DEBUG off + PortOne IP allowlist + mock 가능한 dummy 키 / URL.
+
+    실제 PortOne SDK 호출은 `mock_portone_*` fixture 가 가로채므로 키 값은 임의.
+    `override_settings` 라 각 테스트가 별도 override 하면 그쪽이 우선.
+    """
+    with override_settings(
+        DEBUG=False,
+        PORTONE=SimpleNamespace(
+            api_url="https://api.example-portone.kr",
+            ip_list=[WEBHOOK_WHITELISTED_IP],
+            imp_key="portone_api_key",
+            imp_secret="portone_api_secret",  # nosec: B106
+        ),
+    ):
+        yield
 
 
 @pytest.fixture
@@ -72,11 +96,11 @@ def product(db) -> Product:
         name_en="PyCon Korea 2026 Ticket",
         price=10000,
         stock=100,
-        visible_starts_at=_FAR_PAST,
-        visible_ends_at=_FAR_FUTURE,
-        orderable_starts_at=_FAR_PAST,
-        orderable_ends_at=_FAR_FUTURE,
-        refundable_ends_at=_FAR_FUTURE,
+        visible_starts_at=FAR_PAST,
+        visible_ends_at=FAR_FUTURE,
+        orderable_starts_at=FAR_PAST,
+        orderable_ends_at=FAR_FUTURE,
+        refundable_ends_at=FAR_FUTURE,
     )
 
 
@@ -197,7 +221,7 @@ def modifiable_option_relation(completed_order, product) -> OrderProductOptionRe
         name="요청사항",
         is_custom_response=True,
         custom_response_pattern=r"^.{1,100}$",
-        response_modifiable_ends_at=_FAR_FUTURE,
+        response_modifiable_ends_at=FAR_FUTURE,
     )
     return OrderProductOptionRelation.objects.create(
         order_product_relation=completed_order.products.first(),

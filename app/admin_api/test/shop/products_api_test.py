@@ -8,11 +8,9 @@ from rest_framework.status import (
     HTTP_400_BAD_REQUEST,
     HTTP_403_FORBIDDEN,
 )
+from shop.conftest import FAR_FUTURE, FAR_PAST
 from shop.product.models import Category, CategoryGroup, Product, Tag
 from shop.test.helpers import CategoryGroupsAdminApi, ProductsAdminApi, TagsAdminApi
-
-_FAR_PAST = datetime(2020, 1, 1, tzinfo=timezone.utc)
-_FAR_FUTURE = datetime(2099, 12, 31, tzinfo=timezone.utc)
 
 
 @pytest.mark.parametrize("api_cls", [CategoryGroupsAdminApi, TagsAdminApi, ProductsAdminApi])
@@ -66,11 +64,11 @@ def test_admin_product_create_returns_201(api_client, product):
             "price": 1000,
             "stock": 10,
             "hidden": False,
-            "visible_starts_at": _FAR_PAST.isoformat(),
-            "visible_ends_at": _FAR_FUTURE.isoformat(),
-            "orderable_starts_at": _FAR_PAST.isoformat(),
-            "orderable_ends_at": _FAR_FUTURE.isoformat(),
-            "refundable_ends_at": _FAR_FUTURE.isoformat(),
+            "visible_starts_at": FAR_PAST.isoformat(),
+            "visible_ends_at": FAR_FUTURE.isoformat(),
+            "orderable_starts_at": FAR_PAST.isoformat(),
+            "orderable_ends_at": FAR_FUTURE.isoformat(),
+            "refundable_ends_at": FAR_FUTURE.isoformat(),
             "category": str(product.category.id),
         }
     )
@@ -80,7 +78,7 @@ def test_admin_product_create_returns_201(api_client, product):
 
 @pytest.mark.django_db
 def test_admin_product_partial_update_validates_orderable_after_visible_start(api_client, product):
-    # orderable_starts_at(2010) < visible_starts_at(fixture default _FAR_PAST=2020) → 400.
+    # orderable_starts_at(2010) < visible_starts_at(fixture default FAR_PAST=2020) → 400.
     response = ProductsAdminApi(http_client=api_client).update(
         product.id, {"orderable_starts_at": datetime(2010, 1, 1, tzinfo=timezone.utc).isoformat()}
     )
@@ -90,7 +88,7 @@ def test_admin_product_partial_update_validates_orderable_after_visible_start(ap
 
 @pytest.mark.django_db
 def test_admin_product_partial_update_validates_orderable_before_visible_end(api_client, product):
-    # orderable_ends_at(2100) > visible_ends_at(_FAR_FUTURE=2099) → 400.
+    # orderable_ends_at(2100) > visible_ends_at(FAR_FUTURE=2099) → 400.
     response = ProductsAdminApi(http_client=api_client).update(
         product.id, {"orderable_ends_at": datetime(2100, 1, 1, tzinfo=timezone.utc).isoformat()}
     )
@@ -124,11 +122,11 @@ def test_admin_product_list_filters_by_category(api_client, product):
         ),
         name="other product",
         price=100,
-        visible_starts_at=_FAR_PAST,
-        visible_ends_at=_FAR_FUTURE,
-        orderable_starts_at=_FAR_PAST,
-        orderable_ends_at=_FAR_FUTURE,
-        refundable_ends_at=_FAR_FUTURE,
+        visible_starts_at=FAR_PAST,
+        visible_ends_at=FAR_FUTURE,
+        orderable_starts_at=FAR_PAST,
+        orderable_ends_at=FAR_FUTURE,
+        refundable_ends_at=FAR_FUTURE,
     )
 
     response = ProductsAdminApi(http_client=api_client).list({"category": str(product.category.id)})

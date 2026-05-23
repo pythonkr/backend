@@ -1,5 +1,3 @@
-from types import SimpleNamespace
-
 import pytest
 from core.const.shop_error_messages import PortOneWebhookFailureMessages as Msgs
 from django.test import override_settings
@@ -7,25 +5,11 @@ from django.urls import reverse
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_403_FORBIDDEN
 from rest_framework.test import APIClient
+from shop.conftest import WEBHOOK_WHITELISTED_IP
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
 from shop.test.helpers import make_portone_payment_info, make_webhook_payload
 
-_WHITELISTED_IP = "1.2.3.4"
 _NON_WHITELISTED_IP = "5.6.7.8"
-
-
-@pytest.fixture(autouse=True)
-def _default_webhook_settings():
-    with override_settings(
-        DEBUG=False,
-        PORTONE=SimpleNamespace(
-            api_url="https://api.example-portone.kr",
-            ip_list=[_WHITELISTED_IP],
-            imp_key="portone_api_key",
-            imp_secret="portone_api_secret",  # nosec: B106
-        ),
-    ):
-        yield
 
 
 def _post_webhook(*, merchant_uid: str, ip: str) -> Response:
@@ -81,7 +65,7 @@ def test_ip_allowlist_respects_debug_bypass(
 @pytest.mark.django_db
 def test_accepts_request_from_whitelisted_ip(pending_order, mock_portone_find_payment_info):
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=pending_order)
-    response = _post_webhook(merchant_uid=str(pending_order.id), ip=_WHITELISTED_IP)
+    response = _post_webhook(merchant_uid=str(pending_order.id), ip=WEBHOOK_WHITELISTED_IP)
     assert response.status_code == HTTP_200_OK
     assert response.json() == {"status": "success", "message": "일반 결제 성공"}
     assert PaymentHistory.objects.filter(
@@ -98,7 +82,7 @@ def test_atomic_rollback_on_validation_failure(pending_order, mock_portone_find_
     mock_portone_find_payment_info.return_value = make_portone_payment_info(
         order=pending_order, amount=pending_order.first_paid_price + 9999
     )
-    response = _post_webhook(merchant_uid=str(pending_order.id), ip=_WHITELISTED_IP)
+    response = _post_webhook(merchant_uid=str(pending_order.id), ip=WEBHOOK_WHITELISTED_IP)
     assert response.status_code == HTTP_400_BAD_REQUEST
     assert response.json() == {
         "type": "validation_error",

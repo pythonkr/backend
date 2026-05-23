@@ -95,6 +95,23 @@ class ProductsAdminApi(ModelApiFixture):
     name: ClassVar[str] = "v1:admin-shop-product"
 
 
+class OptionGroupsAdminApi(ModelApiFixture):
+    name: ClassVar[str] = "v1:admin-shop-option-group"
+
+
+class PortOneWebhookApi(ModelApiFixture):
+    name: ClassVar[str] = "v1:payment_histories"
+
+    def notify(self, *, merchant_uid: str, ip: str, status: str = "paid", imp_uid: str = "imp_x"):
+        # PortOne 서버 IP 검증을 위해 REMOTE_ADDR 명시 — IP allowlist 통과 / 거절 테스트 양쪽 지원.
+        return self.http_client.post(
+            reverse(f"{self.name}-list"),
+            data=make_webhook_payload(merchant_uid=merchant_uid, status=status, imp_uid=imp_uid),
+            format="json",
+            REMOTE_ADDR=ip,
+        )
+
+
 def make_serializer_context(user, **extras) -> dict:
     """serializer context 헬퍼 — `{"request": SimpleNamespace(user=user), **extras}` 반환.
 
