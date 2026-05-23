@@ -1,7 +1,98 @@
 from types import SimpleNamespace
+from typing import ClassVar
 
+from core.util.testutil import ModelApiFixture
 from core.util.totp import TOTPInfo
 from django.conf import settings
+from django.urls import reverse
+
+
+class OrdersApi(ModelApiFixture):
+    name: ClassVar[str] = "v1:orders"
+
+    def create_single(self, data=None):
+        return self.http_client.post(reverse(f"{self.name}-create-single-product-order"), data, format="json")
+
+    def retrieve_receipt(self, pk):
+        return self.http_client.get(reverse(f"{self.name}-retrieve-receipt", args=(pk,)))
+
+
+class OrderProductsApi(ModelApiFixture):
+    name: ClassVar[str] = "v1:order-products"
+
+    def modify_options(self, order_id, opr_id, data=None):
+        return self.http_client.patch(
+            reverse(f"{self.name}-modify-options", kwargs={"order_id": order_id, "order_product_rel_id": opr_id}),
+            data,
+            format="json",
+        )
+
+    def delete_partial(self, order_id, opr_id):
+        return self.http_client.delete(
+            reverse(f"{self.name}-detail", kwargs={"order_id": order_id, "order_product_rel_id": opr_id})
+        )
+
+
+class CartApi(ModelApiFixture):
+    name: ClassVar[str] = "v1:cart"
+
+
+class CartProductsApi(ModelApiFixture):
+    name: ClassVar[str] = "v1:cart-products"
+
+
+class ScanCodeApi(ModelApiFixture):
+    name: ClassVar[str] = "v1:scancode"
+
+
+class ProductsApi(ModelApiFixture):
+    name: ClassVar[str] = "v1:products"
+
+
+class PatronApi(ModelApiFixture):
+    name: ClassVar[str] = "v1:patron"
+
+
+class OrdersAdminApi(ModelApiFixture):
+    name: ClassVar[str] = "v1:admin-shop-order"
+
+    def refund(self, pk, *, totp: str | None = None):
+        url = reverse(f"{self.name}-refund", kwargs={"pk": pk})
+        if totp is not None:
+            url += f"?totp={totp}"
+        return self.http_client.post(url)
+
+    def refund_product(self, pk, rel_id, *, totp: str | None = None):
+        url = reverse(f"{self.name}-refund-product", kwargs={"pk": pk, "rel_id": rel_id})
+        if totp is not None:
+            url += f"?totp={totp}"
+        return self.http_client.post(url)
+
+    def import_template(self, *, product_id: str | None = None):
+        params = {"product_id": product_id} if product_id is not None else None
+        return self.http_client.get(reverse(f"{self.name}-import-template"), params)
+
+
+class OrderNotificationsAdminApi(ModelApiFixture):
+    name: ClassVar[str] = "v1:admin-shop-order-notification"
+
+    def preview(self, data=None):
+        return self.http_client.post(reverse(f"{self.name}-preview"), data, format="json")
+
+    def send(self, data=None):
+        return self.http_client.post(reverse(f"{self.name}-send"), data, format="json")
+
+
+class CategoryGroupsAdminApi(ModelApiFixture):
+    name: ClassVar[str] = "v1:admin-shop-category-group"
+
+
+class TagsAdminApi(ModelApiFixture):
+    name: ClassVar[str] = "v1:admin-shop-tag"
+
+
+class ProductsAdminApi(ModelApiFixture):
+    name: ClassVar[str] = "v1:admin-shop-product"
 
 
 def make_serializer_context(user, **extras) -> dict:

@@ -3,7 +3,8 @@ from unittest.mock import patch
 
 import pytest
 from core.external_apis.portone.client import portone_client
-from shop.order.models import CustomerInfo, Order, OrderProductRelation, SingleProductCart
+from rest_framework.test import APIClient
+from shop.order.models import CustomerInfo, Order, OrderProductOptionRelation, OrderProductRelation, SingleProductCart
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
 from shop.product.models import Category, CategoryGroup, Option, OptionGroup, Product, ProductTagRelation, Tag
 from user.models import UserExt
@@ -34,6 +35,32 @@ def staff_user(db) -> UserExt:
 
 
 @pytest.fixture
+def anon_client() -> APIClient:
+    return APIClient()
+
+
+@pytest.fixture
+def customer_client(customer_user) -> APIClient:
+    client = APIClient()
+    client.force_authenticate(user=customer_user)
+    return client
+
+
+@pytest.fixture
+def other_client(other_user) -> APIClient:
+    client = APIClient()
+    client.force_authenticate(user=other_user)
+    return client
+
+
+@pytest.fixture
+def staff_client(staff_user) -> APIClient:
+    client = APIClient()
+    client.force_authenticate(user=staff_user)
+    return client
+
+
+@pytest.fixture
 def product(db) -> Product:
     # category_group / category 는 Product 의 FK 체인을 만들기 위한 중간 단계 — 직접 참조하는 테스트가 생기는 시점에 별도 fixture 로 분리.
     category_group = CategoryGroup.objects.create(name="기본")
@@ -51,6 +78,15 @@ def product(db) -> Product:
         orderable_ends_at=_FAR_FUTURE,
         refundable_ends_at=_FAR_FUTURE,
     )
+
+
+@pytest.fixture
+def donation_product(product) -> Product:
+    """`product` fixture 를 donation_allowed=True 로 토글 — patron / 후원 테스트용."""
+    product.donation_allowed = True
+    product.donation_max_price = 999_999
+    product.save()
+    return product
 
 
 @pytest.fixture
@@ -134,6 +170,43 @@ def partial_refunded_order(completed_order) -> Order:
 
 
 @pytest.fixture
+def empty_cart(customer_user) -> Order:
+    """OPR 없는 빈 Order — PaymentHistory 없는 cart 상태."""
+    return Order.objects.create(user=customer_user, name="cart")
+
+
+@pytest.fixture
+def donation_completed_order(completed_order, donation_product) -> Order:
+    """결제 완료 + OPR 에 donation_price 부여 — patron / 후원 통계 테스트용."""
+    completed_order.products.update(donation_price=5000)
+    return completed_order
+
+
+@pytest.fixture
+def donation_refunded_order(refunded_order, donation_product) -> Order:
+    """전액 환불 + OPR 에 donation_price 부여 — 환불된 후원 주문 boundary 테스트용."""
+    refunded_order.products.update(donation_price=5000)
+    return refunded_order
+
+
+@pytest.fixture
+def modifiable_option_relation(completed_order, product) -> OrderProductOptionRelation:
+    """custom_response 수정 가능 옵션 — `response_modifiable_ends_at` 미래, paid OPR 에 attached."""
+    group = OptionGroup.objects.create(
+        product=product,
+        name="요청사항",
+        is_custom_response=True,
+        custom_response_pattern=r"^.{1,100}$",
+        response_modifiable_ends_at=_FAR_FUTURE,
+    )
+    return OrderProductOptionRelation.objects.create(
+        order_product_relation=completed_order.products.first(),
+        product_option_group=group,
+        custom_response="initial",
+    )
+
+
+@pytest.fixture
 def mock_portone_find_payment_info():
     """`portone_client.find_payment_info` 를 mock. 각 테스트에서 `.return_value` 를 덮어쓴다."""
     with patch.object(portone_client, "find_payment_info") as mocked:
@@ -144,6 +217,20 @@ def mock_portone_find_payment_info():
 def mock_portone_req_cancel_payment():
     """`portone_client.req_cancel_payment` 를 mock — 환불 호출 검증 / 실패 주입에 사용."""
     with patch.object(portone_client, "req_cancel_payment") as mocked:
+        yield mocked
+
+
+@pytest.fixture
+def mock_portone_register():
+    """`portone_client.register_or_update_prepared_payment` 를 mock — 결제 사전 등록 호출 검증."""
+    with patch.object(portone_client, "register_or_update_prepared_payment") as mocked:
+        yield mocked
+
+
+@pytest.fixture
+def mock_portone_kcp_receipt():
+    """`portone_client.get_kcp_receipt_search_data` 를 mock — 영수증 페이지 redirect 데이터 주입."""
+    with patch.object(portone_client, "get_kcp_receipt_search_data") as mocked:
         yield mocked
 
 

@@ -1,6 +1,5 @@
 import pytest
 from core.models import BaseAbstractModelQuerySet
-from core.util.thread_local import thread_local
 from notification.models import (
     EmailNotificationTemplate,
     NHNCloudKakaoAlimTalkNotificationTemplate,
@@ -8,17 +7,6 @@ from notification.models import (
 )
 from rest_framework.test import APIClient
 from user.models import UserExt
-
-
-@pytest.fixture(autouse=True)
-def _isolate_thread_local():
-    # ThreadLocalMiddleware가 thread_local.current_request를 정리하지 않아, 직전 테스트의 (롤백된) user를
-    # get_current_user()가 반환하면서 FK violation이 발생. 양쪽으로 정리.
-    if hasattr(thread_local, "current_request"):
-        del thread_local.current_request
-    yield
-    if hasattr(thread_local, "current_request"):
-        del thread_local.current_request
 
 
 @pytest.fixture
