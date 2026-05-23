@@ -115,10 +115,7 @@ class OrderViewSet(
         self, request: request.Request, *args: tuple[typing.Any], **kwargs: dict[str, typing.Any]
     ) -> response.Response:
         """단일 상품 주문을 생성합니다."""
-        context = self.get_serializer_context() | {
-            "mode": OrderableCheckSerializerMode.CHECKOUT_SINGLE_PRODUCT,
-            "is_free_product_allowed": False,
-        }
+        context = self.get_serializer_context() | {"mode": OrderableCheckSerializerMode.CHECKOUT_SINGLE_PRODUCT}
         serializer = SingleProductCartOrderableCheckSerializer(data=request.data, context=context)
         serializer.is_valid(raise_exception=True)
         order_product_rel: OrderProductRelation = serializer.save()
@@ -153,10 +150,7 @@ class OrderViewSet(
         customer_info_serializer.is_valid(raise_exception=True)
         customer_info_serializer.save(order=cart)
 
-        context = self.get_serializer_context() | {
-            "mode": OrderableCheckSerializerMode.CHECKOUT_CART,
-            "is_free_product_allowed": False,
-        }
+        context = self.get_serializer_context() | {"mode": OrderableCheckSerializerMode.CHECKOUT_CART}
         cart_product_rels = sorted(cart.products.all(), key=lambda x: x.price, reverse=True)
         ProductOrderableCheckSerializer(
             data=[

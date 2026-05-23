@@ -118,7 +118,6 @@ class OrderProductImportSerializer(serializers.ModelSerializer):
             context={
                 "mode": OrderableCheckSerializerMode.CHECKOUT_SINGLE_PRODUCT,
                 "request": types.SimpleNamespace(user=self.user),
-                "is_free_product_allowed": True,
             },
             data={
                 "product": self.product.id,

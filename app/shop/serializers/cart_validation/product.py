@@ -86,10 +86,6 @@ class ProductOrderableCheckSerializer(serializers.ModelSerializer):
 
         return self.request.user
 
-    @property
-    def is_free_product_allowed(self) -> bool:
-        return self.context.get("is_free_product_allowed", False)
-
     def validate_product(self, product: Product) -> Product:
         # 판매 시작일 & 판매 종료일 사이가 아닌 경우 주문 불가능
         now = now_aware()
