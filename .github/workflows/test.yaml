@@ -1,0 +1,102 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches:
+      - 'main'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Run pytest (all tests)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17.2
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: pyconkr_2025_test_db
+        ports:
+          - 45432:5432
+        options: >-
+          --health-cmd "pg_isready -U user -d pyconkr_2025_test_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:alpine
+        ports:
+          - 46379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      ENV_PATH: ../envfile/.env.local
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          ignore-nothing-to-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run pytest
+        working-directory: app
+        run: uv run pytest
+
+  shop-coverage:
+    name: Verify shop coverage is 100%
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17.2
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: pyconkr_2025_test_db
+        ports:
+          - 45432:5432
+        options: >-
+          --health-cmd "pg_isready -U user -d pyconkr_2025_test_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:alpine
+        ports:
+          - 46379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          ignore-nothing-to-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run shop coverage check (fails if <100%)
+        run: make local-test-cov-shop
