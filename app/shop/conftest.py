@@ -1,6 +1,8 @@
-from datetime import datetime, timezone
+from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
-from unittest.mock import patch
+from typing import Literal
+from unittest.mock import DEFAULT, patch
 
 import pytest
 from core.external_apis.portone.client import portone_client
@@ -10,6 +12,30 @@ from shop.order.models import CustomerInfo, Order, OrderProductOptionRelation, O
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
 from shop.product.models import Category, CategoryGroup, Option, OptionGroup, Product, ProductTagRelation, Tag
 from user.models import UserExt
+
+
+@contextmanager
+def _strict_portone_mock(target_attr: str):
+    """`portone_client.<target_attr>` 를 mock 하되, `.return_value` 미설정 시 호출 즉시 RuntimeError.
+
+    Mock 내부 `_mock_return_value` 는 미설정 시 `DEFAULT` sentinel — side_effect 가 이를 검사하면
+    "테스트가 명시적으로 return_value 를 세팅했는가" 와 "자동 생성된 MagicMock 인가" 를 구분할 수 있다.
+    side_effect 가 `DEFAULT` 를 반환하면 Mock 은 정상 경로로 `return_value` 를 사용하므로 기존 호출부 변경 불요.
+    `.side_effect = ...` 를 직접 주입하는 테스트(예: `PortOneException`)는 그대로 동작.
+    """
+    with patch.object(portone_client, target_attr) as mocked:
+
+        def _strict(*_args, **_kwargs):
+            if mocked._mock_return_value is DEFAULT:
+                raise RuntimeError(
+                    f"PortOne mock `portone_client.{target_attr}` was called without an explicit `.return_value` — "
+                    f"set `mock.return_value = ...` before exercising the code under test."
+                )
+            return DEFAULT
+
+        mocked.side_effect = _strict
+        yield mocked
+
 
 # Product 모델 datetime default 인 naive datetime.min / max 는 Asia/Seoul → UTC 변환 시 Postgres timestamptz 범위 밖으로 나가 깨진다.
 # fixture 는 항상 tz-aware 명시값으로 생성.
@@ -161,17 +187,6 @@ def tag(product) -> Tag:
 
 
 @pytest.fixture
-def pending_order(customer_user, product) -> Order:
-    """결제 직전 cart 상태 — PaymentHistory 없음, OPR pending."""
-    order = Order.objects.create(
-        user=customer_user, name=product.name, name_ko=product.name_ko, name_en=product.name_en
-    )
-    OrderProductRelation.objects.create(order=order, product=product, price=product.price)
-    CustomerInfo.objects.create(order=order, name="홍길동", phone="01012345678", email="customer@example.com")
-    return order
-
-
-@pytest.fixture
 def single_product_cart(customer_user, product) -> SingleProductCart:
     """단일 상품 결제용 임시 cart — `to_order()` 로 같은 PK Order 로 승격됨."""
     opr = OrderProductRelation.objects.create(product=product, price=product.price)
@@ -182,67 +197,85 @@ def single_product_cart(customer_user, product) -> SingleProductCart:
     return cart
 
 
-@pytest.fixture
-def completed_order(pending_order) -> Order:
-    """결제 완료 — OPR paid + PaymentHistory completed."""
-    pending_order.products.update(status=OrderProductRelation.OrderProductStatus.paid)
-    PaymentHistory.objects.create(
-        order=pending_order,
-        imp_id=_COMPLETED_ORDER_IMP_ID,
-        status=PaymentHistoryStatus.completed,
-        price=pending_order.first_paid_price,
-    )
-    return pending_order
+OrderStatus = Literal["empty", "cart", "completed", "refunded", "partial_refunded"]
 
 
 @pytest.fixture
-def refunded_order(completed_order) -> Order:
-    """전액 환불된 주문 — PaymentHistory(refunded, price=0) 추가."""
-    completed_order.products.update(status=OrderProductRelation.OrderProductStatus.refunded)
-    PaymentHistory.objects.create(
-        order=completed_order,
-        imp_id=_COMPLETED_ORDER_IMP_ID,
-        status=PaymentHistoryStatus.refunded,
-        price=0,
-    )
-    return completed_order
+def order_factory(customer_user, product, donation_product):
+    """Order 팩토리 — 상태 / 후원 매트릭스를 한 함수로 표현.
+
+    Args:
+        status:
+            - ``"empty"``: OPR / CustomerInfo 없는 빈 Order (donation 인자 무시)
+            - ``"cart"``: PH 없음, OPR pending
+            - ``"completed"``: PH completed + OPR paid
+            - ``"refunded"``: 전액 환불 — PH refunded(price=0) 추가 + OPR refunded
+            - ``"partial_refunded"``: 부분 환불 — PH partial_refunded 추가
+        donation: OPR 의 ``donation_price`` 금액. ``>0`` 이면 ``donation_product`` (donation_allowed=True) 사용.
+    """
+
+    def make(*, status: OrderStatus = "cart", donation: int = 0) -> Order:
+        if status == "empty":
+            return Order.objects.create(user=customer_user, name="cart")
+
+        used_product = donation_product if donation > 0 else product
+        order = Order.objects.create(
+            user=customer_user,
+            name=used_product.name,
+            name_ko=used_product.name_ko,
+            name_en=used_product.name_en,
+        )
+        OrderProductRelation.objects.create(
+            order=order, product=used_product, price=used_product.price, donation_price=donation
+        )
+        CustomerInfo.objects.create(order=order, name="홍길동", phone="01012345678", email="customer@example.com")
+
+        if status == "cart":
+            return order
+
+        # status >= 'completed' — OPR paid + PH completed.
+        order.products.update(status=OrderProductRelation.OrderProductStatus.paid)
+        PaymentHistory.objects.create(
+            order=order,
+            imp_id=_COMPLETED_ORDER_IMP_ID,
+            status=PaymentHistoryStatus.completed,
+            price=order.first_paid_price,
+        )
+
+        if status == "completed":
+            return order
+
+        # completed → refunded/partial_refunded 의 두 번째 PH 는 명시적으로 더 늦은 created_at 으로 강제.
+        # auto_now_add 가 같은 microsecond 를 찍으면 current_status 의 `order_by("-created_at")` tie-break 가
+        # 불안정 — freeze_time 테스트에서 더욱 그러함. 첫 PH 의 created_at + 1초 로 명시 update.
+        first_ph = order.payment_histories.get()
+        later_at = first_ph.created_at + timedelta(seconds=1)
+
+        if status == "refunded":
+            order.products.update(status=OrderProductRelation.OrderProductStatus.refunded)
+            second_ph = PaymentHistory.objects.create(
+                order=order, imp_id=_COMPLETED_ORDER_IMP_ID, status=PaymentHistoryStatus.refunded, price=0
+            )
+            PaymentHistory.objects.filter(id=second_ph.id).update(created_at=later_at)
+            return order
+        if status == "partial_refunded":
+            second_ph = PaymentHistory.objects.create(
+                order=order,
+                imp_id=_COMPLETED_ORDER_IMP_ID,
+                status=PaymentHistoryStatus.partial_refunded,
+                price=order.first_paid_price // 2,
+            )
+            PaymentHistory.objects.filter(id=second_ph.id).update(created_at=later_at)
+            return order
+        raise ValueError(f"Unknown order_factory status: {status!r}")
+
+    return make
 
 
 @pytest.fixture
-def partial_refunded_order(completed_order) -> Order:
-    """부분 환불된 주문 — PaymentHistory(partial_refunded) 추가."""
-    PaymentHistory.objects.create(
-        order=completed_order,
-        imp_id=_COMPLETED_ORDER_IMP_ID,
-        status=PaymentHistoryStatus.partial_refunded,
-        price=completed_order.first_paid_price // 2,
-    )
-    return completed_order
-
-
-@pytest.fixture
-def empty_cart(customer_user) -> Order:
-    """OPR 없는 빈 Order — PaymentHistory 없는 cart 상태."""
-    return Order.objects.create(user=customer_user, name="cart")
-
-
-@pytest.fixture
-def donation_completed_order(completed_order, donation_product) -> Order:
-    """결제 완료 + OPR 에 donation_price 부여 — patron / 후원 통계 테스트용."""
-    completed_order.products.update(donation_price=5000)
-    return completed_order
-
-
-@pytest.fixture
-def donation_refunded_order(refunded_order, donation_product) -> Order:
-    """전액 환불 + OPR 에 donation_price 부여 — 환불된 후원 주문 boundary 테스트용."""
-    refunded_order.products.update(donation_price=5000)
-    return refunded_order
-
-
-@pytest.fixture
-def modifiable_option_relation(completed_order, product) -> OrderProductOptionRelation:
+def modifiable_option_relation(order_factory, product) -> OrderProductOptionRelation:
     """custom_response 수정 가능 옵션 — `response_modifiable_ends_at` 미래, paid OPR 에 attached."""
+    completed_order = order_factory(status="completed")
     group = OptionGroup.objects.create(
         product=product,
         name="요청사항",
@@ -259,27 +292,36 @@ def modifiable_option_relation(completed_order, product) -> OrderProductOptionRe
 
 @pytest.fixture
 def mock_portone_find_payment_info():
-    """`portone_client.find_payment_info` 를 mock. 각 테스트에서 `.return_value` 를 덮어쓴다."""
-    with patch.object(portone_client, "find_payment_info") as mocked:
+    """`portone_client.find_payment_info` 를 mock. `.return_value` 미설정 시 호출 즉시 RuntimeError."""
+    with _strict_portone_mock("find_payment_info") as mocked:
         yield mocked
 
 
 @pytest.fixture
 def mock_portone_req_cancel_payment():
-    """`portone_client.req_cancel_payment` 를 mock — 환불 호출 검증 / 실패 주입에 사용."""
+    """`portone_client.req_cancel_payment` 를 mock — 환불 호출 검증 / 실패 주입에 사용.
+
+    환불 호출은 반환값을 호출자가 사용하지 않으므로 (호출 인자/횟수만 검증), 명시 세팅 없이도 None 반환 허용.
+    """
     with patch.object(portone_client, "req_cancel_payment") as mocked:
         yield mocked
 
 
 @pytest.fixture
 def mock_portone_register():
-    """`portone_client.register_or_update_prepared_payment` 를 mock — 결제 사전 등록 호출 검증."""
+    """`portone_client.register_or_update_prepared_payment` 를 mock — 결제 사전 등록 호출 검증.
+
+    반환값을 호출자가 사용하지 않으므로 명시 세팅 없이도 None 반환 허용.
+    """
     with patch.object(portone_client, "register_or_update_prepared_payment") as mocked:
         yield mocked
 
 
 @pytest.fixture
 def mock_portone_kcp_receipt():
-    """`portone_client.get_kcp_receipt_search_data` 를 mock — 영수증 페이지 redirect 데이터 주입."""
-    with patch.object(portone_client, "get_kcp_receipt_search_data") as mocked:
+    """`portone_client.get_kcp_receipt_search_data` 를 mock — `.return_value` 미설정 시 호출 즉시 RuntimeError.
+
+    영수증 응답 dict 의 형태가 redirect 처리에 영향을 주므로 strict 모드.
+    """
+    with _strict_portone_mock("get_kcp_receipt_search_data") as mocked:
         yield mocked

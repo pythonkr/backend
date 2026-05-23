@@ -55,7 +55,8 @@ def test_validate_rejects_when_merchant_uid_matches_no_order_or_cart(mock_porton
 
 
 @pytest.mark.django_db
-def test_validate_rejects_when_portone_api_returns_non_paid_status(pending_order, mock_portone_find_payment_info):
+def test_validate_rejects_when_portone_api_returns_non_paid_status(mock_portone_find_payment_info, order_factory):
+    pending_order = order_factory()
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=pending_order, status="ready")
     serializer = PortOneV1WebhookRequestSerializer(data=make_webhook_payload(merchant_uid=str(pending_order.id)))
     assert serializer.is_valid() is False
@@ -67,7 +68,8 @@ def test_validate_rejects_when_portone_api_returns_non_paid_status(pending_order
 
 
 @pytest.mark.django_db
-def test_validate_rejects_when_currency_is_not_krw(pending_order, mock_portone_find_payment_info):
+def test_validate_rejects_when_currency_is_not_krw(mock_portone_find_payment_info, order_factory):
+    pending_order = order_factory()
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=pending_order, currency="USD")
     serializer = PortOneV1WebhookRequestSerializer(data=make_webhook_payload(merchant_uid=str(pending_order.id)))
     assert serializer.is_valid() is False
@@ -77,7 +79,8 @@ def test_validate_rejects_when_currency_is_not_krw(pending_order, mock_portone_f
 
 
 @pytest.mark.django_db
-def test_validate_rejects_when_retrieved_merchant_uid_does_not_match(pending_order, mock_portone_find_payment_info):
+def test_validate_rejects_when_retrieved_merchant_uid_does_not_match(mock_portone_find_payment_info, order_factory):
+    pending_order = order_factory()
     mock_portone_find_payment_info.return_value = make_portone_payment_info(
         order=pending_order, merchant_uid="different-merchant-uid"
     )
@@ -91,7 +94,8 @@ def test_validate_rejects_when_retrieved_merchant_uid_does_not_match(pending_ord
 
 
 @pytest.mark.django_db
-def test_validate_rejects_when_paid_amount_does_not_match_order_price(pending_order, mock_portone_find_payment_info):
+def test_validate_rejects_when_paid_amount_does_not_match_order_price(mock_portone_find_payment_info, order_factory):
+    pending_order = order_factory()
     mock_portone_find_payment_info.return_value = make_portone_payment_info(
         order=pending_order, amount=pending_order.first_paid_price - 1
     )
@@ -103,7 +107,8 @@ def test_validate_rejects_when_paid_amount_does_not_match_order_price(pending_or
 
 
 @pytest.mark.django_db
-def test_validate_rejects_when_portone_api_raises(pending_order, mock_portone_find_payment_info):
+def test_validate_rejects_when_portone_api_raises(mock_portone_find_payment_info, order_factory):
+    pending_order = order_factory()
     mock_portone_find_payment_info.side_effect = PortOneException("PortOne 서버 통신 실패")
     serializer = PortOneV1WebhookRequestSerializer(data=make_webhook_payload(merchant_uid=str(pending_order.id)))
     assert serializer.is_valid() is False
@@ -113,7 +118,8 @@ def test_validate_rejects_when_portone_api_raises(pending_order, mock_portone_fi
 
 
 @pytest.mark.django_db
-def test_validate_passes_happy_path_for_order(pending_order, mock_portone_find_payment_info):
+def test_validate_passes_happy_path_for_order(mock_portone_find_payment_info, order_factory):
+    pending_order = order_factory()
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=pending_order)
     serializer = PortOneV1WebhookRequestSerializer(data=make_webhook_payload(merchant_uid=str(pending_order.id)))
     assert serializer.is_valid()
@@ -129,7 +135,8 @@ def test_validate_passes_happy_path_for_single_product_cart(single_product_cart,
 
 
 @pytest.mark.django_db
-def test_create_completes_pending_order(pending_order, mock_portone_find_payment_info):
+def test_create_completes_pending_order(mock_portone_find_payment_info, order_factory):
+    pending_order = order_factory()
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=pending_order, imp_uid="imp_done")
     serializer = PortOneV1WebhookRequestSerializer(
         data=make_webhook_payload(merchant_uid=str(pending_order.id), imp_uid="imp_done")
@@ -159,10 +166,12 @@ def test_create_promotes_single_product_cart_to_order(single_product_cart, mock_
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("order_fixture", ["completed_order", "refunded_order", "partial_refunded_order"])
-def test_create_rejects_webhook_when_state_machine_blocks(order_fixture, request, mock_portone_find_payment_info):
+@pytest.mark.parametrize("terminal_status", ["completed", "refunded", "partial_refunded"])
+def test_create_rejects_webhook_when_state_machine_blocks(
+    terminal_status, order_factory, mock_portone_find_payment_info
+):
     # 결제 완료 / 환불 / 부분환불 어느 terminal state 든 webhook 재시도 (pending → completed 외 전이) 는 거절.
-    order = request.getfixturevalue(order_fixture)
+    order = order_factory(status=terminal_status)
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=order)
     serializer = PortOneV1WebhookRequestSerializer(data=make_webhook_payload(merchant_uid=str(order.id)))
     assert serializer.is_valid()
@@ -175,7 +184,8 @@ def test_create_rejects_webhook_when_state_machine_blocks(order_fixture, request
 
 
 @pytest.mark.django_db
-def test_create_registers_notification_task_on_commit(pending_order, mock_portone_find_payment_info, mocked_on_commit):
+def test_create_registers_notification_task_on_commit(mock_portone_find_payment_info, mocked_on_commit, order_factory):
+    pending_order = order_factory()
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=pending_order)
     serializer = PortOneV1WebhookRequestSerializer(data=make_webhook_payload(merchant_uid=str(pending_order.id)))
     assert serializer.is_valid()
@@ -190,7 +200,16 @@ def test_create_registers_notification_task_on_commit(pending_order, mock_porton
 
 
 @pytest.mark.django_db
-def test_create_rolls_back_when_state_machine_blocks(completed_order, mock_portone_find_payment_info):
+def test_strict_mock_raises_when_return_value_not_set(mock_portone_find_payment_info, order_factory):
+    pending_order = order_factory()
+    serializer = PortOneV1WebhookRequestSerializer(data=make_webhook_payload(merchant_uid=str(pending_order.id)))
+    with pytest.raises(RuntimeError, match="without an explicit `.return_value`"):
+        serializer.is_valid()
+
+
+@pytest.mark.django_db
+def test_create_rolls_back_when_state_machine_blocks(mock_portone_find_payment_info, order_factory):
+    completed_order = order_factory(status="completed")
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=completed_order)
     serializer = PortOneV1WebhookRequestSerializer(data=make_webhook_payload(merchant_uid=str(completed_order.id)))
     assert serializer.is_valid()

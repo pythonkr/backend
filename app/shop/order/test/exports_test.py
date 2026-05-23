@@ -6,7 +6,8 @@ from shop.product.models import OptionGroup
 
 
 @pytest.mark.django_db
-def test_order_export_returns_dataframe_with_korean_renamed_columns(completed_order):
+def test_order_export_returns_dataframe_with_korean_renamed_columns(order_factory):
+    completed_order = order_factory(status="completed")
     df = OrderExportSerializer(instance=Order.objects.filter(id=completed_order.id), many=True).export()
     assert df.to_dict(orient="records") == [
         {
@@ -35,7 +36,8 @@ def test_order_export_returns_empty_dataframe_for_empty_queryset():
 
 
 @pytest.mark.django_db
-def test_order_product_export_flattens_options_as_dynamic_columns(completed_order, product):
+def test_order_product_export_flattens_options_as_dynamic_columns(product, order_factory):
+    completed_order = order_factory(status="completed")
     size_group = OptionGroup.objects.create(product=product, name="사이즈")
     opr = completed_order.products.first()
     OrderProductOptionRelation.objects.create(

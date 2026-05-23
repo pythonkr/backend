@@ -22,7 +22,8 @@ def test_pending_cart_first_paid_price_is_zero_when_no_products(customer_user):
 
 
 @pytest.mark.django_db
-def test_pending_cart_payment_history_accessors_return_none_when_no_history(pending_order):
+def test_pending_cart_payment_history_accessors_return_none_when_no_history(order_factory):
+    pending_order = order_factory()
     assert pending_order.first_payment_history is None
     assert pending_order.first_paid_at is None
     assert pending_order.current_payment_history is None
@@ -33,7 +34,8 @@ def test_pending_cart_payment_history_accessors_return_none_when_no_history(pend
 
 
 @pytest.mark.django_db
-def test_first_payment_history_returns_oldest_among_multiple(completed_order):
+def test_first_payment_history_returns_oldest_among_multiple(order_factory):
+    completed_order = order_factory(status="completed")
     completed = completed_order.payment_histories.first()
     PaymentHistory.objects.create(
         order=completed_order, imp_id="imp_test_completed", status=PaymentHistoryStatus.refunded, price=0
@@ -45,7 +47,8 @@ def test_first_payment_history_returns_oldest_among_multiple(completed_order):
 
 
 @pytest.mark.django_db
-def test_current_payment_history_returns_newest_among_multiple(completed_order):
+def test_current_payment_history_returns_newest_among_multiple(order_factory):
+    completed_order = order_factory(status="completed")
     refund_ph = PaymentHistory.objects.create(
         order=completed_order, imp_id="imp_test_completed", status=PaymentHistoryStatus.refunded, price=0
     )
@@ -58,8 +61,8 @@ def test_current_payment_history_returns_newest_among_multiple(completed_order):
 
 
 @pytest.mark.django_db
-def test_payment_history_accessors_use_prefetched_attr_when_present(pending_order):
-    # `_payment_histories_by_latest` prefetch (Order.prefetchs) 가 있으면 그 list 를 사용 — DB 재조회 안 함.
+def test_payment_history_accessors_use_prefetched_attr_when_present(order_factory):
+    pending_order = order_factory()
     ph1 = PaymentHistory.objects.create(
         order=pending_order, imp_id="imp_a", status=PaymentHistoryStatus.completed, price=10000
     )
@@ -75,17 +78,20 @@ def test_payment_history_accessors_use_prefetched_attr_when_present(pending_orde
 
 
 @pytest.mark.django_db
-def test_not_fully_refundable_reason_when_no_imp_id(pending_order):
+def test_not_fully_refundable_reason_when_no_imp_id(order_factory):
+    pending_order = order_factory()
     assert pending_order.not_fully_refundable_reason == NotRefundableErrorMessages.ORDER_IMP_ID_NOT_EXIST
 
 
 @pytest.mark.django_db
-def test_not_fully_refundable_reason_when_order_status_not_refundable(refunded_order):
+def test_not_fully_refundable_reason_when_order_status_not_refundable(order_factory):
+    refunded_order = order_factory(status="refunded")
     assert refunded_order.not_fully_refundable_reason == NotRefundableErrorMessages.ORDER_NOT_REFUNDABLE_STATUS
 
 
 @pytest.mark.django_db
-def test_not_fully_refundable_reason_when_any_opr_is_pending(completed_order, product):
+def test_not_fully_refundable_reason_when_any_opr_is_pending(product, order_factory):
+    completed_order = order_factory(status="completed")
     OrderProductRelation.objects.create(order=completed_order, product=product, price=product.price)
     refreshed = Order.objects.get(id=completed_order.id)
     assert (
@@ -95,7 +101,8 @@ def test_not_fully_refundable_reason_when_any_opr_is_pending(completed_order, pr
 
 
 @pytest.mark.django_db
-def test_not_fully_refundable_reason_when_any_opr_is_used(completed_order):
+def test_not_fully_refundable_reason_when_any_opr_is_used(order_factory):
+    completed_order = order_factory(status="completed")
     completed_order.products.update(status=OrderProductRelation.OrderProductStatus.used)
     refreshed = Order.objects.get(id=completed_order.id)
     assert (
@@ -105,8 +112,8 @@ def test_not_fully_refundable_reason_when_any_opr_is_used(completed_order):
 
 
 @pytest.mark.django_db
-def test_not_fully_refundable_reason_when_no_paid_product(completed_order):
-    # OPR 만 refunded — PaymentHistory 는 그대로라 current_status 는 completed 유지 → 다음 가드에서 ORDER_REFUNDABLE_PRODUCT_NOT_FOUND.
+def test_not_fully_refundable_reason_when_no_paid_product(order_factory):
+    completed_order = order_factory(status="completed")
     completed_order.products.update(status=OrderProductRelation.OrderProductStatus.refunded)
     refreshed = Order.objects.get(id=completed_order.id)
     assert refreshed.not_fully_refundable_reason == NotRefundableErrorMessages.ORDER_REFUNDABLE_PRODUCT_NOT_FOUND
@@ -124,8 +131,8 @@ def test_not_fully_refundable_reason_when_price_zero(customer_user, product):
 
 
 @pytest.mark.django_db
-def test_not_fully_refundable_reason_when_expected_price_mismatch(completed_order, product):
-    # paid OPR 추가 → expected_refund_price 증가, current_paid_price 는 그대로 → MISMATCH.
+def test_not_fully_refundable_reason_when_expected_price_mismatch(product, order_factory):
+    completed_order = order_factory(status="completed")
     OrderProductRelation.objects.create(
         order=completed_order, product=product, price=5000, status=OrderProductRelation.OrderProductStatus.paid
     )
@@ -135,17 +142,20 @@ def test_not_fully_refundable_reason_when_expected_price_mismatch(completed_orde
 
 @freeze_time(datetime(2100, 1, 1, tzinfo=timezone.utc))
 @pytest.mark.django_db
-def test_not_fully_refundable_reason_when_refund_window_expired(completed_order):
+def test_not_fully_refundable_reason_when_refund_window_expired(order_factory):
+    completed_order = order_factory(status="completed")
     assert completed_order.not_fully_refundable_reason == NotRefundableErrorMessages.ONE_OF_PRODUCT_REFUND_TIME_EXPIRED
 
 
 @pytest.mark.django_db
-def test_not_fully_refundable_reason_returns_none_for_refundable_order(completed_order):
+def test_not_fully_refundable_reason_returns_none_for_refundable_order(order_factory):
+    completed_order = order_factory(status="completed")
     assert completed_order.not_fully_refundable_reason is None
 
 
 @pytest.mark.django_db
-def test_filter_has_payment_histories_includes_only_orders_with_payment(completed_order, customer_user):
+def test_filter_has_payment_histories_includes_only_orders_with_payment(customer_user, order_factory):
+    completed_order = order_factory(status="completed")
     cart = Order.objects.create(user=customer_user, name="cart")
     qs = Order.objects.filter_has_payment_histories().filter(user=customer_user)
     ids = list(qs.values_list("id", flat=True))
@@ -154,7 +164,8 @@ def test_filter_has_payment_histories_includes_only_orders_with_payment(complete
 
 
 @pytest.mark.django_db
-def test_filter_has_no_payment_histories_includes_only_carts(completed_order, customer_user):
+def test_filter_has_no_payment_histories_includes_only_carts(customer_user, order_factory):
+    completed_order = order_factory(status="completed")
     cart = Order.objects.create(user=customer_user, name="cart")
     qs = Order.objects.filter_has_no_payment_histories().filter(user=customer_user)
     ids = list(qs.values_list("id", flat=True))
@@ -164,8 +175,9 @@ def test_filter_has_no_payment_histories_includes_only_carts(completed_order, cu
 
 @pytest.mark.django_db
 def test_filter_purchased_by_returns_only_target_users_purchased_orders(
-    completed_order, customer_user, other_user, product
+    customer_user, other_user, product, order_factory
 ):
+    completed_order = order_factory(status="completed")
     other_order = Order.objects.create(user=other_user, name="other")
     OrderProductRelation.objects.create(
         order=other_order, product=product, price=product.price, status=OrderProductRelation.OrderProductStatus.paid
@@ -180,8 +192,8 @@ def test_filter_purchased_by_returns_only_target_users_purchased_orders(
 
 
 @pytest.mark.django_db
-def test_filter_purchased_by_excludes_pending_status_orders(pending_order, customer_user):
-    # pending → PURCHASED_STATUSES 미포함.
+def test_filter_purchased_by_excludes_pending_status_orders(customer_user, order_factory):
+    pending_order = order_factory()
     qs = Order.objects.filter_purchased_by(customer_user)
     assert pending_order.id not in list(qs.values_list("id", flat=True))
 

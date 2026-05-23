@@ -6,10 +6,11 @@ from shop.test.helpers import OrderProductsApi
 
 
 @pytest.mark.django_db
-def test_modify_options_updates_custom_response(modifiable_option_relation, completed_order, customer_client):
-    opr = completed_order.products.first()
+def test_modify_options_updates_custom_response(modifiable_option_relation, customer_client):
+    # `modifiable_option_relation` fixture 가 이미 completed_order 를 생성 + OPOR 를 거기 OPR 에 attach.
+    opr = modifiable_option_relation.order_product_relation
     response = OrderProductsApi(http_client=customer_client).modify_options(
-        completed_order.id,
+        opr.order_id,
         opr.id,
         [{"order_product_option_relation": str(modifiable_option_relation.id), "custom_response": "updated"}],
     )
@@ -21,10 +22,10 @@ def test_modify_options_updates_custom_response(modifiable_option_relation, comp
 
 
 @pytest.mark.django_db
-def test_modify_options_rejects_other_users_opr(modifiable_option_relation, completed_order, other_client):
-    opr = completed_order.products.first()
+def test_modify_options_rejects_other_users_opr(modifiable_option_relation, other_client):
+    opr = modifiable_option_relation.order_product_relation
     response = OrderProductsApi(http_client=other_client).modify_options(
-        completed_order.id,
+        opr.order_id,
         opr.id,
         [{"order_product_option_relation": str(modifiable_option_relation.id), "custom_response": "updated"}],
     )
@@ -33,9 +34,9 @@ def test_modify_options_rejects_other_users_opr(modifiable_option_relation, comp
 
 @pytest.mark.django_db
 def test_destroy_order_product_refunds_partially(
-    customer_client, completed_order, product, mock_portone_req_cancel_payment
+    customer_client, product, mock_portone_req_cancel_payment, order_factory
 ):
-    # 두 번째 paid OPR 추가 → 첫 OPR 환불 시 partial_refunded 기록.
+    completed_order = order_factory(status="completed")
     target_opr = completed_order.products.first()
     OrderProductRelation.objects.create(
         order=completed_order, product=product, price=product.price, status=OrderProductRelation.OrderProductStatus.paid
@@ -48,7 +49,8 @@ def test_destroy_order_product_refunds_partially(
 
 
 @pytest.mark.django_db
-def test_destroy_order_product_rejects_other_users_opr(other_client, completed_order, mock_portone_req_cancel_payment):
+def test_destroy_order_product_rejects_other_users_opr(other_client, mock_portone_req_cancel_payment, order_factory):
+    completed_order = order_factory(status="completed")
     target_opr = completed_order.products.first()
     response = OrderProductsApi(http_client=other_client).delete_partial(completed_order.id, target_opr.id)
     assert response.status_code == HTTP_404_NOT_FOUND
@@ -57,8 +59,9 @@ def test_destroy_order_product_rejects_other_users_opr(other_client, completed_o
 
 @pytest.mark.django_db
 def test_destroy_order_product_rejects_when_status_not_paid(
-    customer_client, completed_order, mock_portone_req_cancel_payment
+    customer_client, mock_portone_req_cancel_payment, order_factory
 ):
+    completed_order = order_factory(status="completed")
     target_opr = completed_order.products.first()
     target_opr.status = OrderProductRelation.OrderProductStatus.used
     target_opr.save()
@@ -68,8 +71,8 @@ def test_destroy_order_product_rejects_when_status_not_paid(
 
 
 @pytest.mark.django_db
-def test_destroy_order_product_returns_404_for_unauthenticated_request(anon_client, completed_order):
-    # 비인증 → ViewSet 의 get_queryset 이 `OrderProductRelation.objects.none()` 반환 → 404.
+def test_destroy_order_product_returns_404_for_unauthenticated_request(anon_client, order_factory):
+    completed_order = order_factory(status="completed")
     response = OrderProductsApi(http_client=anon_client).delete_partial(
         completed_order.id, completed_order.products.first().id
     )

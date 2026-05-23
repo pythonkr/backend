@@ -26,28 +26,33 @@ def test_order_list_returns_empty_for_unauthenticated_request(anon_client):
 
 
 @pytest.mark.django_db
-def test_order_list_returns_only_orders_with_payment_history(customer_client, completed_order, empty_cart):
+def test_order_list_returns_only_orders_with_payment_history(customer_client, order_factory):
+    completed_order = order_factory(status="completed")
+    order_factory(status="empty")
     response = OrdersApi(http_client=customer_client).list()
     assert response.status_code == HTTP_200_OK
     assert response.json() == to_json([OrderDto(instance=completed_order).data])
 
 
 @pytest.mark.django_db
-def test_order_list_excludes_other_users_orders(other_client, completed_order):
+def test_order_list_excludes_other_users_orders(other_client, order_factory):
+    order_factory(status="completed")
     response = OrdersApi(http_client=other_client).list()
     assert response.status_code == HTTP_200_OK
     assert response.json() == []
 
 
 @pytest.mark.django_db
-def test_order_retrieve_returns_full_order_dto(customer_client, completed_order):
+def test_order_retrieve_returns_full_order_dto(customer_client, order_factory):
+    completed_order = order_factory(status="completed")
     response = OrdersApi(http_client=customer_client).retrieve(completed_order.id)
     assert response.status_code == HTTP_200_OK
     assert response.json() == to_json(OrderDto(instance=completed_order).data)
 
 
 @pytest.mark.django_db
-def test_order_retrieve_returns_404_for_other_users_order(other_client, completed_order):
+def test_order_retrieve_returns_404_for_other_users_order(other_client, order_factory):
+    completed_order = order_factory(status="completed")
     response = OrdersApi(http_client=other_client).retrieve(completed_order.id)
     assert response.status_code == HTTP_404_NOT_FOUND
 
@@ -96,7 +101,8 @@ def test_create_single_product_order_rejects_invalid_product(customer_client, mo
 
 
 @pytest.mark.django_db
-def test_create_order_rejects_when_cart_is_empty(customer_client, empty_cart, mock_portone_register):
+def test_create_order_rejects_when_cart_is_empty(customer_client, mock_portone_register, order_factory):
+    order_factory(status="empty")
     response = OrdersApi(http_client=customer_client).create(
         {"name": "홍길동", "phone": "010-1234-5678", "email": "customer@example.com", "organization": ""}
     )
@@ -127,8 +133,9 @@ def test_create_order_persists_customer_info_and_schedules_portone_call(
 
 @pytest.mark.django_db
 def test_destroy_order_refunds_when_owned_by_request_user(
-    customer_client, completed_order, mock_portone_req_cancel_payment
+    customer_client, mock_portone_req_cancel_payment, order_factory
 ):
+    completed_order = order_factory(status="completed")
     opr = completed_order.products.first()
     response = OrdersApi(http_client=customer_client).delete(completed_order.id)
     assert response.status_code == HTTP_204_NO_CONTENT
@@ -141,16 +148,16 @@ def test_destroy_order_refunds_when_owned_by_request_user(
 
 
 @pytest.mark.django_db
-def test_destroy_order_rejects_other_users_order(other_client, completed_order, mock_portone_req_cancel_payment):
+def test_destroy_order_rejects_other_users_order(other_client, mock_portone_req_cancel_payment, order_factory):
+    completed_order = order_factory(status="completed")
     response = OrdersApi(http_client=other_client).delete(completed_order.id)
     assert response.status_code == HTTP_404_NOT_FOUND
     mock_portone_req_cancel_payment.assert_not_called()
 
 
 @pytest.mark.django_db
-def test_retrieve_receipt_returns_kcp_redirect_html_for_owner(
-    customer_client, completed_order, mock_portone_kcp_receipt
-):
+def test_retrieve_receipt_returns_kcp_redirect_html_for_owner(customer_client, mock_portone_kcp_receipt, order_factory):
+    completed_order = order_factory(status="completed")
     mock_portone_kcp_receipt.return_value.to_search_data.return_value = {"x": "y"}
     mock_portone_kcp_receipt.return_value.to_kcp_signed_search_data.return_value = "signed"
     response = OrdersApi(http_client=customer_client).retrieve_receipt(completed_order.id)
@@ -159,21 +166,23 @@ def test_retrieve_receipt_returns_kcp_redirect_html_for_owner(
 
 
 @pytest.mark.django_db
-def test_retrieve_receipt_returns_404_when_order_has_no_imp_id(customer_client, pending_order):
+def test_retrieve_receipt_returns_404_when_order_has_no_imp_id(customer_client, order_factory):
+    pending_order = order_factory()
     response = OrdersApi(http_client=customer_client).retrieve_receipt(pending_order.id)
     assert response.status_code == HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
-def test_retrieve_receipt_returns_404_when_payment_history_has_no_imp_id(customer_client, completed_order):
-    # CSV import 경로처럼 imp_id=None — queryset 필터는 통과하나 action body 에서 404 HTML.
+def test_retrieve_receipt_returns_404_when_payment_history_has_no_imp_id(customer_client, order_factory):
+    completed_order = order_factory(status="completed")
     completed_order.payment_histories.update(imp_id=None)
     response = OrdersApi(http_client=customer_client).retrieve_receipt(completed_order.id)
     assert response.status_code == HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
-def test_retrieve_receipt_allows_staff_to_access_any_order(staff_client, completed_order, mock_portone_kcp_receipt):
+def test_retrieve_receipt_allows_staff_to_access_any_order(staff_client, mock_portone_kcp_receipt, order_factory):
+    completed_order = order_factory(status="completed")
     mock_portone_kcp_receipt.return_value.to_search_data.return_value = {"x": "y"}
     mock_portone_kcp_receipt.return_value.to_kcp_signed_search_data.return_value = "signed"
     response = OrdersApi(http_client=staff_client).retrieve_receipt(completed_order.id)
@@ -182,8 +191,9 @@ def test_retrieve_receipt_allows_staff_to_access_any_order(staff_client, complet
 
 @pytest.mark.django_db
 def test_retrieve_receipt_returns_500_when_portone_unavailable(
-    customer_client, completed_order, mock_portone_kcp_receipt
+    customer_client, mock_portone_kcp_receipt, order_factory
 ):
+    completed_order = order_factory(status="completed")
     mock_portone_kcp_receipt.side_effect = PortOneException("down")
     response = OrdersApi(http_client=customer_client).retrieve_receipt(completed_order.id)
     assert response.status_code == HTTP_500_INTERNAL_SERVER_ERROR

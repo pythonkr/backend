@@ -28,7 +28,9 @@ def test_admin_list_rejects_non_superuser_client(request, client_fixture):
 
 
 @pytest.mark.django_db
-def test_admin_list_returns_only_orders_with_payment_history_and_products(api_client, completed_order, empty_cart):
+def test_admin_list_returns_only_orders_with_payment_history_and_products(api_client, order_factory):
+    completed_order = order_factory(status="completed")
+    order_factory(status="empty")
     response = OrdersAdminApi(http_client=api_client).list()
     assert response.status_code == HTTP_200_OK
     assert response.json() == {
@@ -40,7 +42,9 @@ def test_admin_list_returns_only_orders_with_payment_history_and_products(api_cl
 
 
 @pytest.mark.django_db
-def test_admin_list_filters_by_status_csv(api_client, completed_order, refunded_order):
+def test_admin_list_filters_by_status_csv(api_client, order_factory):
+    order_factory(status="completed")
+    refunded_order = order_factory(status="refunded")
     response = OrdersAdminApi(http_client=api_client).list({"status": "refunded"})
     assert response.status_code == HTTP_200_OK
     assert response.json() == {
@@ -52,8 +56,8 @@ def test_admin_list_filters_by_status_csv(api_client, completed_order, refunded_
 
 
 @pytest.mark.django_db
-def test_admin_list_filters_by_product_id_distinct(api_client, completed_order, product):
-    # distinct=True 라 OPR 여러 개 매칭돼도 같은 order 한 번만 반환.
+def test_admin_list_filters_by_product_id_distinct(api_client, product, order_factory):
+    completed_order = order_factory(status="completed")
     response = OrdersAdminApi(http_client=api_client).list({"product_id": str(product.id)})
     assert response.status_code == HTTP_200_OK
     assert response.json() == {
@@ -65,16 +69,16 @@ def test_admin_list_filters_by_product_id_distinct(api_client, completed_order, 
 
 
 @pytest.mark.django_db
-def test_admin_retrieve_returns_nested_payload(api_client, completed_order):
+def test_admin_retrieve_returns_nested_payload(api_client, order_factory):
+    completed_order = order_factory(status="completed")
     response = OrdersAdminApi(http_client=api_client).retrieve(completed_order.id)
     assert response.status_code == HTTP_200_OK
     assert response.json() == OrderAdminSerializer(instance=OrderAdminViewSet.queryset.get(id=completed_order.id)).data
 
 
 @pytest.mark.django_db
-def test_admin_refund_action_refunds_order_with_valid_totp(
-    api_client, completed_order, mock_portone_req_cancel_payment
-):
+def test_admin_refund_action_refunds_order_with_valid_totp(api_client, mock_portone_req_cancel_payment, order_factory):
+    completed_order = order_factory(status="completed")
     response = OrdersAdminApi(http_client=api_client).refund(completed_order.id, totp=valid_refund_totp())
     assert response.status_code == HTTP_204_NO_CONTENT
     completed_order.refresh_from_db()
@@ -84,14 +88,16 @@ def test_admin_refund_action_refunds_order_with_valid_totp(
 
 
 @pytest.mark.django_db
-def test_admin_refund_action_rejects_invalid_totp(api_client, completed_order, mock_portone_req_cancel_payment):
+def test_admin_refund_action_rejects_invalid_totp(api_client, mock_portone_req_cancel_payment, order_factory):
+    completed_order = order_factory(status="completed")
     response = OrdersAdminApi(http_client=api_client).refund(completed_order.id, totp="000000")
     assert response.status_code == HTTP_400_BAD_REQUEST
     mock_portone_req_cancel_payment.assert_not_called()
 
 
 @pytest.mark.django_db
-def test_admin_refund_action_rejects_missing_totp(api_client, completed_order, mock_portone_req_cancel_payment):
+def test_admin_refund_action_rejects_missing_totp(api_client, mock_portone_req_cancel_payment, order_factory):
+    completed_order = order_factory(status="completed")
     response = OrdersAdminApi(http_client=api_client).refund(completed_order.id)
     assert response.status_code == HTTP_400_BAD_REQUEST
     mock_portone_req_cancel_payment.assert_not_called()
@@ -99,8 +105,9 @@ def test_admin_refund_action_rejects_missing_totp(api_client, completed_order, m
 
 @pytest.mark.django_db
 def test_admin_refund_product_action_does_partial_refund(
-    api_client, completed_order, product, mock_portone_req_cancel_payment
+    api_client, product, mock_portone_req_cancel_payment, order_factory
 ):
+    completed_order = order_factory(status="completed")
     target_opr = completed_order.products.first()
     OrderProductRelation.objects.create(
         order=completed_order, product=product, price=product.price, status=OrderProductRelation.OrderProductStatus.paid
@@ -116,7 +123,8 @@ def test_admin_refund_product_action_does_partial_refund(
 
 
 @pytest.mark.django_db
-def test_admin_refund_product_action_returns_404_for_unknown_rel(api_client, completed_order):
+def test_admin_refund_product_action_returns_404_for_unknown_rel(api_client, order_factory):
+    completed_order = order_factory(status="completed")
     response = OrdersAdminApi(http_client=api_client).refund_product(
         completed_order.id, "00000000-0000-0000-0000-000000000000", totp=valid_refund_totp()
     )
@@ -124,8 +132,8 @@ def test_admin_refund_product_action_returns_404_for_unknown_rel(api_client, com
 
 
 @pytest.mark.django_db
-def test_admin_refund_allows_expired_window(api_client, completed_order, mock_portone_req_cancel_payment):
-    # admin endpoint 는 check_refundable_date=False 로 expired 상품도 환불 가능.
+def test_admin_refund_allows_expired_window(api_client, mock_portone_req_cancel_payment, order_factory):
+    completed_order = order_factory(status="completed")
     product = completed_order.products.first().product
     product.refundable_ends_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
     product.save()
@@ -196,8 +204,9 @@ def test_admin_import_csv_returns_400_for_invalid_rows_without_persisting(api_cl
 @freeze_time(datetime(2026, 5, 23, 15, 30, 45, tzinfo=timezone.utc))
 @pytest.mark.django_db
 def test_admin_export_returns_xlsx_filtering_refunded_per_include_flag(
-    api_client, customer_user, refunded_order, product, include_refunded
+    api_client, customer_user, product, include_refunded, order_factory
 ):
+    refunded_order = order_factory(status="refunded")
     response = OrdersAdminApi(http_client=api_client).export(
         {"product_ids": [str(product.id)], "include_refunded": include_refunded}
     )
@@ -262,7 +271,8 @@ def test_admin_export_rejects_missing_or_empty_product_ids(api_client, payload):
 
 
 @pytest.mark.django_db
-def test_admin_partial_update_modifies_existing_customer_info(api_client, completed_order):
+def test_admin_partial_update_modifies_existing_customer_info(api_client, order_factory):
+    completed_order = order_factory(status="completed")
     response = OrdersAdminApi(http_client=api_client).update(
         completed_order.id,
         {"customer_info": {"name": "수정", "phone": "01099998888", "email": "new@x.com", "organization": "Z"}},
@@ -274,7 +284,8 @@ def test_admin_partial_update_modifies_existing_customer_info(api_client, comple
 
 
 @pytest.mark.django_db
-def test_admin_partial_update_creates_customer_info_when_missing(api_client, completed_order):
+def test_admin_partial_update_creates_customer_info_when_missing(api_client, order_factory):
+    completed_order = order_factory(status="completed")
     CustomerInfo.objects.filter(order=completed_order).hard_delete()
     response = OrdersAdminApi(http_client=api_client).update(
         completed_order.id,
@@ -285,7 +296,8 @@ def test_admin_partial_update_creates_customer_info_when_missing(api_client, com
 
 
 @pytest.mark.django_db
-def test_admin_list_filters_by_user_id(api_client, completed_order, customer_user, other_user, product):
+def test_admin_list_filters_by_user_id(api_client, customer_user, other_user, product, order_factory):
+    completed_order = order_factory(status="completed")
     other_order = Order.objects.create(user=other_user, name="other")
     OrderProductRelation.objects.create(
         order=other_order, product=product, price=product.price, status=OrderProductRelation.OrderProductStatus.paid

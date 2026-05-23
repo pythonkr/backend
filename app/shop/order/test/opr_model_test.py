@@ -8,22 +8,22 @@ from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
 
 
 @pytest.mark.django_db
-def test_opr_not_refundable_reason_when_order_has_no_imp_id(pending_order):
-    # PaymentHistory 부재 → latest_imp_id None → ORDER_NOT_REFUNDABLE.
+def test_opr_not_refundable_reason_when_order_has_no_imp_id(order_factory):
+    pending_order = order_factory()
     opr = pending_order.products.first()
     assert opr.not_refundable_reason == NotRefundableErrorMessages.ORDER_NOT_REFUNDABLE
 
 
 @pytest.mark.django_db
-def test_opr_not_refundable_reason_when_order_status_not_refundable(refunded_order):
-    # order.current_status=refunded → ORDER_NOT_REFUNDABLE_STATUS.
+def test_opr_not_refundable_reason_when_order_status_not_refundable(order_factory):
+    refunded_order = order_factory(status="refunded")
     opr = refunded_order.products.first()
     assert opr.not_refundable_reason == NotRefundableErrorMessages.ORDER_NOT_REFUNDABLE_STATUS
 
 
 @pytest.mark.django_db
-def test_opr_not_refundable_reason_when_opr_status_not_paid(completed_order):
-    # opr.status=used → PRODUCT_STATUS_IS_NOT_PAID.
+def test_opr_not_refundable_reason_when_opr_status_not_paid(order_factory):
+    completed_order = order_factory(status="completed")
     opr = completed_order.products.first()
     opr.status = OrderProductRelation.OrderProductStatus.used
     opr.save()
@@ -32,7 +32,8 @@ def test_opr_not_refundable_reason_when_opr_status_not_paid(completed_order):
 
 @freeze_time(datetime(2100, 1, 1, tzinfo=timezone.utc))
 @pytest.mark.django_db
-def test_opr_not_refundable_reason_when_refund_window_expired(completed_order):
+def test_opr_not_refundable_reason_when_refund_window_expired(order_factory):
+    completed_order = order_factory(status="completed")
     opr = completed_order.products.first()
     assert opr.not_refundable_reason == NotRefundableErrorMessages.PRODUCT_REFUND_TIME_EXPIRED
 
@@ -49,6 +50,7 @@ def test_opr_not_refundable_reason_when_price_is_zero(customer_user, product):
 
 
 @pytest.mark.django_db
-def test_opr_not_refundable_reason_returns_none_for_refundable_opr(completed_order):
+def test_opr_not_refundable_reason_returns_none_for_refundable_opr(order_factory):
+    completed_order = order_factory(status="completed")
     opr = completed_order.products.first()
     assert opr.not_refundable_reason is None

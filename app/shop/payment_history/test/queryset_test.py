@@ -4,8 +4,8 @@ from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
 
 
 @pytest.mark.django_db
-def test_latest_per_order_field_returns_most_recent_field_per_order(completed_order):
-    # 같은 order 에 3건 PaymentHistory — 가장 최근 1건의 status 만 subquery 로 반환돼야.
+def test_latest_per_order_field_returns_most_recent_field_per_order(order_factory):
+    completed_order = order_factory(status="completed")
     PaymentHistory.objects.create(
         order=completed_order, imp_id="imp_b", status=PaymentHistoryStatus.partial_refunded, price=5000
     )
@@ -19,8 +19,8 @@ def test_latest_per_order_field_returns_most_recent_field_per_order(completed_or
 
 
 @pytest.mark.django_db
-def test_latest_per_order_field_correlates_per_outer_order(completed_order, customer_user, product):
-    # 다른 order 의 PaymentHistory 와 섞이지 않는지 — outer_field 상관관계.
+def test_latest_per_order_field_correlates_per_outer_order(customer_user, product, order_factory):
+    completed_order = order_factory(status="completed")
     other_order = Order.objects.create(user=customer_user, name="other")
     OrderProductRelation.objects.create(
         order=other_order, product=product, price=product.price, status=OrderProductRelation.OrderProductStatus.paid

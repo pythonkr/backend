@@ -14,8 +14,9 @@ from shop.test.helpers import valid_refund_totp
 
 @pytest.mark.django_db
 def test_total_refund_happy_path_marks_all_oprs_refunded_and_records_payment_history(
-    completed_order, mock_portone_req_cancel_payment
+    mock_portone_req_cancel_payment, order_factory
 ):
+    completed_order = order_factory(status="completed")
     serializer = OrderTotalRefundSerializer(
         instance=completed_order,
         data={"id": str(completed_order.id)},
@@ -41,8 +42,8 @@ def test_total_refund_happy_path_marks_all_oprs_refunded_and_records_payment_his
 
 
 @pytest.mark.django_db
-def test_total_refund_rejects_when_order_has_no_imp_id(pending_order, mock_portone_req_cancel_payment):
-    # CSV import 로 생성된 주문 (imp_id 없음) → PortOne 취소 불가능.
+def test_total_refund_rejects_when_order_has_no_imp_id(mock_portone_req_cancel_payment, order_factory):
+    pending_order = order_factory()
     serializer = OrderTotalRefundSerializer(
         instance=pending_order,
         data={"id": str(pending_order.id)},
@@ -56,7 +57,8 @@ def test_total_refund_rejects_when_order_has_no_imp_id(pending_order, mock_porto
 
 
 @pytest.mark.django_db
-def test_total_refund_rejects_when_order_already_refunded(refunded_order, mock_portone_req_cancel_payment):
+def test_total_refund_rejects_when_order_already_refunded(mock_portone_req_cancel_payment, order_factory):
+    refunded_order = order_factory(status="refunded")
     serializer = OrderTotalRefundSerializer(
         instance=refunded_order,
         data={"id": str(refunded_order.id)},
@@ -70,7 +72,8 @@ def test_total_refund_rejects_when_order_already_refunded(refunded_order, mock_p
 
 
 @pytest.mark.django_db
-def test_total_refund_rejects_when_any_opr_is_used(completed_order, mock_portone_req_cancel_payment):
+def test_total_refund_rejects_when_any_opr_is_used(mock_portone_req_cancel_payment, order_factory):
+    completed_order = order_factory(status="completed")
     completed_order.products.update(status=OrderProductRelation.OrderProductStatus.used)
     serializer = OrderTotalRefundSerializer(
         instance=completed_order,
@@ -89,7 +92,8 @@ def test_total_refund_rejects_when_any_opr_is_used(completed_order, mock_portone
 # _FAR_FUTURE (2099-12-31) 이후로 시간 이동 — product.refundable_ends_at 가 지남.
 @freeze_time(datetime(2100, 1, 1, tzinfo=timezone.utc))
 @pytest.mark.django_db
-def test_total_refund_rejects_when_refund_window_expired(completed_order, mock_portone_req_cancel_payment):
+def test_total_refund_rejects_when_refund_window_expired(mock_portone_req_cancel_payment, order_factory):
+    completed_order = order_factory(status="completed")
     serializer = OrderTotalRefundSerializer(
         instance=completed_order, data={"id": str(completed_order.id)}, context={"check_totp": False}
     )
@@ -105,7 +109,8 @@ def test_total_refund_rejects_when_refund_window_expired(completed_order, mock_p
 # check_refundable_date=False escape hatch — 운영자가 강제 환불 시 사용.
 @freeze_time(datetime(2100, 1, 1, tzinfo=timezone.utc))
 @pytest.mark.django_db
-def test_total_refund_allows_expired_window_when_check_disabled(completed_order, mock_portone_req_cancel_payment):
+def test_total_refund_allows_expired_window_when_check_disabled(mock_portone_req_cancel_payment, order_factory):
+    completed_order = order_factory(status="completed")
     serializer = OrderTotalRefundSerializer(
         instance=completed_order,
         data={"id": str(completed_order.id)},
@@ -117,7 +122,8 @@ def test_total_refund_allows_expired_window_when_check_disabled(completed_order,
 
 
 @pytest.mark.django_db
-def test_total_refund_rolls_back_when_portone_cancel_fails(completed_order, mock_portone_req_cancel_payment):
+def test_total_refund_rolls_back_when_portone_cancel_fails(mock_portone_req_cancel_payment, order_factory):
+    completed_order = order_factory(status="completed")
     mock_portone_req_cancel_payment.side_effect = PortOneException("PortOne 취소 실패")
     serializer = OrderTotalRefundSerializer(
         instance=completed_order,
@@ -138,7 +144,8 @@ def test_total_refund_rolls_back_when_portone_cancel_fails(completed_order, mock
 
 
 @pytest.mark.django_db
-def test_total_refund_rejects_when_totp_missing(completed_order, mock_portone_req_cancel_payment):
+def test_total_refund_rejects_when_totp_missing(mock_portone_req_cancel_payment, order_factory):
+    completed_order = order_factory(status="completed")
     serializer = OrderTotalRefundSerializer(instance=completed_order, data={"id": str(completed_order.id)})
     assert serializer.is_valid() is False
     assert errors_payload(serializer.errors) == {
@@ -148,7 +155,8 @@ def test_total_refund_rejects_when_totp_missing(completed_order, mock_portone_re
 
 
 @pytest.mark.django_db
-def test_total_refund_rejects_when_totp_invalid(completed_order, mock_portone_req_cancel_payment):
+def test_total_refund_rejects_when_totp_invalid(mock_portone_req_cancel_payment, order_factory):
+    completed_order = order_factory(status="completed")
     serializer = OrderTotalRefundSerializer(
         instance=completed_order,
         data={"id": str(completed_order.id), "totp": "000000"},
@@ -161,7 +169,8 @@ def test_total_refund_rejects_when_totp_invalid(completed_order, mock_portone_re
 
 
 @pytest.mark.django_db
-def test_total_refund_passes_with_valid_totp(completed_order, mock_portone_req_cancel_payment):
+def test_total_refund_passes_with_valid_totp(mock_portone_req_cancel_payment, order_factory):
+    completed_order = order_factory(status="completed")
     serializer = OrderTotalRefundSerializer(
         instance=completed_order,
         data={"id": str(completed_order.id), "totp": valid_refund_totp()},
@@ -171,9 +180,9 @@ def test_total_refund_passes_with_valid_totp(completed_order, mock_portone_req_c
 
 @pytest.mark.django_db
 def test_partial_refund_with_remaining_paid_creates_partial_refunded_history(
-    completed_order, mock_portone_req_cancel_payment
+    mock_portone_req_cancel_payment, order_factory
 ):
-    # 2번째 OPR 추가 후, 첫 OPR 만 환불 → 남은 paid OPR 1개 → partial_refunded.
+    completed_order = order_factory(status="completed")
     target_opr = completed_order.products.first()
     second_opr = OrderProductRelation.objects.create(
         order=completed_order,
@@ -198,10 +207,8 @@ def test_partial_refund_with_remaining_paid_creates_partial_refunded_history(
 
 
 @pytest.mark.django_db
-def test_partial_refund_of_last_paid_opr_creates_full_refunded_history(
-    completed_order, mock_portone_req_cancel_payment
-):
-    # OPR 1개 (completed_order fixture default) 를 환불 → 남은 paid 없음 → refunded.
+def test_partial_refund_of_last_paid_opr_creates_full_refunded_history(mock_portone_req_cancel_payment, order_factory):
+    completed_order = order_factory(status="completed")
     target_opr = completed_order.products.first()
     serializer = OrderProductRefundSerializer(
         instance=target_opr,
@@ -218,7 +225,8 @@ def test_partial_refund_of_last_paid_opr_creates_full_refunded_history(
 
 
 @pytest.mark.django_db
-def test_partial_refund_calls_portone_with_correct_prices(completed_order, mock_portone_req_cancel_payment):
+def test_partial_refund_calls_portone_with_correct_prices(mock_portone_req_cancel_payment, order_factory):
+    completed_order = order_factory(status="completed")
     target_opr = completed_order.products.first()
     # refund() 전 leftover 를 snapshot — `first_paid_price` 는 cached_property 라 호출 시점 의존성 회피.
     expected_leftover = completed_order.first_paid_price
@@ -244,8 +252,9 @@ def test_partial_refund_calls_portone_with_correct_prices(completed_order, mock_
 )
 @pytest.mark.django_db
 def test_partial_refund_rejects_when_opr_status_is_not_paid(
-    completed_order, mock_portone_req_cancel_payment, non_paid_status
+    mock_portone_req_cancel_payment, non_paid_status, order_factory
 ):
+    completed_order = order_factory(status="completed")
     target_opr = completed_order.products.first()
     target_opr.status = non_paid_status
     target_opr.save()
@@ -264,7 +273,8 @@ def test_partial_refund_rejects_when_opr_status_is_not_paid(
 
 @freeze_time(datetime(2100, 1, 1, tzinfo=timezone.utc))
 @pytest.mark.django_db
-def test_partial_refund_rejects_when_refund_window_expired(completed_order, mock_portone_req_cancel_payment):
+def test_partial_refund_rejects_when_refund_window_expired(mock_portone_req_cancel_payment, order_factory):
+    completed_order = order_factory(status="completed")
     target_opr = completed_order.products.first()
     serializer = OrderProductRefundSerializer(
         instance=target_opr,
@@ -279,23 +289,23 @@ def test_partial_refund_rejects_when_refund_window_expired(completed_order, mock
 
 
 @pytest.mark.django_db
-def test_total_refund_expected_price_is_zero_when_no_paid_oprs(refunded_order):
-    # 모든 OPR 이 refunded — refund_target 없음 → expected_refund_price 는 0.
+def test_total_refund_expected_price_is_zero_when_no_paid_oprs(order_factory):
+    refunded_order = order_factory(status="refunded")
     serializer = OrderTotalRefundSerializer(instance=refunded_order, data={"id": str(refunded_order.id)})
     assert serializer.expected_refund_price == 0
 
 
 @pytest.mark.django_db
-def test_partial_refund_product_cached_property_returns_relation_product(completed_order):
-    # OrderProductRefundSerializer.product 는 instance 의 product 를 cached 로 노출.
+def test_partial_refund_product_cached_property_returns_relation_product(order_factory):
+    completed_order = order_factory(status="completed")
     target_opr = completed_order.products.first()
     serializer = OrderProductRefundSerializer(instance=target_opr, data={"id": str(target_opr.id)})
     assert serializer.product == target_opr.product
 
 
 @pytest.mark.django_db
-def test_total_refund_recheck_after_lock_rejects_when_state_changed(completed_order, mock_portone_req_cancel_payment):
-    # validate() 통과 → 외부에서 OPR refunded 처리 → refund() lock 후 invariant 재검사에서 거부.
+def test_total_refund_recheck_after_lock_rejects_when_state_changed(mock_portone_req_cancel_payment, order_factory):
+    completed_order = order_factory(status="completed")
     serializer = OrderTotalRefundSerializer(
         instance=completed_order, data={"id": str(completed_order.id)}, context={"check_totp": False}
     )
@@ -309,8 +319,8 @@ def test_total_refund_recheck_after_lock_rejects_when_state_changed(completed_or
 
 
 @pytest.mark.django_db
-def test_partial_refund_recheck_after_lock_rejects_when_state_changed(completed_order, mock_portone_req_cancel_payment):
-    # validate() 통과 → 외부에서 OPR refunded 처리 → refund() lock 후 재검사에서 거부.
+def test_partial_refund_recheck_after_lock_rejects_when_state_changed(mock_portone_req_cancel_payment, order_factory):
+    completed_order = order_factory(status="completed")
     target_opr = completed_order.products.first()
     serializer = OrderProductRefundSerializer(
         instance=target_opr,

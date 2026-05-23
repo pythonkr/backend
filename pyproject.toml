@@ -103,6 +103,7 @@ omit = [
     "*/migrations/*",
     "*/test/*",
     "*/tests/*",
+    "*/conftest.py",
     "*/__pycache__/*",
     "*/admin.py",
     "manage.py",

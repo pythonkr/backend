@@ -10,7 +10,8 @@ from shop.product.models import OptionGroup
 
 
 @pytest.fixture
-def paid_custom_option_relation(completed_order, product):
+def paid_custom_option_relation(product, order_factory):
+    completed_order = order_factory(status="completed")
     """결제 완료된 OPR 의 custom_response 옵션 — 수정 가능 그룹 (response_modifiable_ends_at 미래)."""
     group = OptionGroup.objects.create(
         product=product,
@@ -27,8 +28,8 @@ def paid_custom_option_relation(completed_order, product):
 
 
 @pytest.mark.django_db
-def test_modify_rejects_when_relation_belongs_to_different_order_product(paid_custom_option_relation, completed_order):
-    # 무관한 OPR 을 context 로 전달 → relation 의 opr 와 불일치.
+def test_modify_rejects_when_relation_belongs_to_different_order_product(paid_custom_option_relation, order_factory):
+    completed_order = order_factory(status="completed")
     other_opr = OrderProductRelation.objects.create(
         order=completed_order,
         product=completed_order.products.first().product,
@@ -48,8 +49,8 @@ def test_modify_rejects_when_relation_belongs_to_different_order_product(paid_cu
 
 
 @pytest.mark.django_db
-def test_modify_rejects_when_response_modifiable_ends_at_is_none(completed_order, product):
-    # response_modifiable_ends_at=None (default) → 수정 자체 불가능 그룹.
+def test_modify_rejects_when_response_modifiable_ends_at_is_none(product, order_factory):
+    completed_order = order_factory(status="completed")
     group = OptionGroup.objects.create(
         product=product,
         name="lock",
@@ -89,8 +90,8 @@ def test_modify_rejects_when_modifiable_deadline_passed(paid_custom_option_relat
 
 
 @pytest.mark.django_db
-def test_modify_rejects_when_custom_response_pattern_mismatch(completed_order, product):
-    # pattern 이 숫자 6자리 — "abc" 위배.
+def test_modify_rejects_when_custom_response_pattern_mismatch(product, order_factory):
+    completed_order = order_factory(status="completed")
     group = OptionGroup.objects.create(
         product=product,
         name="numeric",
@@ -148,8 +149,8 @@ def test_modify_rejects_refunded_opr_option_via_queryset_filter(paid_custom_opti
 
 
 @pytest.mark.django_db
-def test_modify_rejects_non_custom_response_group_option_via_queryset_filter(completed_order, product):
-    # is_custom_response=False 그룹의 option 은 queryset 의 is_custom_response=True 필터에서 빠짐.
+def test_modify_rejects_non_custom_response_group_option_via_queryset_filter(product, order_factory):
+    completed_order = order_factory(status="completed")
     plain_group = OptionGroup.objects.create(product=product, name="plain", is_custom_response=False)
     rel = OrderProductOptionRelation.objects.create(
         order_product_relation=completed_order.products.first(),

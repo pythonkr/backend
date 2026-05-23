@@ -21,7 +21,8 @@ def test_notification_send_rejects_non_superuser(customer_client):
 
 
 @pytest.mark.django_db
-def test_notification_preview_returns_recipients_for_completed_order(api_client, completed_order, order_email_template):
+def test_notification_preview_returns_recipients_for_completed_order(api_client, order_email_template, order_factory):
+    completed_order = order_factory(status="completed")
     response = OrderNotificationsAdminApi(http_client=api_client).preview(
         {"channel": "email", "template_id": str(order_email_template.id)}
     )
@@ -50,7 +51,8 @@ def test_notification_preview_returns_recipients_for_completed_order(api_client,
 
 
 @pytest.mark.django_db
-def test_notification_preview_rejects_unknown_template_id(api_client, completed_order):
+def test_notification_preview_rejects_unknown_template_id(api_client, order_factory):
+    order_factory(status="completed")
     response = OrderNotificationsAdminApi(http_client=api_client).preview(
         {"channel": "email", "template_id": "00000000-0000-0000-0000-000000000000"}
     )
@@ -62,7 +64,8 @@ def test_notification_preview_rejects_unknown_template_id(api_client, completed_
 
 
 @pytest.mark.django_db
-def test_notification_preview_excludes_refunded_orders(api_client, refunded_order, order_email_template):
+def test_notification_preview_excludes_refunded_orders(api_client, order_email_template, order_factory):
+    order_factory(status="refunded")
     response = OrderNotificationsAdminApi(http_client=api_client).preview(
         {"channel": "email", "template_id": str(order_email_template.id)}
     )
@@ -74,8 +77,8 @@ def test_notification_preview_excludes_refunded_orders(api_client, refunded_orde
 
 
 @pytest.mark.django_db
-def test_notification_send_creates_history_for_completed_order(api_client, completed_order, order_email_template):
-    # order_email_template 의 모든 변수가 Order 에서 자동 추출되므로 context_override 불필요.
+def test_notification_send_creates_history_for_completed_order(api_client, order_email_template, order_factory):
+    order_factory(status="completed")
     response = OrderNotificationsAdminApi(http_client=api_client).send(
         {"channel": "email", "template_id": str(order_email_template.id)}
     )
@@ -90,8 +93,8 @@ def test_notification_send_creates_history_for_completed_order(api_client, compl
 
 
 @pytest.mark.django_db
-def test_notification_preview_skips_order_without_customer_info(api_client, completed_order, order_email_template):
-    # hard_delete 로 reverse OneToOne 부재 → to_representation 의 customer_info guard 가 None 반환.
+def test_notification_preview_skips_order_without_customer_info(api_client, order_email_template, order_factory):
+    completed_order = order_factory(status="completed")
     CustomerInfo.objects.filter(order=completed_order).hard_delete()
     response = OrderNotificationsAdminApi(http_client=api_client).preview(
         {"channel": "email", "template_id": str(order_email_template.id)}
@@ -101,7 +104,8 @@ def test_notification_preview_skips_order_without_customer_info(api_client, comp
 
 
 @pytest.mark.django_db
-def test_notification_preview_skips_order_with_empty_recipient_field(api_client, completed_order, order_email_template):
+def test_notification_preview_skips_order_with_empty_recipient_field(api_client, order_email_template, order_factory):
+    completed_order = order_factory(status="completed")
     completed_order.customer_info.email = ""
     completed_order.customer_info.save()
     response = OrderNotificationsAdminApi(http_client=api_client).preview(
@@ -112,8 +116,8 @@ def test_notification_preview_skips_order_with_empty_recipient_field(api_client,
 
 
 @pytest.mark.django_db
-def test_notification_preview_skips_order_with_no_active_products(api_client, completed_order, order_email_template):
-    # OPR soft-delete → admin queryset 의 products prefetch (filter_active) 가 제외 → next() 가 None.
+def test_notification_preview_skips_order_with_no_active_products(api_client, order_email_template, order_factory):
+    completed_order = order_factory(status="completed")
     completed_order.products.first().delete()
     response = OrderNotificationsAdminApi(http_client=api_client).preview(
         {"channel": "email", "template_id": str(order_email_template.id)}
@@ -123,8 +127,8 @@ def test_notification_preview_skips_order_with_no_active_products(api_client, co
 
 
 @pytest.mark.django_db
-def test_notification_send_rejects_when_no_eligible_recipients(api_client, completed_order, order_email_template):
-    # 모든 매칭 order 가 customer_info 부재 → items=[] → "발송 대상이 없습니다" 400.
+def test_notification_send_rejects_when_no_eligible_recipients(api_client, order_email_template, order_factory):
+    completed_order = order_factory(status="completed")
     CustomerInfo.objects.filter(order=completed_order).hard_delete()
     response = OrderNotificationsAdminApi(http_client=api_client).send(
         {"channel": "email", "template_id": str(order_email_template.id)}
@@ -135,9 +139,9 @@ def test_notification_send_rejects_when_no_eligible_recipients(api_client, compl
 
 @pytest.mark.django_db
 def test_notification_send_rejects_when_recipients_have_missing_template_variables(
-    api_client, completed_order, superuser
+    api_client, superuser, order_factory
 ):
-    # Order 에서 추출되지 않는 변수 (`coupon_code`) 를 요구하는 템플릿 → missing_variables 발생 → 400.
+    order_factory(status="completed")
     template = EmailNotificationTemplate.objects.create(
         code="coupon",
         title="쿠폰",

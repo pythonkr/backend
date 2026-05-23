@@ -4,8 +4,8 @@ from shop.order.models import CustomerInfo, Order
 
 
 @pytest.mark.django_db
-def test_customer_info_one_to_one_with_order_rejects_duplicate(pending_order):
-    # OneToOneField — 같은 Order 에 두 번째 CustomerInfo 생성 → UNIQUE 위배.
+def test_customer_info_one_to_one_with_order_rejects_duplicate(order_factory):
+    pending_order = order_factory()
     with pytest.raises(IntegrityError):
         CustomerInfo.objects.create(order=pending_order, name="동명이인", phone="01000000000", email="a@a.a")
 

@@ -20,14 +20,16 @@ def test_cart_returns_empty_dict_when_user_has_no_cart(customer_client):
 
 
 @pytest.mark.django_db
-def test_cart_returns_order_dto_when_cart_exists(pending_order, customer_client):
+def test_cart_returns_order_dto_when_cart_exists(customer_client, order_factory):
+    pending_order = order_factory()
     response = CartApi(http_client=customer_client).list()
     assert response.status_code == HTTP_200_OK
     assert response.json() == to_json(OrderDto(instance=pending_order).data)
 
 
 @pytest.mark.django_db
-def test_cart_excludes_other_users_cart(pending_order, other_client):
+def test_cart_excludes_other_users_cart(other_client, order_factory):
+    order_factory()
     response = CartApi(http_client=other_client).list()
     assert response.status_code == HTTP_200_OK
     assert response.json() == {}
@@ -68,7 +70,8 @@ def test_cart_add_product_rejects_invalid_product_id(customer_client):
 
 
 @pytest.mark.django_db
-def test_cart_remove_product_soft_deletes_pending_opr(pending_order, customer_client):
+def test_cart_remove_product_soft_deletes_pending_opr(customer_client, order_factory):
+    pending_order = order_factory()
     opr = pending_order.products.first()
     response = CartProductsApi(http_client=customer_client).delete(opr.id)
     assert response.status_code == HTTP_204_NO_CONTENT
@@ -80,22 +83,24 @@ def test_cart_remove_product_soft_deletes_pending_opr(pending_order, customer_cl
 
 
 @pytest.mark.django_db
-def test_cart_remove_product_rejects_other_users_opr(pending_order, other_client):
+def test_cart_remove_product_rejects_other_users_opr(other_client, order_factory):
+    pending_order = order_factory()
     opr = pending_order.products.first()
     response = CartProductsApi(http_client=other_client).delete(opr.id)
     assert response.status_code == HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
-def test_cart_remove_product_rejects_already_paid_opr(completed_order, customer_client):
+def test_cart_remove_product_rejects_already_paid_opr(customer_client, order_factory):
+    completed_order = order_factory(status="completed")
     opr = completed_order.products.first()
     response = CartProductsApi(http_client=customer_client).delete(opr.id)
     assert response.status_code == HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
-def test_cart_remove_product_returns_404_for_unauthenticated_request(pending_order, anon_client):
-    # 비인증 → ViewSet 의 get_queryset 이 `OrderProductRelation.objects.none()` 반환 → 404.
+def test_cart_remove_product_returns_404_for_unauthenticated_request(anon_client, order_factory):
+    pending_order = order_factory()
     opr = pending_order.products.first()
     response = CartProductsApi(http_client=anon_client).delete(opr.id)
     assert response.status_code == HTTP_404_NOT_FOUND

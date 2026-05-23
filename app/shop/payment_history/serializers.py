@@ -172,10 +172,11 @@ class PortOneV1WebhookRequestSerializer(serializers.Serializer):
             return order
         if cart := SingleProductCart.objects.select_for_update().filter_active().filter(id=obj_id).first():
             return cart.to_order()
-        # 첫 lock 시 cart 가 다른 webhook 에 의해 promote 된 경우 — Order 재조회.
-        # 단일 스레드 테스트로는 진입 불가능 — validate() 에서 cart_or_order 부재를 이미 거부함.
-        if order := Order.objects.select_for_update().filter_active().filter(id=obj_id).first():  # pragma: no cover
+        # 두 webhook 동시 진입 race: cart lock 대기 동안 다른 thread 가 cart→Order 승격을 commit + cart hard_delete.
+        # lock 해제 시점에 cart 는 비어 있고 Order 가 새로 보이므로 재조회. 동시성 테스트 `concurrent_webhook_test` 가 커버.
+        if order := Order.objects.select_for_update().filter_active().filter(id=obj_id).first():
             return order
+        # defensive: cart 도 Order 도 없는 상태는 validate() 에서 이미 거부됨 — 도달 시 invariant 위반.
         raise serializers.ValidationError(  # pragma: no cover
             detail=PortOneWebhookFailureMessages.ORDER_NOT_FOUND, code="forgery"
         )

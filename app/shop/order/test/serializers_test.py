@@ -11,7 +11,8 @@ _TEST_BACKEND_DOMAIN = "https://test.pycon.kr"
 
 @override_settings(BACKEND_DOMAIN=_TEST_BACKEND_DOMAIN)
 @pytest.mark.django_db
-def test_order_product_relation_dto_scancode_url_for_ticket_category(pending_order, product):
+def test_order_product_relation_dto_scancode_url_for_ticket_category(product, order_factory):
+    pending_order = order_factory()
     opr = pending_order.products.first()
     assert OrderProductRelationDto(instance=opr).data == {
         "id": str(opr.id),
@@ -46,7 +47,8 @@ def test_order_product_relation_dto_scancode_url_none_for_non_ticket_category(cu
 
 @override_settings(BACKEND_DOMAIN=_TEST_BACKEND_DOMAIN)
 @pytest.mark.django_db
-def test_order_dto_includes_scancode_url_and_nested_payload(pending_order, product):
+def test_order_dto_includes_scancode_url_and_nested_payload(product, order_factory):
+    pending_order = order_factory()
     opr = pending_order.products.first()
     customer_info = pending_order.customer_info
     assert OrderDto(instance=pending_order).data == {
@@ -82,7 +84,8 @@ def test_order_dto_includes_scancode_url_and_nested_payload(pending_order, produ
 
 
 @pytest.mark.django_db
-def test_scancode_option_serializer_value_for_custom_response_group(completed_order, product):
+def test_scancode_option_serializer_value_for_custom_response_group(product, order_factory):
+    completed_order = order_factory(status="completed")
     group = OptionGroup.objects.create(
         product=product, name="요청사항", is_custom_response=True, custom_response_pattern=r"^.*$"
     )
@@ -95,7 +98,8 @@ def test_scancode_option_serializer_value_for_custom_response_group(completed_or
 
 
 @pytest.mark.django_db
-def test_scancode_option_serializer_value_for_custom_response_when_blank(completed_order, product):
+def test_scancode_option_serializer_value_for_custom_response_when_blank(product, order_factory):
+    completed_order = order_factory(status="completed")
     group = OptionGroup.objects.create(
         product=product, name="요청사항", is_custom_response=True, custom_response_pattern=r"^.*$"
     )
@@ -108,7 +112,8 @@ def test_scancode_option_serializer_value_for_custom_response_when_blank(complet
 
 
 @pytest.mark.django_db
-def test_scancode_option_serializer_value_for_selected_option_with_additional_price(completed_order, option_group):
+def test_scancode_option_serializer_value_for_selected_option_with_additional_price(option_group, order_factory):
+    completed_order = order_factory(status="completed")
     option = option_group.options.create(name="L", additional_price=2000)
     rel = OrderProductOptionRelation.objects.create(
         order_product_relation=completed_order.products.first(),
@@ -123,8 +128,9 @@ def test_scancode_option_serializer_value_for_selected_option_with_additional_pr
 
 @pytest.mark.django_db
 def test_scancode_option_serializer_value_for_selected_option_without_additional_price(
-    completed_order, option_group, option
+    option_group, option, order_factory
 ):
+    completed_order = order_factory(status="completed")
     rel = OrderProductOptionRelation.objects.create(
         order_product_relation=completed_order.products.first(),
         product_option_group=option_group,
@@ -137,7 +143,8 @@ def test_scancode_option_serializer_value_for_selected_option_without_additional
 
 
 @pytest.mark.django_db
-def test_scancode_option_serializer_value_when_no_option_no_custom_response(completed_order, option_group):
+def test_scancode_option_serializer_value_when_no_option_no_custom_response(option_group, order_factory):
+    completed_order = order_factory(status="completed")
     rel = OrderProductOptionRelation.objects.create(
         order_product_relation=completed_order.products.first(),
         product_option_group=option_group,
