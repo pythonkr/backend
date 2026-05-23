@@ -106,6 +106,8 @@ def test_admin_refund_product_action_does_partial_refund(
     assert response.status_code == HTTP_204_NO_CONTENT
     target_opr.refresh_from_db()
     assert target_opr.status == OrderProductRelation.OrderProductStatus.refunded
+    # OrderProductRefundSerializer 가 직접 OPR.save() 호출 — history_type='~' 기록 검증.
+    assert target_opr.history.filter(history_type="~", status=OrderProductRelation.OrderProductStatus.refunded).exists()
 
 
 @pytest.mark.django_db

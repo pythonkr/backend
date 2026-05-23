@@ -53,7 +53,10 @@ def test_cart_add_product_creates_new_cart_when_none_exists(customer_client, cus
     response = CartProductsApi(http_client=customer_client).create({"product": str(product.id), "options": []})
     assert response.status_code == HTTP_201_CREATED
     cart = Order.objects.get(user=customer_user)
-    assert cart.products.filter(product=product).exists()
+    opr = cart.products.get(product=product)
+    # 신규 Order / OPR 양쪽 모두 history 생성 (+) 확인 — REST 경로 통과 검증.
+    assert list(cart.history.values_list("history_type", flat=True)) == ["+"]
+    assert list(opr.history.values_list("history_type", flat=True)) == ["+"]
 
 
 @pytest.mark.django_db
@@ -71,6 +74,9 @@ def test_cart_remove_product_soft_deletes_pending_opr(pending_order, customer_cl
     assert response.status_code == HTTP_204_NO_CONTENT
     opr.refresh_from_db()
     assert opr.deleted_at is not None
+    # soft delete 는 `BaseAbstractModel.delete()` 가 deleted_at 만 update 하는 save() 이므로 history_type='~' 로 기록.
+    types = list(opr.history.order_by("history_date").values_list("history_type", flat=True))
+    assert types == ["+", "~"]
 
 
 @pytest.mark.django_db

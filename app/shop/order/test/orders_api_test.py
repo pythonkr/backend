@@ -72,6 +72,9 @@ def test_create_single_product_order_creates_cart_and_calls_portone(
     cart = SingleProductCart.objects.get(user=customer_user)
     assert response.json() == SingleProductCartDto(instance=cart).data
     mock_portone_register.assert_called_once_with(merchant_id=str(cart.id), price=product.price)
+    # SingleProductCart + OPR 양쪽 history 생성 확인.
+    assert list(cart.history.values_list("history_type", flat=True)) == ["+"]
+    assert list(cart.order_product_relation.history.values_list("history_type", flat=True)) == ["+"]
 
 
 @pytest.mark.django_db
@@ -126,12 +129,15 @@ def test_create_order_persists_customer_info_and_schedules_portone_call(
 def test_destroy_order_refunds_when_owned_by_request_user(
     customer_client, completed_order, mock_portone_req_cancel_payment
 ):
+    opr = completed_order.products.first()
     response = OrdersApi(http_client=customer_client).delete(completed_order.id)
     assert response.status_code == HTTP_204_NO_CONTENT
     completed_order.refresh_from_db()
     statuses = list(completed_order.products.values_list("status", flat=True))
     assert statuses == [OrderProductRelation.OrderProductStatus.refunded]
     assert completed_order.payment_histories.filter(status=PaymentHistoryStatus.refunded).exists()
+    # `bulk_update_with_history` 경로가 OPR 상태 변경 history 를 잘 남기는지 확인 — 누락 시 회귀.
+    assert opr.history.filter(history_type="~", status=OrderProductRelation.OrderProductStatus.refunded).exists()
 
 
 @pytest.mark.django_db

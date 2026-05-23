@@ -16,6 +16,8 @@ def test_modify_options_updates_custom_response(modifiable_option_relation, comp
     assert response.status_code == HTTP_200_OK
     modifiable_option_relation.refresh_from_db()
     assert modifiable_option_relation.custom_response == "updated"
+    # PATCH 가 OPOR custom_response 변경 history 를 남기는지 확인 — 응답 수정 감사 추적.
+    assert modifiable_option_relation.history.filter(history_type="~", custom_response="updated").exists()
 
 
 @pytest.mark.django_db
