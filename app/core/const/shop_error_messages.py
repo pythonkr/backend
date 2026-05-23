@@ -18,8 +18,6 @@ class ProductNotOrderableErrorMessages:
     SOLDOUT = "{} 상품은 매진되었습니다."
     ALREADY_ORDERED_TOO_MUCH = "{} 상품의 인당 최대 구매 수량 초과로 구매하실 수 없습니다."
     TOO_MUCH_CART_PRODUCT = "{} 상품의 재고 수량을 초과하여 구매하실 수 없습니다. 장바구니에 담은 수량을 확인해주세요."
-    PRICE_IS_MINUS = "결제 금액이 너무 낮습니다, PyCon 한국 준비 위원회에 문의해주세요."
-    PRICE_TOO_LOW = "결제 금액이 너무 낮습니다, 최소한 1원 이상으로 구매해주세요."
     PRICE_TOO_HIGH = "결제 금액이 너무 높습니다, 후원 금액 등을 줄여 100만원 미만으로 구매해주세요."
     DONATION_NOT_ALLOWED = "{} 상품은 후원이 불가능한 상품입니다."
     DONATION_PRICE_OUT_OF_RANGE = "{} 상품의 후원 금액이 범위를 벗어났습니다. {}원 이상 {}원 이하로 입력해주세요."
@@ -71,7 +69,6 @@ class NotRefundableErrorMessages:
     ORDER_REFUND_TARGET_PRICE_IS_MISMATCH = (
         "환불할 금액이 남은 결제 금액과 일치하지 않습니다. PyCon 한국 준비 위원회에 문의해주세요."
     )
-    ORDER_REFUND_TARGET_PRICE_IS_NEGATIVE = "환불할 금액이 이상합니다. PyCon 한국 준비 위원회에 문의해주세요."
     ORDER_IMP_ID_NOT_EXIST = "환불이 불가능한 주문입니다. PyCon 한국 준비 위원회에 문의해주세요."
 
 

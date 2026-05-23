@@ -179,8 +179,6 @@ class Order(ScanCodeMixin, BaseAbstractModel):
         expected_refund_price = sum(rel.price + rel.donation_price for rel in refund_target_product_relations)
         if expected_refund_price == 0:
             return NotRefundableErrorMessages.ORDER_REFUNDABLE_PRICE_NOT_FOUND
-        if expected_refund_price < 0:
-            return NotRefundableErrorMessages.ORDER_REFUND_TARGET_PRICE_IS_NEGATIVE
         if self.current_paid_price != expected_refund_price:
             return NotRefundableErrorMessages.ORDER_REFUND_TARGET_PRICE_IS_MISMATCH
 

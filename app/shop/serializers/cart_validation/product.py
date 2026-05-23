@@ -216,14 +216,6 @@ class ProductOrderableCheckSerializer(serializers.ModelSerializer):
             + donation_price
             + sum(o["product_option"].additional_price for o in options if o["product_option"])
         )
-        # `total_price < 0` / `total_price == 0 (with product.price > 0)` 은 모든 가격 필드가
-        # PositiveIntegerField 라 현재 스키마로는 진입 불가능 — 향후 필드 타입 완화 대비 가드.
-        if total_price < 0:  # pragma: no cover
-            raise serializers.ValidationError(ProductNotOrderableErrorMessages.PRICE_IS_MINUS)
-
-        elif not (self.is_free_product_allowed or product.price == 0) and total_price == 0:  # pragma: no cover
-            raise serializers.ValidationError(ProductNotOrderableErrorMessages.PRICE_TOO_LOW)
-
         # 후원 금액 포함 단일 상품 금액이 100만원 이상인 경우 주문 불가능
         if total_price >= 1_000_000:
             raise serializers.ValidationError(ProductNotOrderableErrorMessages.PRICE_TOO_HIGH)
