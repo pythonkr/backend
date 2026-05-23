@@ -4,6 +4,7 @@ import pytest
 from django.conf import settings
 from notification.models.email import EmailNotificationHistory, EmailNotificationTemplate
 from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_400_BAD_REQUEST, HTTP_403_FORBIDDEN
+from shop.order.models import CustomerInfo
 from shop.test.helpers import OrderNotificationsAdminApi
 
 
@@ -86,6 +87,50 @@ def test_notification_send_creates_history_for_completed_order(api_client, compl
     history = EmailNotificationHistory.objects.get(id=history_id)
     assert history.template_id == order_email_template.id
     assert history.sent_to_list.filter(recipient="customer@example.com").exists()
+
+
+@pytest.mark.django_db
+def test_notification_preview_skips_order_without_customer_info(api_client, completed_order, order_email_template):
+    # hard_delete 로 reverse OneToOne 부재 → to_representation 의 customer_info guard 가 None 반환.
+    CustomerInfo.objects.filter(order=completed_order).hard_delete()
+    response = OrderNotificationsAdminApi(http_client=api_client).preview(
+        {"channel": "email", "template_id": str(order_email_template.id)}
+    )
+    assert response.status_code == HTTP_200_OK
+    assert response.json()["recipients"] == []
+
+
+@pytest.mark.django_db
+def test_notification_preview_skips_order_with_empty_recipient_field(api_client, completed_order, order_email_template):
+    completed_order.customer_info.email = ""
+    completed_order.customer_info.save()
+    response = OrderNotificationsAdminApi(http_client=api_client).preview(
+        {"channel": "email", "template_id": str(order_email_template.id)}
+    )
+    assert response.status_code == HTTP_200_OK
+    assert response.json()["recipients"] == []
+
+
+@pytest.mark.django_db
+def test_notification_preview_skips_order_with_no_active_products(api_client, completed_order, order_email_template):
+    # OPR soft-delete → admin queryset 의 products prefetch (filter_active) 가 제외 → next() 가 None.
+    completed_order.products.first().delete()
+    response = OrderNotificationsAdminApi(http_client=api_client).preview(
+        {"channel": "email", "template_id": str(order_email_template.id)}
+    )
+    assert response.status_code == HTTP_200_OK
+    assert response.json()["recipients"] == []
+
+
+@pytest.mark.django_db
+def test_notification_send_rejects_when_no_eligible_recipients(api_client, completed_order, order_email_template):
+    # 모든 매칭 order 가 customer_info 부재 → items=[] → "발송 대상이 없습니다" 400.
+    CustomerInfo.objects.filter(order=completed_order).hard_delete()
+    response = OrderNotificationsAdminApi(http_client=api_client).send(
+        {"channel": "email", "template_id": str(order_email_template.id)}
+    )
+    assert response.status_code == HTTP_400_BAD_REQUEST
+    assert "발송 대상이 없습니다" in str(response.json())
 
 
 @pytest.mark.django_db

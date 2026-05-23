@@ -65,3 +65,12 @@ def test_destroy_order_product_rejects_when_status_not_paid(
     response = OrderProductsApi(http_client=customer_client).delete_partial(completed_order.id, target_opr.id)
     assert response.status_code == HTTP_404_NOT_FOUND
     mock_portone_req_cancel_payment.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_destroy_order_product_returns_404_for_unauthenticated_request(anon_client, completed_order):
+    # 비인증 → ViewSet 의 get_queryset 이 `OrderProductRelation.objects.none()` 반환 → 404.
+    response = OrderProductsApi(http_client=anon_client).delete_partial(
+        completed_order.id, completed_order.products.first().id
+    )
+    assert response.status_code == HTTP_404_NOT_FOUND

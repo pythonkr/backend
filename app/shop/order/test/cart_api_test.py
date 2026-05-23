@@ -91,3 +91,11 @@ def test_cart_remove_product_rejects_already_paid_opr(completed_order, customer_
     opr = completed_order.products.first()
     response = CartProductsApi(http_client=customer_client).delete(opr.id)
     assert response.status_code == HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_cart_remove_product_returns_404_for_unauthenticated_request(pending_order, anon_client):
+    # 비인증 → ViewSet 의 get_queryset 이 `OrderProductRelation.objects.none()` 반환 → 404.
+    opr = pending_order.products.first()
+    response = CartProductsApi(http_client=anon_client).delete(opr.id)
+    assert response.status_code == HTTP_404_NOT_FOUND

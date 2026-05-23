@@ -21,6 +21,7 @@ from shop.conftest import (  # noqa: F401
     partial_refunded_order,
     pending_order,
     product,
+    products_by_status,
     refunded_order,
     single_product_cart,
     staff_client,

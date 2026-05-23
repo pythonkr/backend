@@ -19,9 +19,6 @@ class ProductAdminFilterSet(filters.FilterSet):
     status = filters.BaseCSVFilter(method="filter_by_status")
 
     def filter_by_status(self, queryset, name, values):
-        if not values:
-            return queryset
-
         now = now_aware()
         q = Q()
         for value in values:

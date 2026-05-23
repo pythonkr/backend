@@ -98,6 +98,32 @@ def test_import_rejects_invalid_row_and_persists_nothing(
 
 
 @pytest.mark.django_db
+def test_import_skips_option_group_column_when_csv_missing_it(customer_user, product, option_group):
+    # option_group(name="사이즈") 존재 + CSV row 에 "사이즈" 컬럼 부재 → 해당 group 건너뜀 (OPR 옵션 0개).
+    option_group.options.create(name="M", additional_price=0)
+    serializer = OrderProductImportSerializer(
+        data={
+            "name": "홍길동",
+            "phone": "010-1234-5678",
+            "email": customer_user.email,
+            "organization": "",
+            "product_id": str(product.id),
+            "donation_price": 0,
+        }
+    )
+    assert serializer.is_valid()
+    opr = serializer.save()
+    assert opr.options.count() == 0
+
+
+@pytest.mark.django_db
+def test_import_option_input_data_returns_empty_when_product_id_invalid():
+    # `product_id` 가 DB 에 없는 UUID → cached_property `option_input_data` 가 [] 반환 (validate 진입 전 직접 접근 시).
+    serializer = OrderProductImportSerializer(data={"product_id": "00000000-0000-0000-0000-000000000000"})
+    assert serializer.option_input_data == []
+
+
+@pytest.mark.django_db
 def test_import_supports_custom_response_option_group(customer_user, product):
     custom_group = OptionGroup.objects.create(
         product=product, name="요청사항", is_custom_response=True, custom_response_pattern=r"^.*$"

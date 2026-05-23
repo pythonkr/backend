@@ -114,6 +114,33 @@ def donation_product(product) -> Product:
 
 
 @pytest.fixture
+def products_by_status(product) -> dict[Product.CurrentStatus, Product]:
+    """`Product.CurrentStatus` 4가지 상태별 Product 묶음 — status filter / queryset 테스트용.
+
+    `ACTIVE` 는 fixture `product` 재사용 (visible/orderable 모두 NOW 포함).
+    """
+    common = {
+        "category": product.category,
+        "price": 100,
+        "visible_starts_at": FAR_PAST,
+        "visible_ends_at": FAR_FUTURE,
+        "orderable_starts_at": FAR_PAST,
+        "orderable_ends_at": FAR_FUTURE,
+        "refundable_ends_at": FAR_FUTURE,
+    }
+    return {
+        Product.CurrentStatus.ACTIVE: product,
+        Product.CurrentStatus.HIDDEN: Product.objects.create(name="hidden", hidden=True, **common),
+        Product.CurrentStatus.OUT_OF_VISIBLE_PERIOD: Product.objects.create(
+            **{**common, "visible_starts_at": FAR_FUTURE}, name="oov"
+        ),
+        Product.CurrentStatus.OUT_OF_ORDERABLE_PERIOD: Product.objects.create(
+            **{**common, "orderable_starts_at": FAR_FUTURE}, name="ooo"
+        ),
+    }
+
+
+@pytest.fixture
 def option_group(product) -> OptionGroup:
     """기본 옵션 그룹 — `is_custom_response=False`, 선택형. `min_quantity_per_product=0` 이라 stock 검사 우회."""
     return OptionGroup.objects.create(product=product, name="사이즈")

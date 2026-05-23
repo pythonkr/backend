@@ -165,6 +165,14 @@ def test_retrieve_receipt_returns_404_when_order_has_no_imp_id(customer_client, 
 
 
 @pytest.mark.django_db
+def test_retrieve_receipt_returns_404_when_payment_history_has_no_imp_id(customer_client, completed_order):
+    # CSV import 경로처럼 imp_id=None — queryset 필터는 통과하나 action body 에서 404 HTML.
+    completed_order.payment_histories.update(imp_id=None)
+    response = OrdersApi(http_client=customer_client).retrieve_receipt(completed_order.id)
+    assert response.status_code == HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
 def test_retrieve_receipt_allows_staff_to_access_any_order(staff_client, completed_order, mock_portone_kcp_receipt):
     mock_portone_kcp_receipt.return_value.to_search_data.return_value = {"x": "y"}
     mock_portone_kcp_receipt.return_value.to_kcp_signed_search_data.return_value = "signed"

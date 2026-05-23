@@ -103,10 +103,11 @@ class OrderAdminSerializer(
         order = super().update(instance, validated_data)
 
         if customer_info_data is not None:
-            if order.customer_info:
+            # 역방향 OneToOne 은 부재 시 `RelatedObjectDoesNotExist` 를 던지므로 getattr 로 안전 접근.
+            if (existing := getattr(order, "customer_info", None)) is not None:
                 for field, value in customer_info_data.items():
-                    setattr(order.customer_info, field, value)
-                order.customer_info.save()
+                    setattr(existing, field, value)
+                existing.save()
             else:
                 CustomerInfo.objects.create(order=order, **customer_info_data)
 

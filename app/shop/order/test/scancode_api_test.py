@@ -1,4 +1,7 @@
+import uuid
+
 import pytest
+import shortuuid
 from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN, HTTP_404_NOT_FOUND
 from shop.order.models import Order
 from shop.test.helpers import ScanCodeApi
@@ -62,3 +65,17 @@ def test_scancode_opr_token_with_invalid_salt_rejects(anon_client, completed_ord
     tampered = opr.scancode_token[:-1] + ("A" if opr.scancode_token[-1] != "A" else "B")
     response = ScanCodeApi(http_client=anon_client).list({"token": tampered})
     assert response.status_code == HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
+def test_scancode_user_token_returns_403_when_user_does_not_exist(anon_client):
+    token = f"user:{shortuuid.encode(uuid.uuid4())}:fakesalt"
+    response = ScanCodeApi(http_client=anon_client).list({"token": token})
+    assert response.status_code == HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
+def test_scancode_order_token_returns_404_when_order_does_not_exist(anon_client):
+    token = f"order:{shortuuid.encode(uuid.uuid4())}:fakesalt"
+    response = ScanCodeApi(http_client=anon_client).list({"token": token})
+    assert response.status_code == HTTP_404_NOT_FOUND

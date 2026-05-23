@@ -10,7 +10,7 @@ from rest_framework.status import (
 )
 from shop.conftest import FAR_FUTURE, FAR_PAST
 from shop.product.models import Category, CategoryGroup, Product, Tag
-from shop.test.helpers import CategoryGroupsAdminApi, ProductsAdminApi, TagsAdminApi
+from shop.test.helpers import CategoryGroupsAdminApi, OptionGroupsAdminApi, ProductsAdminApi, TagsAdminApi
 
 
 @pytest.mark.parametrize("api_cls", [CategoryGroupsAdminApi, TagsAdminApi, ProductsAdminApi])
@@ -133,3 +133,20 @@ def test_admin_product_list_filters_by_category(api_client, product):
     assert response.status_code == HTTP_200_OK
     ids = [p["id"] for p in response.json()]
     assert ids == [str(product.id)]
+
+
+@pytest.mark.django_db
+def test_admin_option_group_create_rejects_custom_response_without_pattern(api_client, product):
+    response = OptionGroupsAdminApi(http_client=api_client).create(
+        {"product": str(product.id), "name_ko": "요청사항", "name_en": "Req", "is_custom_response": True}
+    )
+    assert response.status_code == HTTP_400_BAD_REQUEST
+    assert "custom_response_pattern" in str(response.json())
+
+
+@pytest.mark.parametrize("status", list(Product.CurrentStatus))
+@pytest.mark.django_db
+def test_admin_product_list_filters_by_status(api_client, products_by_status, status):
+    response = ProductsAdminApi(http_client=api_client).list({"status": status.value})
+    assert response.status_code == HTTP_200_OK
+    assert [p["id"] for p in response.json()] == [str(products_by_status[status].id)]

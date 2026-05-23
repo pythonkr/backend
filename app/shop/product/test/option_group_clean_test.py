@@ -16,3 +16,9 @@ def test_clean_rejects_custom_response_group_without_pattern(product):
     assert exc_info.value.message_dict == {
         "custom_response_pattern": ["is_custom_response=True 일 때 custom_response_pattern 은 필수입니다."],
     }
+
+
+@pytest.mark.django_db
+def test_clean_passes_for_default_group(product):
+    # is_custom_response=False (default) → 미라이즈만 검증 (super().clean() 도달 포함).
+    OptionGroup(product=product, name="size").clean()

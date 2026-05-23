@@ -15,7 +15,7 @@ from rest_framework.status import (
     HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
 )
-from shop.order.models import Order, OrderProductRelation
+from shop.order.models import CustomerInfo, Order, OrderProductRelation
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
 from shop.test.helpers import OrdersAdminApi, valid_refund_totp
 
@@ -259,6 +259,29 @@ def test_admin_export_returns_xlsx_filtering_refunded_per_include_flag(
 def test_admin_export_rejects_missing_or_empty_product_ids(api_client, payload):
     response = OrdersAdminApi(http_client=api_client).export(payload)
     assert response.status_code == HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_admin_partial_update_modifies_existing_customer_info(api_client, completed_order):
+    response = OrdersAdminApi(http_client=api_client).update(
+        completed_order.id,
+        {"customer_info": {"name": "수정", "phone": "01099998888", "email": "new@x.com", "organization": "Z"}},
+    )
+    assert response.status_code == HTTP_200_OK
+    assert list(
+        CustomerInfo.objects.filter(order=completed_order).values("name", "phone", "email", "organization")
+    ) == [{"name": "수정", "phone": "01099998888", "email": "new@x.com", "organization": "Z"}]
+
+
+@pytest.mark.django_db
+def test_admin_partial_update_creates_customer_info_when_missing(api_client, completed_order):
+    CustomerInfo.objects.filter(order=completed_order).hard_delete()
+    response = OrdersAdminApi(http_client=api_client).update(
+        completed_order.id,
+        {"customer_info": {"name": "신규", "phone": "01000000000", "email": "n@x.com", "organization": ""}},
+    )
+    assert response.status_code == HTTP_200_OK
+    assert CustomerInfo.objects.filter(order=completed_order, name="신규", email="n@x.com").exists()
 
 
 @pytest.mark.django_db
