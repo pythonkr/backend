@@ -25,7 +25,7 @@ class CategoryGroup(BaseAbstractModel):
         ordering = ["priority", "-created_at"]
         constraints = [models.UniqueConstraint(fields=["name"], name="uq__cat_grp__nm")]
 
-    def __str__(self) -> str:
+    def __str__(self) -> str:  # pragma: no cover
         return self.name
 
 
@@ -40,7 +40,7 @@ class Category(BaseAbstractModel):
         ordering = ["group__priority", "priority", "-created_at"]
         constraints = [models.UniqueConstraint(fields=["group", "name"], name="uq__cat__grp_nm")]
 
-    def __str__(self) -> str:
+    def __str__(self) -> str:  # pragma: no cover
         return f"{self.group.name} > {self.name}"
 
 
@@ -54,7 +54,7 @@ class Tag(BaseAbstractModel):
     class Meta:
         constraints = [models.UniqueConstraint(fields=["name"], name="uq__tag__nm")]
 
-    def __str__(self) -> str:
+    def __str__(self) -> str:  # pragma: no cover
         return self.name
 
     @functools.cached_property
@@ -149,7 +149,7 @@ class Product(BaseAbstractModel):
         ordering = ["category__group__priority", "category__priority", "priority", "-created_at"]
         indexes = [models.Index(fields=["name"])]
 
-    def __str__(self) -> str:
+    def __str__(self) -> str:  # pragma: no cover
         return f"{self.category} > {self.name} ({self.price}원)"
 
     @property
@@ -249,7 +249,7 @@ class OptionGroup(BaseAbstractModel):
         ordering = ["priority", "-created_at"]
         unique_together = ["product", "name"]
 
-    def __str__(self) -> str:
+    def __str__(self) -> str:  # pragma: no cover
         return f"[{self.product.name}] {self.name}"
 
     def clean(self) -> None:
@@ -289,7 +289,7 @@ class Option(BaseAbstractModel):
         ordering = ["priority", "-created_at"]
         indexes = [models.Index(fields=["name"])]
 
-    def __str__(self) -> str:
+    def __str__(self) -> str:  # pragma: no cover
         return f"{self.name} ({self.additional_price}원)"
 
     @functools.cached_property

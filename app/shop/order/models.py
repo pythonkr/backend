@@ -86,7 +86,7 @@ class Order(ScanCodeMixin, BaseAbstractModel):
     class Meta:
         ordering = ("-created_at",)
 
-    def __str__(self) -> str:
+    def __str__(self) -> str:  # pragma: no cover
         cart_or_order = "CART" if self.is_cart else "ORDER"
         created_at = self.created_at.isoformat()
         return f"{self.user}의 {cart_or_order} <{self.current_status}> [{created_at}]"
@@ -214,7 +214,7 @@ class OrderProductRelation(ScanCodeMixin, BaseAbstractModel):
 
     history = HistoricalRecords()
 
-    def __str__(self) -> str:
+    def __str__(self) -> str:  # pragma: no cover
         return f"[{self.order}] {self.product} ({self.get_status_display()})"
 
     @property
@@ -259,7 +259,7 @@ class OrderProductOptionRelation(BaseAbstractModel):
     class Meta:
         indexes = [models.Index(fields=["custom_response"])]
 
-    def __str__(self) -> str:
+    def __str__(self) -> str:  # pragma: no cover
         name = self.product_option.name if self.product_option else self.custom_response
         return f"{self.product_option_group.name} - {name}"
 

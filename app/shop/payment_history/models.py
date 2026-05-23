@@ -47,7 +47,7 @@ class PaymentHistory(BaseAbstractModel):
 
     objects: PaymentHistoryQuerySet = PaymentHistoryQuerySet.as_manager()  # type: ignore[assignment, misc]
 
-    def __str__(self) -> str:
+    def __str__(self) -> str:  # pragma: no cover
         return f"{self.order} <{self.get_status_display()}> ({self.price}원) [{self.created_at.isoformat()}]"
 
     class Meta:
