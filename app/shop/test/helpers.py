@@ -72,6 +72,14 @@ class OrdersAdminApi(ModelApiFixture):
         params = {"product_id": product_id} if product_id is not None else None
         return self.http_client.get(reverse(f"{self.name}-import-template"), params)
 
+    def import_csv(self, *, csv_file=None):
+        # multipart 업로드 — csv_file 부재 시 None 으로 전달해 view 의 missing-file 처리 분기 검증 가능.
+        data = {"csv_file": csv_file} if csv_file is not None else {}
+        return self.http_client.post(reverse(f"{self.name}-import-csv"), data, format="multipart")
+
+    def export(self, data=None):
+        return self.http_client.post(reverse(f"{self.name}-export"), data, format="json")
+
 
 class OrderNotificationsAdminApi(ModelApiFixture):
     name: ClassVar[str] = "v1:admin-shop-order-notification"
