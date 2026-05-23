@@ -11,7 +11,7 @@ from django.db import models
 from django.db.models.manager import BaseManager
 from simple_history.models import HistoricalRecords
 
-if typing.TYPE_CHECKING:
+if typing.TYPE_CHECKING:  # pragma: no cover
     from user.models import UserExt
 
 
