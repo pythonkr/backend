@@ -5,6 +5,7 @@ from core.const.shop_error_messages import NotRefundableErrorMessages, Permissio
 from core.external_apis.portone.client import PortOneException
 from core.util.testutil import errors_payload
 from freezegun import freeze_time
+from rest_framework.exceptions import ValidationError
 from shop.order.models import OrderProductRelation
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
 from shop.serializers.refund import OrderProductRefundSerializer, OrderTotalRefundSerializer
@@ -274,4 +275,54 @@ def test_partial_refund_rejects_when_refund_window_expired(completed_order, mock
     assert errors_payload(serializer.errors) == {
         "non_field_errors": [{"detail": NotRefundableErrorMessages.PRODUCT_REFUND_TIME_EXPIRED, "code": "invalid"}],
     }
+    mock_portone_req_cancel_payment.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_total_refund_expected_price_is_zero_when_no_paid_oprs(refunded_order):
+    # 모든 OPR 이 refunded — refund_target 없음 → expected_refund_price 는 0.
+    serializer = OrderTotalRefundSerializer(instance=refunded_order, data={"id": str(refunded_order.id)})
+    assert serializer.expected_refund_price == 0
+
+
+@pytest.mark.django_db
+def test_partial_refund_product_cached_property_returns_relation_product(completed_order):
+    # OrderProductRefundSerializer.product 는 instance 의 product 를 cached 로 노출.
+    target_opr = completed_order.products.first()
+    serializer = OrderProductRefundSerializer(instance=target_opr, data={"id": str(target_opr.id)})
+    assert serializer.product == target_opr.product
+
+
+@pytest.mark.django_db
+def test_total_refund_recheck_after_lock_rejects_when_state_changed(completed_order, mock_portone_req_cancel_payment):
+    # validate() 통과 → 외부에서 OPR refunded 처리 → refund() lock 후 invariant 재검사에서 거부.
+    serializer = OrderTotalRefundSerializer(
+        instance=completed_order, data={"id": str(completed_order.id)}, context={"check_totp": False}
+    )
+    assert serializer.is_valid()
+
+    completed_order.products.update(status=OrderProductRelation.OrderProductStatus.refunded)
+
+    with pytest.raises(ValidationError):
+        serializer.refund()
+    mock_portone_req_cancel_payment.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_partial_refund_recheck_after_lock_rejects_when_state_changed(completed_order, mock_portone_req_cancel_payment):
+    # validate() 통과 → 외부에서 OPR refunded 처리 → refund() lock 후 재검사에서 거부.
+    target_opr = completed_order.products.first()
+    serializer = OrderProductRefundSerializer(
+        instance=target_opr,
+        data={"id": str(target_opr.id)},
+        context={"check_totp": False},
+    )
+    assert serializer.is_valid()
+
+    OrderProductRelation.objects.filter(id=target_opr.id).update(
+        status=OrderProductRelation.OrderProductStatus.refunded
+    )
+
+    with pytest.raises(ValidationError):
+        serializer.refund()
     mock_portone_req_cancel_payment.assert_not_called()

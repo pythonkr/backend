@@ -111,7 +111,7 @@ class OptionOrderableCheckSerializer(serializers.Serializer):
                     user_option_cart_included_count = 0
                 case OrderableCheckSerializerMode.CHECKOUT_CART:
                     pass
-                case _:
+                case _:  # pragma: no cover
                     raise ValueError("Invalid validation mode")
 
             if user_option_cart_included_count > option.leftover_stock:
@@ -146,7 +146,7 @@ class OptionOrderableCheckSerializer(serializers.Serializer):
                         include_cart=True,
                         include_purchased=True,
                     )
-                case _:
+                case _:  # pragma: no cover
                     raise ValueError("Invalid validation mode")
 
             if user_option_taken_count > option.max_quantity_per_user:

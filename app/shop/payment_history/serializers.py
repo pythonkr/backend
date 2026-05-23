@@ -173,9 +173,12 @@ class PortOneV1WebhookRequestSerializer(serializers.Serializer):
         if cart := SingleProductCart.objects.select_for_update().filter_active().filter(id=obj_id).first():
             return cart.to_order()
         # 첫 lock 시 cart 가 다른 webhook 에 의해 promote 된 경우 — Order 재조회.
-        if order := Order.objects.select_for_update().filter_active().filter(id=obj_id).first():
+        # 단일 스레드 테스트로는 진입 불가능 — validate() 에서 cart_or_order 부재를 이미 거부함.
+        if order := Order.objects.select_for_update().filter_active().filter(id=obj_id).first():  # pragma: no cover
             return order
-        raise serializers.ValidationError(detail=PortOneWebhookFailureMessages.ORDER_NOT_FOUND, code="forgery")
+        raise serializers.ValidationError(  # pragma: no cover
+            detail=PortOneWebhookFailureMessages.ORDER_NOT_FOUND, code="forgery"
+        )
 
 
 class PortOneV1WebhookResponseSerializer(serializers.Serializer):

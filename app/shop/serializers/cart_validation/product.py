@@ -115,7 +115,7 @@ class ProductOrderableCheckSerializer(serializers.ModelSerializer):
                     user_product_cart_included_count = 0
                 case OrderableCheckSerializerMode.CHECKOUT_CART:
                     pass
-                case _:
+                case _:  # pragma: no cover
                     raise ValueError("Invalid validation mode")
 
             if user_product_cart_included_count > product.leftover_stock:
@@ -150,7 +150,7 @@ class ProductOrderableCheckSerializer(serializers.ModelSerializer):
                         include_cart=True,
                         include_purchased=True,
                     )
-                case _:
+                case _:  # pragma: no cover
                     raise ValueError("Invalid validation mode")
 
             if user_product_taken_count > product.max_quantity_per_user:
@@ -216,11 +216,12 @@ class ProductOrderableCheckSerializer(serializers.ModelSerializer):
             + donation_price
             + sum(o["product_option"].additional_price for o in options if o["product_option"])
         )
-        if total_price < 0:
+        # `total_price < 0` / `total_price == 0 (with product.price > 0)` 은 모든 가격 필드가
+        # PositiveIntegerField 라 현재 스키마로는 진입 불가능 — 향후 필드 타입 완화 대비 가드.
+        if total_price < 0:  # pragma: no cover
             raise serializers.ValidationError(ProductNotOrderableErrorMessages.PRICE_IS_MINUS)
 
-        # 상품이 0원이거나 0원을 별도로 허용한 경우를 제외하면, 후원 금액 포함 단일 상품 금액이 0원인 경우 주문 불가능
-        elif not (self.is_free_product_allowed or product.price == 0) and total_price == 0:
+        elif not (self.is_free_product_allowed or product.price == 0) and total_price == 0:  # pragma: no cover
             raise serializers.ValidationError(ProductNotOrderableErrorMessages.PRICE_TOO_LOW)
 
         # 후원 금액 포함 단일 상품 금액이 100만원 이상인 경우 주문 불가능

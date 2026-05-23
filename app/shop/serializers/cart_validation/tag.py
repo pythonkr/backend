@@ -70,7 +70,7 @@ class TagOrderableCheckSerializer(serializers.ModelSerializer):
                         include_cart=True,
                         include_purchased=True,
                     )
-                case _:
+                case _:  # pragma: no cover
                     raise ValueError("Invalid validation mode")
 
             if user_tagproduct_taken_count > tag.max_quantity_per_user:
