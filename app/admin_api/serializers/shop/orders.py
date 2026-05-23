@@ -1,12 +1,10 @@
 from typing import Any
-from urllib.parse import urljoin
 
 from admin_api.serializers.notification import HISTORY_ADMIN_SERIALIZER_BY_CHANNEL
 from core.const.serializer import COMMON_ADMIN_FIELDS
 from core.serializer.base_abstract_serializer import BaseAbstractSerializer
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
 from core.serializer.skip_none_list_serializer import SkipNoneListSerializer
-from django.conf import settings
 from notification.channels import NotificationChannel
 from notification.models.base import Recipient
 from rest_framework import serializers
@@ -150,8 +148,7 @@ class _OrderRecipientItemSerializer(serializers.Serializer):
                 else (o_rel.product_option.name if o_rel.product_option else "")
             )
             for o_rel in order_product_rel.options.all()
-        }
-        ctx["scancode_url"] = urljoin(settings.BACKEND_DOMAIN, order.scancode_path)
+        } | order.build_notification_context()
 
         return {"recipient": recipient, "context": ctx | self.context["context_override"]}
 

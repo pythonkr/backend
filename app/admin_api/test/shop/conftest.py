@@ -1,3 +1,5 @@
+import pytest
+from notification.models import EmailNotificationTemplate
 from shop.conftest import (  # noqa: F401
     anon_client,
     completed_order,
@@ -25,3 +27,22 @@ from shop.conftest import (  # noqa: F401
     staff_user,
     tag,
 )
+
+
+@pytest.fixture
+def order_email_template(superuser) -> EmailNotificationTemplate:
+    # `send_payment_completed_notifications` Celery task 와 동일한 Order-derived 변수만 사용 —
+    # admin send/preview API 도 동일한 변수를 자동 노출하므로 context_override 없이 발송 가능.
+    return EmailNotificationTemplate.objects.create(
+        code="order-payment-completed",
+        title="결제 완료",
+        sent_from="from@example.com",
+        data=(
+            '{"title":"{{ order_name }} 결제 완료",'
+            '"from_":"f",'
+            '"send_to":"{{ customer_email }}",'
+            '"body":"{{ customer_name }}님 {{ first_paid_price }}원 결제 완료"}'
+        ),
+        created_by=superuser,
+        updated_by=superuser,
+    )

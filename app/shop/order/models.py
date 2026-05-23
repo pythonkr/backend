@@ -3,11 +3,13 @@ from __future__ import annotations
 import datetime
 import functools
 import typing
+from urllib.parse import urljoin
 
 from core.const.shop_error_messages import NotRefundableErrorMessages
 from core.models import BaseAbstractModel, BaseAbstractModelQuerySet
 from core.scancode_mixin import ScanCodeMixin
 from core.util.dateutil import now_aware
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.db.models.manager import BaseManager
@@ -132,6 +134,23 @@ class Order(ScanCodeMixin, BaseAbstractModel):
     @functools.cached_property
     def latest_imp_id(self) -> str | None:
         return self.current_payment_history.imp_id if self.current_payment_history else None
+
+    def build_notification_context(self) -> dict:
+        """결제 완료 알림 (auto + admin manual) 에서 공통으로 사용하는 Order-derived context.
+
+        `first_paid_at` 은 isoformat 문자열로 변환 — JSONField 저장 시 psycopg `json.dumps` 가
+        datetime 을 직접 직렬화 못함. 호출자는 customer_info 존재를 사전 검증해야 함.
+        """
+        customer_info = self.customer_info
+        return {
+            "order_name": self.name,
+            "first_paid_at": self.first_paid_at.isoformat() if self.first_paid_at else None,
+            "first_paid_price": self.first_paid_price,
+            "customer_name": customer_info.name,
+            "customer_phone": customer_info.phone,
+            "customer_email": customer_info.email,
+            "scancode_url": urljoin(settings.BACKEND_DOMAIN, self.scancode_path),
+        }
 
     @functools.cached_property
     def is_cart(self) -> bool:

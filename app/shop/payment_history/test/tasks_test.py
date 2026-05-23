@@ -1,9 +1,11 @@
 import logging
 import types
 from unittest.mock import patch
+from urllib.parse import urljoin
 
 import pytest
 from core.models import BaseAbstractModelQuerySet
+from django.conf import settings
 from notification.models import (
     EmailNotificationHistory,
     EmailNotificationTemplate,
@@ -109,6 +111,7 @@ def test_creates_email_history_when_template_exists(order_with_customer, email_t
         "customer_name": "홍길동",
         "customer_phone": "01012345678",
         "customer_email": "customer@example.com",
+        "scancode_url": urljoin(settings.BACKEND_DOMAIN, order_with_customer.scancode_path),
     }
     assert sent_to.status == NotificationStatus.CREATED
 

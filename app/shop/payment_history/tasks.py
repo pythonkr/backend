@@ -31,15 +31,7 @@ def send_payment_completed_notifications(order_id: str) -> None:
         .first()
     ) is not None:
         if (customer_info := getattr(order, "customer_info", None)) is not None:
-            context = {
-                "order_name": order.name,
-                "first_paid_at": order.first_paid_at,
-                "first_paid_price": order.first_paid_price,
-                "customer_name": customer_info.name,
-                "customer_phone": customer_info.phone,
-                "customer_email": customer_info.email,
-            }
-
+            context = order.build_notification_context()
             _send_alimtalk(order_id, customer_info.phone, context)
             _send_email(order_id, customer_info.email, context)
 

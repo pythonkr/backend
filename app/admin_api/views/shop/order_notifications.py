@@ -34,6 +34,7 @@ class OrderNotificationAdminViewSet(JsonSchemaViewSet, viewsets.GenericViewSet):
         .filter(current_status__in=REFUNDABLE_STATUSES)
         .select_related("customer_info")
         .prefetch_related(
+            Order.prefetchs["_payment_histories_by_latest"],
             models.Prefetch(
                 "products",
                 queryset=OrderProductRelation.objects.filter_active().prefetch_related(
