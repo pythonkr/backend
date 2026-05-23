@@ -77,15 +77,18 @@ local-test-cov:
 		--cov-report=html:../htmlcov \
 		--cov-report=xml:../coverage.xml
 
-# Run pytest with coverage, scoped to shop-related code
+# Run pytest with coverage, scoped to shop-related code (CI 검증용: 100% 미만 시 exit 1)
+# - 테스트 범위는 shop/ + admin_api/test/ — admin shop serializers/filtersets 가 admin_api 테스트로만 커버되므로 필수.
+# - cov 범위는 shop/ 전체 + admin_api/{views,serializers,filtersets}/shop 만.
 local-test-cov-shop:
-	@cd app && ENV_PATH=../envfile/.env.local uv run pytest shop/ \
+	@cd app && ENV_PATH=../envfile/.env.local uv run pytest shop/ admin_api/test/ \
 		--cov=shop \
 		--cov=admin_api/views/shop \
 		--cov=admin_api/serializers/shop \
 		--cov=admin_api/filtersets/shop \
 		--cov-config=../pyproject.toml \
-		--cov-report=term-missing
+		--cov-report=term-missing \
+		--cov-fail-under=100
 
 # Devtools
 hooks-install: local-setup
