@@ -271,6 +271,12 @@ def test_product_rejects_when_option_does_not_belong_to_product(customer_user, p
             lambda _product: ProductNotOrderableErrorMessages.PRICE_TOO_HIGH,
             id="total_price_too_high",
         ),
+        pytest.param(
+            {"price": 0},
+            0,
+            lambda _product: ProductNotOrderableErrorMessages.PRICE_TOO_LOW,
+            id="total_price_is_zero",
+        ),
     ],
 )
 @pytest.mark.django_db

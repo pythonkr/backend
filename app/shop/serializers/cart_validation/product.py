@@ -206,12 +206,14 @@ class ProductOrderableCheckSerializer(serializers.ModelSerializer):
                     )
                 )
 
-        # 후원 금액 포함 단일 상품 금액이 0원 미만인 경우 주문 불가능
         total_price = (
             product.price
             + donation_price
             + sum(o["product_option"].additional_price for o in options if o["product_option"])
         )
+        # 후원 금액 포함 단일 상품 금액이 0원 이하인 경우 주문 불가능 — PortOne 결제는 0원 금액에서 실패하므로 사전 차단.
+        if total_price <= 0:
+            raise serializers.ValidationError(ProductNotOrderableErrorMessages.PRICE_TOO_LOW)
         # 후원 금액 포함 단일 상품 금액이 100만원 이상인 경우 주문 불가능
         if total_price >= 1_000_000:
             raise serializers.ValidationError(ProductNotOrderableErrorMessages.PRICE_TOO_HIGH)
