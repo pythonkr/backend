@@ -41,7 +41,8 @@ class ScanCodeMixin:
     @classmethod
     def from_short_id(cls, short_id: str) -> Self | None:
         with suppress(ValueError):
-            return cls.objects.filter(**{cls.scancode_uuid_field: decode(short_id)}).first()
+            queryset = cls.objects.filter_active() if hasattr(cls.objects, "filter_active") else cls.objects
+            return queryset.filter(**{cls.scancode_uuid_field: decode(short_id)}).first()
         return None
 
     @classmethod

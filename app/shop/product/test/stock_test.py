@@ -267,3 +267,130 @@ def test_option_taken_count_per_flag_excludes_single_product_cart(customer_user,
     )
     # SingleProductCart 에 매달린 OPR 은 cart count 에서 제외 — promote 전이라 stock 점유 아님.
     assert option.get_user_taken_stock_count(user=customer_user, include_cart=True, include_purchased=False) == 0
+
+
+# --- soft-delete / SPC 누락 분에 대한 회귀 가드 ---
+# 본 PR 에서 누락된 filter_active() / single_product_cart 제외 / 부모 OPR deleted_at 제외 분을 메서드별로 잠근다.
+
+
+def _make_paid_opr(user, product) -> OrderProductRelation:
+    return OrderProductRelation.objects.create(
+        order=Order.objects.create(user=user, name="o"),
+        product=product,
+        price=product.price,
+        status=OrderProductRelation.OrderProductStatus.paid,
+    )
+
+
+@pytest.mark.django_db
+def test_tag_leftover_stock_excludes_soft_deleted_opr(customer_user, tag, product):
+    tag.stock = 3
+    tag.save()
+    opr = _make_paid_opr(customer_user, product)
+    opr.delete()  # soft
+
+    assert Tag.objects.get(id=tag.id).leftover_stock == 3
+
+
+@pytest.mark.django_db
+def test_tag_taken_count_excludes_soft_deleted_opr(customer_user, tag, product):
+    opr = _make_paid_opr(customer_user, product)
+    opr.delete()
+
+    assert tag.get_user_taken_stock_count(user=customer_user, include_cart=True, include_purchased=True) == 0
+
+
+@pytest.mark.django_db
+def test_product_leftover_stock_excludes_soft_deleted_opr(customer_user, product):
+    product.stock = 5
+    product.save()
+    opr = _make_paid_opr(customer_user, product)
+    opr.delete()
+
+    assert Product.objects.get(id=product.id).leftover_stock == 5
+
+
+@pytest.mark.django_db
+def test_product_taken_count_excludes_soft_deleted_opr(customer_user, product):
+    opr = _make_paid_opr(customer_user, product)
+    opr.delete()
+
+    assert product.get_user_taken_stock_count(user=customer_user, include_cart=True, include_purchased=True) == 0
+
+
+@pytest.mark.django_db
+def test_option_group_taken_count_excludes_soft_deleted_opor(customer_user, option_group, option):
+    # OPOR 자체가 soft-delete 된 경우 (parent OPR 은 active) 도 제외돼야 한다.
+    opr = _make_paid_opr(customer_user, option_group.product)
+    opor = OrderProductOptionRelation.objects.create(
+        order_product_relation=opr, product_option_group=option_group, product_option=option
+    )
+    opor.delete()
+
+    assert option_group.get_user_taken_stock_count(user=customer_user, include_cart=True, include_purchased=True) == 0
+
+
+@pytest.mark.django_db
+def test_option_leftover_stock_excludes_single_product_cart(customer_user, option_group, option):
+    # Pre-existing 가장 심각한 누락 — SPC promote 전 OPR 의 OPOR 가 option stock 을 차감하던 버그.
+    option.stock = 3
+    option.save()
+    spc_opr = OrderProductRelation.objects.create(
+        product=option_group.product,
+        price=option_group.product.price,
+        status=OrderProductRelation.OrderProductStatus.paid,
+    )
+    SingleProductCart.objects.create(user=customer_user, order_product_relation=spc_opr)
+    OrderProductOptionRelation.objects.create(
+        order_product_relation=spc_opr, product_option_group=option_group, product_option=option
+    )
+
+    assert Option.objects.get(id=option.id).leftover_stock == 3
+
+
+@pytest.mark.django_db
+def test_option_leftover_stock_excludes_soft_deleted_opor(customer_user, option_group, option):
+    option.stock = 3
+    option.save()
+    opr = _make_paid_opr(customer_user, option_group.product)
+    opor = OrderProductOptionRelation.objects.create(
+        order_product_relation=opr, product_option_group=option_group, product_option=option
+    )
+    opor.delete()
+
+    assert Option.objects.get(id=option.id).leftover_stock == 3
+
+
+@pytest.mark.django_db
+def test_option_leftover_stock_excludes_opor_under_soft_deleted_opr(customer_user, option_group, option):
+    option.stock = 3
+    option.save()
+    opr = _make_paid_opr(customer_user, option_group.product)
+    OrderProductOptionRelation.objects.create(
+        order_product_relation=opr, product_option_group=option_group, product_option=option
+    )
+    opr.delete()  # 부모 soft-delete → OPOR 도 effectively 제외돼야 한다.
+
+    assert Option.objects.get(id=option.id).leftover_stock == 3
+
+
+@pytest.mark.django_db
+def test_option_taken_count_excludes_soft_deleted_opor(customer_user, option_group, option):
+    opr = _make_paid_opr(customer_user, option_group.product)
+    opor = OrderProductOptionRelation.objects.create(
+        order_product_relation=opr, product_option_group=option_group, product_option=option
+    )
+    opor.delete()
+
+    assert option.get_user_taken_stock_count(user=customer_user, include_cart=True, include_purchased=True) == 0
+
+
+@pytest.mark.django_db
+def test_option_taken_count_excludes_opor_under_soft_deleted_opr(customer_user, option_group, option):
+    opr = _make_paid_opr(customer_user, option_group.product)
+    OrderProductOptionRelation.objects.create(
+        order_product_relation=opr, product_option_group=option_group, product_option=option
+    )
+    opr.delete()
+
+    assert option.get_user_taken_stock_count(user=customer_user, include_cart=True, include_purchased=True) == 0

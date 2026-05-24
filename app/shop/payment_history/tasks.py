@@ -23,13 +23,7 @@ def send_payment_completed_notifications(order_id: str) -> None:
     - 실제 외부 API 호출은 send_notification_to_recipient task에서 채널별로 처리됩니다.
     """
 
-    if (
-        order := Order.objects.filter_active()
-        .select_related("customer_info")
-        .prefetch_related("products", Order.prefetchs["_active_payment_histories"])
-        .filter(id=order_id)
-        .first()
-    ) is not None:
+    if (order := Order.objects.filter_active().for_dto_response().filter(id=order_id).first()) is not None:
         if (customer_info := getattr(order, "customer_info", None)) is not None:
             context = order.build_notification_context()
             _send_alimtalk(order_id, customer_info.phone, context)
