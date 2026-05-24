@@ -76,6 +76,9 @@ class NotificationTemplateBase(BaseAbstractModel):
             ),
         ]
 
+    def __str__(self) -> str:
+        return f"[{self.code}] {self.title}"
+
     @classmethod
     def _to_dtl(cls, source: str) -> str:
         return source
@@ -153,6 +156,9 @@ class NotificationHistoryBase(BaseAbstractModel):
     class Meta:
         abstract = True
 
+    def __str__(self) -> str:
+        return f"{self.template_code or '-'} by {self.created_by}"
+
     @property
     def template_code(self) -> str:
         return self.template.code if self.template_id else ""
@@ -211,6 +217,9 @@ class NotificationHistorySentToBase(BaseAbstractModel):
                 name="uq_%(app_label)s_%(class)s_history_recipient",
             ),
         ]
+
+    def __str__(self) -> str:
+        return f"{self.recipient} ({self.get_status_display()})"
 
     def _parsed_template_data(self) -> Any:
         try:
