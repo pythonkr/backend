@@ -31,7 +31,7 @@ class UserAdminViewSet(
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = UserAdminSerializer
     permission_classes = [IsSuperUser]
-    queryset = UserExt.objects.filter(is_active=True)
+    queryset = UserExt.objects.filter(is_active=True).prefetch_related("emailaddress_set", "socialaccount_set")
 
     def create(self, request: request.Request, *args: tuple, **kwargs: dict) -> response.Response:
         serializer = self.get_serializer(data=request.data)

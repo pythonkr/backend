@@ -12,6 +12,7 @@ class OpenAPITag:
 
     ADMIN_ACCOUNT = "Admin > Sign-In & Sign-Out"
     ADMIN_USER = "Admin > User"
+    ADMIN_ALLAUTH = "Admin > Allauth"
     ADMIN_CMS = "Admin > CMS"
     ADMIN_PUBLIC_FILE = "Admin > Public File"
     ADMIN_EVENT_EVENT = "Admin > Event > Event"
