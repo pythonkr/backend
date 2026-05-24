@@ -40,6 +40,8 @@ class OptionGroupNotOrderableErrorMessages:
     SOLDOUT = "{} 상품의 필수 구매 옵션인 '{}' 옵션이 매진되어 상품을 구매하실 수 없습니다."
     NOT_ENOUGH_OPTION = "{} 상품의 필수 구매 옵션인 '{}' 옵션을 선택해주세요."
     TOO_MUCH_OPTION = "{} 상품의 '{}' 옵션을 너무 많이 선택하셨습니다."
+    ALREADY_ORDERED_TOO_MUCH = "{} 상품 '{}' 옵션 그룹의 인당 최대 선택 수량 초과로 구매하실 수 없습니다."
+    NOT_ORDERABLE_TIME = "{} 상품의 '{}' 옵션 그룹은 현재 구매하실 수 없습니다."
 
 
 class OptionNotOrderableErrorMessages:

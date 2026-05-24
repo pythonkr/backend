@@ -1,6 +1,5 @@
 from core.const.tag import OpenAPITag
-from core.util.dateutil import now_aware
-from django.db.models import Prefetch, Q, QuerySet
+from django.db.models import Prefetch, QuerySet
 from drf_spectacular.openapi import OpenApiParameter, OpenApiTypes
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from drf_standardized_errors.openapi_serializers import ErrorResponse404Serializer
@@ -43,9 +42,7 @@ class ProductViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.
     filterset_class = ProductFilterSet
 
     def get_queryset(self) -> QuerySet[Product]:
-        # 현재 노출 가능한 상품만 보여야 합니다.
-        now = now_aware()
-        filter = Q(visible_starts_at__lte=now, visible_ends_at__gte=now)
+        base_qs = Product.objects.filter_visible_now()
 
         if self.action == "retrieve" and isinstance(self.request.user, UserExt):
             # 단, 사용자가 구매한 상품인 경우, 노출 기간에 상관없이 상세 정보를 조회할 수 있어야 합니다.
@@ -54,14 +51,12 @@ class ProductViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.
                 single_product_cart__isnull=True,
                 status=OrderProductRelation.OrderProductStatus.paid,
             ).values_list("product_id", flat=True)
-            filter |= Q(id__in=purchased_product_ids)
+            base_qs = base_qs | Product.objects.filter_active().filter(id__in=purchased_product_ids)
 
-        return (
-            Product.objects.filter_active()
-            .filter(filter)
-            .select_related("category", "category__group", "image")
-            .prefetch_related(
-                "tags",
-                Prefetch("option_groups", queryset=OptionGroup.objects.prefetch_related("options")),
-            )
+        return base_qs.select_related("category", "category__group", "image").prefetch_related(
+            "tags",
+            Prefetch(
+                "option_groups",
+                queryset=OptionGroup.objects.filter_visible_now().prefetch_related("options"),
+            ),
         )

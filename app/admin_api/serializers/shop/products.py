@@ -7,6 +7,7 @@ from core.serializer.nested_model_serializer import (
     NestedFieldSpec,
     NestedModelSerializer,
 )
+from core.util.timespan import TimeSpan
 from file.models import PublicFile
 from rest_framework import serializers
 from shop.product.models import Category, CategoryGroup, Option, OptionGroup, Product, Tag
@@ -81,6 +82,11 @@ class OptionGroupAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, N
             "name_en",
             "min_quantity_per_product",
             "max_quantity_per_product",
+            "max_quantity_per_user",
+            "visible_starts_at",
+            "visible_ends_at",
+            "orderable_starts_at",
+            "orderable_ends_at",
             "is_custom_response",
             "custom_response_pattern",
             "response_modifiable_ends_at",
@@ -104,7 +110,64 @@ class OptionGroupAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, N
             raise serializers.ValidationError(
                 {"custom_response_pattern": "is_custom_response=True 일 때 custom_response_pattern 은 필수입니다."}
             )
+
+        if errors := self._validate_period(attrs):
+            raise serializers.ValidationError(errors)
         return attrs
+
+    # 메시지 템플릿 — visible / orderable 둘 다 같은 구조라 label 만 치환.
+    _GROUP_PERIOD_LABELS = (("visible", "노출"), ("orderable", "판매"))
+
+    def _validate_period(self, attrs: dict) -> dict[str, str]:
+        merged = {**attrs}
+        for field in (
+            "visible_starts_at",
+            "visible_ends_at",
+            "orderable_starts_at",
+            "orderable_ends_at",
+            "min_quantity_per_product",
+            "product",
+        ):
+            if self.instance is not None:
+                merged.setdefault(field, getattr(self.instance, field, None))
+
+        product: Product = merged["product"]
+        min_qty = merged.get("min_quantity_per_product") or 0
+
+        errors: dict[str, str] = {}
+        for kind, label in self._GROUP_PERIOD_LABELS:
+            span = TimeSpan(merged.get(f"{kind}_starts_at"), merged.get(f"{kind}_ends_at"))
+            parent = getattr(product, f"{kind}_period")
+            errors.update(self._check_group_span(span, parent, kind=kind, label=label))
+            if min_qty >= 1:
+                # 필수 옵션 그룹은 상품 기간과 동기되어야 한다 — 그룹 starts_at 이 늦거나 ends_at 이 일찍이면
+                # 상품은 노출/판매되는데 필수 옵션을 채울 수 없는 죽은 구간이 생기므로 그룹 단위 윈도우 지정 금지.
+                if span.starts_at is not None:
+                    msg = f"필수 옵션 그룹의 {label} 시작은 별도로 지정할 수 없습니다 (상품 기준)."
+                    errors[f"{kind}_starts_at"] = msg
+                if span.ends_at is not None:
+                    msg = f"필수 옵션 그룹의 {label} 종료는 별도로 지정할 수 없습니다 (상품 기준)."
+                    errors[f"{kind}_ends_at"] = msg
+
+        return errors
+
+    @staticmethod
+    def _check_group_span(span: TimeSpan, parent: TimeSpan, *, kind: str, label: str) -> dict[str, str]:
+        # 그룹의 visible/orderable 윈도우 검증 — 자기 inverted + 상품 윈도우 안 포함 + 한 boundary fallback inverted.
+        errors: dict[str, str] = {}
+        if span.is_inverted:
+            errors[f"{kind}_starts_at"] = f"옵션 그룹의 {label} 시작은 {label} 종료 이전이어야 합니다."
+        if span.starts_before(parent):
+            errors[f"{kind}_starts_at"] = f"옵션 그룹의 {label} 시작은 상품 {label} 시작 이후여야 합니다."
+        if span.ends_after(parent):
+            errors[f"{kind}_ends_at"] = f"옵션 그룹의 {label} 종료는 상품 {label} 종료 이전이어야 합니다."
+        # 한 쪽 boundary 만 명시하면 model effective_*_period (None → product fallback) 가 inverted 될 수 있다.
+        # 예: product=[2020,2099], group ends_at=2019 → effective=[2020,2019]. admin 이 잡는다.
+        if span.ends_at and span.ends_at < parent.effective_starts_at:
+            errors[f"{kind}_ends_at"] = f"옵션 그룹의 {label} 종료는 상품 {label} 시작 이후여야 합니다."
+        if span.starts_at and span.starts_at > parent.effective_ends_at:
+            errors[f"{kind}_starts_at"] = f"옵션 그룹의 {label} 시작은 상품 {label} 종료 이전이어야 합니다."
+        return errors
 
 
 class ProductAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
@@ -148,22 +211,27 @@ class ProductAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, seria
         )
 
     def validate(self, attrs: dict) -> dict:
+        if errors := self._validate_period(attrs):
+            raise serializers.ValidationError(errors)
+        return attrs
+
+    def _validate_period(self, attrs: dict) -> dict[str, str]:
+        """visible/orderable 윈도우 검증 — partial update 대비 merged 패턴."""
         merged = {**attrs}
         if self.instance is not None:
             for field in ("visible_starts_at", "visible_ends_at", "orderable_starts_at", "orderable_ends_at"):
                 merged.setdefault(field, getattr(self.instance, field, None))
 
-        v_start = merged.get("visible_starts_at")
-        v_end = merged.get("visible_ends_at")
-        o_start = merged.get("orderable_starts_at")
-        o_end = merged.get("orderable_ends_at")
+        visible = TimeSpan(merged.get("visible_starts_at"), merged.get("visible_ends_at"))
+        orderable = TimeSpan(merged.get("orderable_starts_at"), merged.get("orderable_ends_at"))
 
         errors: dict[str, str] = {}
-        if v_start and o_start and o_start < v_start:
+        if visible.is_inverted:
+            errors["visible_starts_at"] = "노출 시작은 노출 종료 이전이어야 합니다."
+        if orderable.is_inverted:
+            errors["orderable_starts_at"] = "판매 시작은 판매 종료 이전이어야 합니다."
+        if orderable.starts_before(visible):
             errors["orderable_starts_at"] = "판매 시작은 노출 시작 이후여야 합니다."
-        if v_end and o_end and o_end > v_end:
+        if orderable.ends_after(visible):
             errors["orderable_ends_at"] = "판매 종료는 노출 종료 이전이어야 합니다."
-
-        if errors:
-            raise serializers.ValidationError(errors)
-        return attrs
+        return errors

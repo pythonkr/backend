@@ -1,9 +1,11 @@
 import functools
 import typing
+from collections import Counter
 
 from core.const.shop_error_messages import (
     CriticalErrorMessages,
     OptionGroupNotOrderableErrorMessages,
+    OptionNotOrderableErrorMessages,
     ProductNotOrderableErrorMessages,
     SignInErrorMessages,
 )
@@ -12,7 +14,7 @@ from core.util.dateutil import now_aware
 from django.db import transaction
 from rest_framework import request, serializers
 from shop.order.models import Order, OrderProductOptionRelation, OrderProductRelation, SingleProductCart
-from shop.product.models import Product
+from shop.product.models import Option, Product
 from shop.serializers.cart_validation._base import OrderableCheckSerializerMode
 from shop.serializers.cart_validation.option import OptionOrderableCheckSerializer, OptionOrderableCheckTypedDict
 from shop.serializers.cart_validation.tag import TagOrderableCheckSerializer
@@ -32,28 +34,26 @@ class ProductOrderableCheckAfterValidationDataType(typing.TypedDict):
 
 
 class ProductOrderableCheckSerializer(serializers.ModelSerializer):
-    """
-    장바구니에 담긴 상품이 주문 가능한지 확인합니다.
-    아래 조건에 해당될 경우 주문 불가능합니다.
+    """장바구니에 담긴 상품 + 옵션이 주문 가능한지 확인.
 
     ==================== 상품(Product) ====================
-    - 판매 시작일 & 판매 종료일 사이가 아닌 경우 주문 불가능
-    - 상품의 재고가 없는 경우 주문 불가능
-    - 상품의 최대 구매 수량이 정해져있으면, 해당 사용자가 이미 구매한 수량이 최대 구매 수량을 초과하는 경우 주문 불가능
-    - 고객이 상품의 재고를 초과하여 상품을 장바구니에 담으면 주문 불가능
-    - 후원 가능 상품일 경우에만, 후원 가능 금액 범위 내에서 후원 금액을 입력받을 수 있음
-    - 후원 금액 포함 단일 상품 금액이 0원 미만인 경우 주문 불가능
-    - 상품이 0원이거나 0원을 별도로 허용한 경우를 제외하면, 후원 금액 포함 단일 상품 금액이 0원인 경우 주문 불가능
-    - 후원 금액 포함 단일 상품 금액이 100만원 이상인 경우 주문 불가능
+    - 판매 기간 안 (orderable_starts_at <= now <= orderable_ends_at)
+    - 재고 충분 (mode 별 cart 누적 / +1 / 무시 분기)
+    - 인당 최대 구매 수량 안 (mode 별)
+    - 후원 금액 정책: donation_allowed + [min, max] 범위
+    - 총 금액 (product + donation + option additional) 이 [1원, 100만원)
 
     ==================== 상품군 (Tag) ====================
-    - 상품군이 주문 불가능한 경우 주문 불가능
+    - TagOrderableCheckSerializer 위임 (재고 / 인당 한도)
 
-    ==================== 상품 옵션 (Option) ====================
-    - 상품 옵션 중 필수 옵션이 매진된 경우 주문 불가능
-    - 옵션의 필수 선택 수량이 충족되지 않은 경우 주문 불가능
-    - 옵션의 최대 선택 수량을 초과한 경우 주문 불가능
-    - 선택한 상품 옵션들 중 주문 불가능한 옵션이 있는 경우 주문 불가능
+    ==================== 옵션 그룹 (OptionGroup) ====================
+    - effective_visible / effective_orderable 기간 안 (그룹 값 → product fallback)
+    - min/max_quantity_per_product 안
+    - group 단위 max_quantity_per_user 안
+
+    ==================== 옵션 (Option) ====================
+    - 단건 정합성 — OptionOrderableCheckSerializer 가 entry 마다 검사 (SOLDOUT / 그룹 소속 / custom_response).
+    - 같은 OPR 안 합산 stock / max_per_user — `_validate_aggregated_option_counts` 가 mode 별로 검사.
     """
 
     product = serializers.PrimaryKeyRelatedField(
@@ -180,31 +180,58 @@ class ProductOrderableCheckSerializer(serializers.ModelSerializer):
 
         for group in product.option_groups.all():
             option_selected_count = len([o for o in options if o["product_option_group"] == group])
+            # 그룹 단위 visible/orderable 기간 밖이면 거절 — visible 미래/과거인 그룹은 API 노출도 안 되지만
+            # 직접 ID 로 주문 시도 차단을 위해 cart validation 에서도 함께 검사한다.
+            if option_selected_count > 0 and (not group.is_visible_now() or not group.is_orderable_now()):
+                msg = OptionGroupNotOrderableErrorMessages.NOT_ORDERABLE_TIME.format(product.name, group.name)
+                raise serializers.ValidationError(msg)
             # 옵션의 필수 선택 수량이 충족되지 않은 경우 주문 불가능
             if group.min_quantity_per_product and group.min_quantity_per_product > option_selected_count:
-                raise serializers.ValidationError(
-                    OptionGroupNotOrderableErrorMessages.NOT_ENOUGH_OPTION.format(product.name, group.name)
-                )
+                msg = OptionGroupNotOrderableErrorMessages.NOT_ENOUGH_OPTION.format(product.name, group.name)
+                raise serializers.ValidationError(msg)
             # 옵션의 최대 선택 수량을 초과한 경우 주문 불가능
             if group.max_quantity_per_product and option_selected_count > group.max_quantity_per_product:
-                raise serializers.ValidationError(
-                    OptionGroupNotOrderableErrorMessages.TOO_MUCH_OPTION.format(product.name, group.name)
-                )
+                msg = OptionGroupNotOrderableErrorMessages.TOO_MUCH_OPTION.format(product.name, group.name)
+                raise serializers.ValidationError(msg)
+            # 옵션 그룹 단위 인당 최대 선택 수량 초과 검증 — option-level / option-counter 와 별개로 group 합산도 본다.
+            if group.max_quantity_per_user > 0 and option_selected_count > 0:  # 0 = 무제한 sentinel
+                match self.validation_mode:
+                    case OrderableCheckSerializerMode.ADD_SINGLE_PRODUCT_TO_CART:
+                        total = (
+                            group.get_user_taken_stock_count(user=self.user, include_cart=True, include_purchased=True)
+                            + option_selected_count
+                        )
+                    case OrderableCheckSerializerMode.CHECKOUT_SINGLE_PRODUCT:
+                        total = (
+                            group.get_user_taken_stock_count(user=self.user, include_cart=False, include_purchased=True)
+                            + option_selected_count
+                        )
+                    case OrderableCheckSerializerMode.CHECKOUT_CART:
+                        total = group.get_user_taken_stock_count(
+                            user=self.user, include_cart=True, include_purchased=True
+                        )
+                    case _:  # pragma: no cover
+                        raise ValueError("Invalid validation mode")
+                if total > group.max_quantity_per_user:
+                    msg = OptionGroupNotOrderableErrorMessages.ALREADY_ORDERED_TOO_MUCH.format(product.name, group.name)
+                    raise serializers.ValidationError(msg)
+
+        # 같은 OPR 안 option 별 합산 stock / max_per_user 검증.
+        # option-level 은 단건 SOLDOUT 만 보고 합산 검증은 모두 여기서 처리 — 단건/다건 동일 경로.
+        self._validate_aggregated_option_counts(options)
 
         # 후원 가능 상품일 경우에만, 후원 가능 금액 범위 내에서 후원 금액을 입력받을 수 있음
         if donation_price:
             if not product.donation_allowed:
-                raise serializers.ValidationError(
-                    ProductNotOrderableErrorMessages.DONATION_NOT_ALLOWED.format(product.name)
-                )
+                msg = ProductNotOrderableErrorMessages.DONATION_NOT_ALLOWED.format(product.name)
+                raise serializers.ValidationError(msg)
             if not (product.donation_min_price <= donation_price <= product.donation_max_price):
-                raise serializers.ValidationError(
-                    ProductNotOrderableErrorMessages.DONATION_PRICE_OUT_OF_RANGE.format(
-                        product.name,
-                        product.donation_min_price,
-                        product.donation_max_price,
-                    )
+                msg = ProductNotOrderableErrorMessages.DONATION_PRICE_OUT_OF_RANGE.format(
+                    product.name,
+                    product.donation_min_price,
+                    product.donation_max_price,
                 )
+                raise serializers.ValidationError(msg)
 
         total_price = (
             product.price
@@ -219,6 +246,40 @@ class ProductOrderableCheckSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(ProductNotOrderableErrorMessages.PRICE_TOO_HIGH)
 
         return typing.cast(ProductOrderableCheckAfterValidationDataType, data | {"donation_price": donation_price})
+
+    def _validate_aggregated_option_counts(self, options: list[OptionOrderableCheckTypedDict]) -> None:
+        # 같은 OPR 안 option 별 합산 stock / max_per_user 검증. count == 1 / >= 2 동일 경로.
+        # option SOLDOUT (leftover<=0) 은 option-level 이 이미 거절하므로 여기는 leftover > 0 전제 — DRF 자동 short-circuit.
+        option_counter = Counter(o["product_option"] for o in options if o["product_option"])
+
+        for option, requested_count in option_counter.items():
+            product_name = option.group.product.name
+
+            if option.leftover_stock is not None:
+                total = self._aggregated_count(option, requested_count, include_purchased=False)
+                if total > option.leftover_stock:
+                    msg = OptionNotOrderableErrorMessages.TOO_MUCH_CART_OPTION.format(product_name, option.name)
+                    raise serializers.ValidationError(msg)
+
+            if option.max_quantity_per_user > 0:  # 0 = 무제한 sentinel
+                total = self._aggregated_count(option, requested_count, include_purchased=True)
+                if total > option.max_quantity_per_user:
+                    msg = OptionNotOrderableErrorMessages.ALREADY_ORDERED_TOO_MUCH.format(product_name, option.name)
+                    raise serializers.ValidationError(msg)
+
+    def _aggregated_count(self, option: Option, requested_count: int, *, include_purchased: bool) -> int:
+        # mode 별 base count + 이번 request 의 N 합산 규칙:
+        #   ADD                       — cart 누적 + N (자기 추가)
+        #   CHECKOUT_SINGLE_PRODUCT   — cart 무시, purchased 만 (+ N)  / stock 검증은 purchased 도 무시 → N 만
+        #   CHECKOUT_CART             — cart 누적 (이미 자기 포함, + N 없음)
+        if self.validation_mode == OrderableCheckSerializerMode.CHECKOUT_SINGLE_PRODUCT and not include_purchased:
+            return requested_count
+        base = option.get_user_taken_stock_count(
+            user=self.user,
+            include_cart=self.validation_mode != OrderableCheckSerializerMode.CHECKOUT_SINGLE_PRODUCT,
+            include_purchased=include_purchased,
+        )
+        return base + (requested_count if self.validation_mode != OrderableCheckSerializerMode.CHECKOUT_CART else 0)
 
     @transaction.atomic
     def create(self, validated_data: ProductOrderableCheckAfterValidationDataType) -> OrderProductRelation:
