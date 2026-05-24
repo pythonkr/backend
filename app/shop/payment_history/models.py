@@ -31,7 +31,8 @@ def is_legal_payment_status_transition(current: PaymentHistoryStatus, next_: Pay
 class PaymentHistoryQuerySet(BaseAbstractModelQuerySet):
     def latest_per_order_field(self, field_name: str, *, outer_field: str = "id") -> "PaymentHistoryQuerySet":
         return (
-            self.order_by("order_id", "-created_at")
+            self.filter_active()
+            .order_by("order_id", "-created_at")
             .distinct("order_id")
             .filter(order_id=models.OuterRef(outer_field))
             .values(field_name)[:1]

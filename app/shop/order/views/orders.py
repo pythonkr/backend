@@ -12,7 +12,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view
 from drf_standardized_errors.openapi_serializers import ErrorResponse403Serializer, ValidationErrorResponseSerializer
 from rest_framework import mixins, renderers, request, response, serializers, status, viewsets
 from rest_framework.decorators import action
-from shop.order.models import CustomerInfo, Order, OrderProductOptionRelation, OrderProductRelation, OrderQuerySet
+from shop.order.models import CustomerInfo, Order, OrderProductRelation, OrderQuerySet
 from shop.order.serializers.dto import OrderDto, SingleProductCartDto
 from shop.order.serializers.validator import OptionProductOptionCustomResponseModifyRequestSerializer
 from shop.payment_history.models import PaymentHistory
@@ -77,28 +77,7 @@ class OrderViewSet(
         if self.action == "retrieve_receipt":
             user_filter = {} if self.request.user.is_staff else {"user": self.request.user}
             return base_qs.filter_has_payment_histories().filter(**user_filter).distinct()
-        return (
-            base_qs.prefetch_related(
-                models.Prefetch("payment_histories"),
-                models.Prefetch(
-                    "products",
-                    queryset=(
-                        OrderProductRelation.objects.select_related("product").prefetch_related(
-                            models.Prefetch(
-                                "options",
-                                queryset=OrderProductOptionRelation.objects.select_related(
-                                    "product_option_group",
-                                    "product_option",
-                                ),
-                            ),
-                        )
-                    ),
-                ),
-            )
-            .filter_has_payment_histories()
-            .filter(user=self.request.user)
-            .distinct()
-        )
+        return base_qs.with_dto_prefetches().filter_has_payment_histories().filter(user=self.request.user).distinct()
 
     @extend_schema(
         summary="단건 주문 프로세스 시작",
@@ -143,7 +122,7 @@ class OrderViewSet(
         self, request: request.Request, *args: tuple[typing.Any], **kwargs: dict[str, typing.Any]
     ) -> response.Response:
         """아직 결제하지 않은 Order(Cart)를 가져온 후, PortOne에 결제 금액 사전 등록을 하고, Order 데이터를 응답합니다."""
-        if not ((cart := self.get_queryset().first()) and cart.products.exists()):
+        if not ((cart := self.get_queryset().first()) and cart.products.filter_active().exists()):
             raise serializers.ValidationError(CartNotOrderableErrorMessages.EMPTY)
 
         customer_info = CustomerInfo.objects.filter(order=cart).first()
@@ -152,7 +131,7 @@ class OrderViewSet(
         customer_info_serializer.save(order=cart)
 
         context = self.get_serializer_context() | {"mode": OrderableCheckSerializerMode.CHECKOUT_CART}
-        cart_product_rels = sorted(cart.products.all(), key=lambda x: x.price, reverse=True)
+        cart_product_rels = sorted(cart.products.filter_active(), key=lambda x: x.price, reverse=True)
         ProductOrderableCheckSerializer(
             data=[
                 {
@@ -163,7 +142,7 @@ class OrderViewSet(
                             "product_option": product_option_rel.product_option_id,
                             "custom_response": product_option_rel.custom_response,
                         }
-                        for product_option_rel in product_rel.options.all()
+                        for product_option_rel in product_rel.options.filter_active()
                     ],
                 }
                 for product_rel in cart_product_rels
@@ -190,7 +169,8 @@ class OrderViewSet(
             )
         )
 
-        return response.Response(data=OrderDto(instance=cart).data, status=status.HTTP_201_CREATED)
+        dto_cart = Order.objects.for_dto_response().get(id=cart.id)
+        return response.Response(data=OrderDto(instance=dto_cart).data, status=status.HTTP_201_CREATED)
 
     @extend_schema(
         summary="해당 주문에 남아있는 환불 가능한 모든 상품 환불 (주문 전체 환불)",
@@ -272,14 +252,18 @@ class OrderProductViewSet(mixins.DestroyModelMixin, viewsets.GenericViewSet):
         if not isinstance(self.request.user, UserExt):
             return OrderProductRelation.objects.none()
 
-        return OrderProductRelation.objects.filter(
-            models.Exists(PaymentHistory.objects.filter(order=models.OuterRef("order"))),
-            order_id=self.kwargs["order_id"],
-            order__deleted_at__isnull=True,
-            order__user=self.request.user,
-            single_product_cart__isnull=True,
-            status=OrderProductRelation.OrderProductStatus.paid,
-        ).distinct()
+        return (
+            OrderProductRelation.objects.filter_active()
+            .filter(
+                models.Exists(PaymentHistory.objects.filter_active().filter(order=models.OuterRef("order"))),
+                order_id=self.kwargs["order_id"],
+                order__deleted_at__isnull=True,
+                order__user=self.request.user,
+                single_product_cart__isnull=True,
+                status=OrderProductRelation.OrderProductStatus.paid,
+            )
+            .distinct()
+        )
 
     @extend_schema(
         summary="주문 중 특정 상품의 옵션 수정",
@@ -312,7 +296,8 @@ class OrderProductViewSet(mixins.DestroyModelMixin, viewsets.GenericViewSet):
             )
             serializer.is_valid(raise_exception=True)
             serializer.save()
-        return response.Response(data=OrderDto(instance=order_product_rel.order).data)
+        dto_order = Order.objects.for_dto_response().get(id=order_product_rel.order_id)
+        return response.Response(data=OrderDto(instance=dto_order).data)
 
     @extend_schema(
         summary="주문의 특정 상품 환불 (주문 부분 환불)",

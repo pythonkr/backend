@@ -36,11 +36,12 @@ class CartOrderableCheckSerializer(serializers.Serializer):
         cart: Order = data["cart"]
 
         # 이미 결제한 장바구니인 경우 주문 불가능
-        if cart.current_status != PaymentHistoryStatus.pending or cart.payment_histories.exists():
+        # `current_status` 는 active PH 기준이라 != pending 이면 곧 active PH 가 존재 — 별도 exists() 불필요.
+        if cart.current_status != PaymentHistoryStatus.pending:
             raise serializers.ValidationError(CartNotOrderableErrorMessages.ALREADY_ORDERED)
 
         # 장바구니 내에 이미 결제한 상품이 있는 경우 주문 불가능
-        if cart.products.exclude(status=OrderProductRelation.OrderProductStatus.pending).exists():
+        if cart.products.filter_active().exclude(status=OrderProductRelation.OrderProductStatus.pending).exists():
             raise serializers.ValidationError(CartNotOrderableErrorMessages.CONTAINS_PAID_PRODUCT)
 
         # 장바구니 내의 상품들 주문 금액 합계가 0원 이하거나 100만원 이상인 경우 주문 불가능

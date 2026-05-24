@@ -69,6 +69,24 @@ def test_admin_list_filters_by_product_id_distinct(api_client, product, order_fa
 
 
 @pytest.mark.django_db
+def test_admin_list_filters_by_active_opr_category(api_client, product, order_factory):
+    """`?category_id=` 가 active OPR 가 있는 주문만 매칭한다."""
+    completed_order = order_factory(status="completed")
+    response = OrdersAdminApi(http_client=api_client).list({"category_id": str(product.category_id)})
+    assert response.status_code == HTTP_200_OK
+    assert {row["id"] for row in response.json()["results"]} == {str(completed_order.id)}
+
+
+@pytest.mark.django_db
+def test_admin_list_filters_by_active_opr_category_group(api_client, product, order_factory):
+    """`?category_group_id=` 가 active OPR 가 있는 주문만 매칭한다."""
+    completed_order = order_factory(status="completed")
+    response = OrdersAdminApi(http_client=api_client).list({"category_group_id": str(product.category.group_id)})
+    assert response.status_code == HTTP_200_OK
+    assert {row["id"] for row in response.json()["results"]} == {str(completed_order.id)}
+
+
+@pytest.mark.django_db
 def test_admin_retrieve_returns_nested_payload(api_client, order_factory):
     completed_order = order_factory(status="completed")
     response = OrdersAdminApi(http_client=api_client).retrieve(completed_order.id)

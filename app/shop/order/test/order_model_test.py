@@ -70,9 +70,7 @@ def test_payment_history_accessors_use_prefetched_attr_when_present(order_factor
         order=pending_order, imp_id="imp_b", status=PaymentHistoryStatus.refunded, price=0
     )
 
-    prefetched = Order.objects.prefetch_related(Order.prefetchs["_payment_histories_by_latest"]).get(
-        id=pending_order.id
-    )
+    prefetched = Order.objects.prefetch_related(Order.prefetchs["_active_payment_histories"]).get(id=pending_order.id)
     assert prefetched.current_payment_history.id == ph2.id
     assert prefetched.first_payment_history.id == ph1.id
 

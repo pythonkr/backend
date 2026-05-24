@@ -26,7 +26,7 @@ def send_payment_completed_notifications(order_id: str) -> None:
     if (
         order := Order.objects.filter_active()
         .select_related("customer_info")
-        .prefetch_related("products", Order.prefetchs["_payment_histories_by_latest"])
+        .prefetch_related("products", Order.prefetchs["_active_payment_histories"])
         .filter(id=order_id)
         .first()
     ) is not None:

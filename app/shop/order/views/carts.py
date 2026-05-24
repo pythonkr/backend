@@ -30,7 +30,12 @@ class CartViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         if not isinstance(self.request.user, UserExt):
             return Order.objects.none()
 
-        return Order.objects.filter_has_no_payment_histories().filter(user=self.request.user).distinct()
+        return (
+            Order.objects.filter_has_no_payment_histories()
+            .with_dto_prefetches()
+            .filter(user=self.request.user)
+            .distinct()
+        )
 
     def list(
         self, request: request.Request, *args: tuple[typing.Any], **kwargs: dict[str, typing.Any]
@@ -76,10 +81,10 @@ class CartProductViewSet(mixins.CreateModelMixin, mixins.DestroyModelMixin, view
         if not isinstance(self.request.user, UserExt):
             return OrderProductRelation.objects.none()
 
-        return OrderProductRelation.objects.filter(
-            ~Exists(PaymentHistory.objects.filter(order=OuterRef("order"))),
+        return OrderProductRelation.objects.filter_active().filter(
+            ~Exists(PaymentHistory.objects.filter_active().filter(order=OuterRef("order"))),
             order__deleted_at__isnull=True,
             order__user=self.request.user,
             single_product_cart__isnull=True,
             status=OrderProductRelation.OrderProductStatus.pending,
-        ).all()
+        )

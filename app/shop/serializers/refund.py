@@ -55,7 +55,9 @@ class OrderTotalRefundSerializer(serializers.ModelSerializer):
     @functools.cached_property
     def refund_target_prod_rels(self) -> list[OrderProductRelation]:
         return list(
-            typing.cast(Order, self.instance).products.filter(status=OrderProductRelation.OrderProductStatus.paid)
+            typing.cast(Order, self.instance)
+            .products.filter_active()
+            .filter(status=OrderProductRelation.OrderProductStatus.paid)
         )
 
     @functools.cached_property
@@ -181,7 +183,9 @@ class OrderProductRefundSerializer(serializers.ModelSerializer):
         active_statuses = (OrderProductRelation.OrderProductStatus.paid, OrderProductRelation.OrderProductStatus.used)
         next_status = (
             PaymentHistoryStatus.partial_refunded
-            if OrderProductRelation.objects.filter(order_id=order.id, status__in=active_statuses).exists()
+            if OrderProductRelation.objects.filter_active()
+            .filter(order_id=order.id, status__in=active_statuses)
+            .exists()
             else PaymentHistoryStatus.refunded
         )
         imp_id = order.latest_imp_id

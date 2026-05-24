@@ -144,7 +144,7 @@ class PortOneV1WebhookRequestSerializer(serializers.Serializer):
         if not is_legal_payment_status_transition(order.current_status, next_status):
             self._reject(PortOneWebhookFailureCode.ILLEGAL_STATUS_TRANSITION)
 
-        for product_rel in order.products.all():
+        for product_rel in order.products.filter_active():
             product_rel.status = OrderProductRelation.OrderProductStatus.paid
             product_rel.save()
 
