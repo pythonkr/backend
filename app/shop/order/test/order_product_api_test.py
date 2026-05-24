@@ -77,3 +77,35 @@ def test_destroy_order_product_returns_404_for_unauthenticated_request(anon_clie
         completed_order.id, completed_order.products.first().id
     )
     assert response.status_code == HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_modify_options_rejects_opr_from_another_order_of_same_user(
+    modifiable_option_relation, customer_client, order_factory
+):
+    # 같은 사용자의 다른 주문 URL 로 OPR rel_id 를 끼워넣어 수정 시도 — URL 의 order_id 가 강제돼야 함.
+    opr = modifiable_option_relation.order_product_relation
+    foreign_order = order_factory(status="completed")
+    response = OrderProductsApi(http_client=customer_client).modify_options(
+        foreign_order.id,
+        opr.id,
+        [{"order_product_option_relation": str(modifiable_option_relation.id), "custom_response": "updated"}],
+    )
+    assert response.status_code == HTTP_404_NOT_FOUND
+    modifiable_option_relation.refresh_from_db()
+    assert modifiable_option_relation.custom_response != "updated"
+
+
+@pytest.mark.django_db
+def test_destroy_order_product_rejects_opr_from_another_order_of_same_user(
+    customer_client, mock_portone_req_cancel_payment, order_factory
+):
+    # 같은 사용자의 다른 주문 URL 로 환불을 시도해도 거절 — cross-order rel_id 사용 차단.
+    target_order = order_factory(status="completed")
+    foreign_order = order_factory(status="completed")
+    target_opr = target_order.products.first()
+    response = OrderProductsApi(http_client=customer_client).delete_partial(foreign_order.id, target_opr.id)
+    assert response.status_code == HTTP_404_NOT_FOUND
+    target_opr.refresh_from_db()
+    assert target_opr.status == OrderProductRelation.OrderProductStatus.paid
+    mock_portone_req_cancel_payment.assert_not_called()

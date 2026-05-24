@@ -274,6 +274,7 @@ class OrderProductViewSet(mixins.DestroyModelMixin, viewsets.GenericViewSet):
 
         return OrderProductRelation.objects.filter(
             models.Exists(PaymentHistory.objects.filter(order=models.OuterRef("order"))),
+            order_id=self.kwargs["order_id"],
             order__deleted_at__isnull=True,
             order__user=self.request.user,
             single_product_cart__isnull=True,
