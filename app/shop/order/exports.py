@@ -66,7 +66,7 @@ class OrderProductExportSerializer(serializers.ModelSerializer):
     def to_representation(self, instance: OrderProductRelation) -> dict[str, typing.Any]:
         result: dict[str, typing.Any] = super().to_representation(instance)
 
-        options: collections.abc.Iterable[OrderProductOptionRelation] = instance.options.all()
+        options: collections.abc.Iterable[OrderProductOptionRelation] = instance.options.filter_active()
         for option in options:
             option_group: OptionGroup = option.product_option_group
             selected_option: Option = option.product_option

@@ -78,8 +78,8 @@ class CustomerInfoDto(serializers.ModelSerializer):
 
 
 class OrderDto(serializers.ModelSerializer):
-    payment_histories = PaymentHistoryDto(many=True)
-    products = OrderProductRelationDto(many=True)
+    payment_histories = PaymentHistoryDto(many=True, source="active_payment_histories")
+    products = OrderProductRelationDto(many=True, source="active_products")
     current_status = serializers.ChoiceField(choices=PaymentHistoryStatus.choices)
     scancode_url = serializers.SerializerMethodField()
 
@@ -108,8 +108,8 @@ class OrderDto(serializers.ModelSerializer):
 
 
 class SingleProductCartDto(serializers.ModelSerializer):
-    payment_histories = PaymentHistoryDto(many=True)
-    products = OrderProductRelationDto(many=True)
+    payment_histories = PaymentHistoryDto(many=True, source="active_payment_histories")
+    products = OrderProductRelationDto(many=True, source="active_products")
     current_status = serializers.ChoiceField(choices=PaymentHistoryStatus.choices)
 
     customer_info = CustomerInfoDto(allow_null=True)

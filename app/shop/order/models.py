@@ -117,40 +117,55 @@ class BaseCartQuerySet(BaseAbstractModelQuerySet):
 
 class OrderQuerySet(BaseCartQuerySet):
     def filter_has_payment_histories(self) -> models.QuerySet[Order]:
-        return self.filter_active().filter(models.Exists(PaymentHistory.objects.filter(order=models.OuterRef("id"))))
+        return self.filter_active().filter(
+            models.Exists(PaymentHistory.objects.filter_active().filter(order=models.OuterRef("id")))
+        )
 
     def filter_has_no_payment_histories(self) -> models.QuerySet[Order]:
-        return self.filter_active().filter(~models.Exists(PaymentHistory.objects.filter(order=models.OuterRef("id"))))
+        return self.filter_active().filter(
+            ~models.Exists(PaymentHistory.objects.filter_active().filter(order=models.OuterRef("id")))
+        )
+
+    def for_dto_response(self) -> models.QuerySet[Order]:
+        return self.select_related("customer_info").with_dto_prefetches()
+
+    def with_dto_prefetches(self) -> models.QuerySet[Order]:
+        """OrderDto 직렬화에 필요한 active row 들을 `to_attr` 로 prefetch."""
+        return self.prefetch_related(
+            models.Prefetch(
+                "payment_histories",
+                queryset=PaymentHistory.objects.filter_active(),
+                to_attr="_active_payment_histories",
+            ),
+            models.Prefetch(
+                "products",
+                queryset=(
+                    OrderProductRelation.objects.filter_active()
+                    .select_related("product")
+                    .prefetch_related(
+                        models.Prefetch(
+                            "options",
+                            queryset=OrderProductOptionRelation.objects.filter_active().select_related(
+                                "product_option_group",
+                                "product_option",
+                            ),
+                        ),
+                    )
+                ),
+                to_attr="_active_products",
+            ),
+        )
 
     def filter_purchased_by(self, user: UserModel) -> models.QuerySet[Order]:
         """결제 완료/부분환불/환불된 (terminal status) 주문을 user 별로 필터."""
         return (
             self.filter_active()
             .select_related("customer_info")
-            .prefetch_related(
-                models.Prefetch(
-                    lookup="products",
-                    queryset=OrderProductRelation.objects.filter_active()
-                    .select_related("product")
-                    .prefetch_related(
-                        models.Prefetch(
-                            lookup="options",
-                            queryset=OrderProductOptionRelation.objects.filter_active().select_related(
-                                "product_option_group",
-                                "product_option",
-                            ),
-                        ),
-                    ),
-                ),
-                models.Prefetch(
-                    "payment_histories",
-                    queryset=PaymentHistory.objects.filter_active().order_by("-created_at"),
-                    to_attr="_payment_histories_by_latest",
-                ),
-            )
+            .with_dto_prefetches()
             .annotate(
                 current_status=(
-                    PaymentHistory.objects.filter(order_id=models.OuterRef("id"), status__in=PURCHASED_STATUSES)
+                    PaymentHistory.objects.filter_active()
+                    .filter(order_id=models.OuterRef("id"), status__in=PURCHASED_STATUSES)
                     .order_by("-created_at")
                     .values_list("status", flat=True)[:1]
                 ),
@@ -176,10 +191,10 @@ class Order(PaymentPreparationMixin, ScanCodeMixin, BaseAbstractModel):
 
     objects: OrderQuerySet = OrderQuerySet.as_manager()  # type: ignore[assignment, misc]
     prefetchs = {
-        "_payment_histories_by_latest": models.Prefetch(
+        "_active_payment_histories": models.Prefetch(
             "payment_histories",
-            queryset=PaymentHistory.objects.filter_active().order_by("-created_at"),
-            to_attr="_payment_histories_by_latest",
+            queryset=PaymentHistory.objects.filter_active(),
+            to_attr="_active_payment_histories",
         ),
     }
 
@@ -191,18 +206,26 @@ class Order(PaymentPreparationMixin, ScanCodeMixin, BaseAbstractModel):
         created_at = self.created_at.isoformat()
         return f"{self.user}의 {cart_or_order} <{self.current_status}> [{created_at}]"
 
+    @property
+    def active_products(self) -> list[OrderProductRelation]:
+        if hasattr(self, "_active_products"):
+            return self._active_products
+        return list(self.products.filter_active())
+
+    @property
+    def active_payment_histories(self) -> list[PaymentHistory]:
+        if hasattr(self, "_active_payment_histories"):
+            return self._active_payment_histories
+        return list(self.payment_histories.filter_active())
+
     @functools.cached_property
     def first_paid_price(self) -> int:
-        return sum(product.price + product.donation_price for product in self.products.all())
+        return sum(product.price + product.donation_price for product in self.active_products)
 
     @functools.cached_property
     def first_payment_history(self) -> PaymentHistory | None:
-        if hasattr(self, "_payment_histories_by_latest") and self._payment_histories_by_latest:
-            return self._payment_histories_by_latest[-1]
-
-        if not (payment_histories := self.payment_histories.all()):
+        if not (payment_histories := self.active_payment_histories):
             return None
-
         return min(payment_histories, key=lambda payment_history: payment_history.created_at)
 
     @functools.cached_property
@@ -211,12 +234,8 @@ class Order(PaymentPreparationMixin, ScanCodeMixin, BaseAbstractModel):
 
     @functools.cached_property
     def current_payment_history(self) -> PaymentHistory | None:
-        if hasattr(self, "_payment_histories_by_latest") and self._payment_histories_by_latest:
-            return self._payment_histories_by_latest[0]
-
-        if not (payment_histories := self.payment_histories.all()):
+        if not (payment_histories := self.active_payment_histories):
             return None
-
         return max(payment_histories, key=lambda payment_history: payment_history.created_at)
 
     @functools.cached_property
@@ -283,7 +302,7 @@ class Order(PaymentPreparationMixin, ScanCodeMixin, BaseAbstractModel):
         if self.current_status not in REFUNDABLE_STATUSES:
             return NotRefundableErrorMessages.ORDER_NOT_REFUNDABLE_STATUS
 
-        product_relations = list[OrderProductRelation](self.products.all())
+        product_relations = self.active_products
         if any(rel.status in NOT_REFUNDABLE_PRODUCT_RELATION_STATUSES for rel in product_relations):
             return NotRefundableErrorMessages.ONE_OF_PRODUCT_IS_USED_TRY_AFTER_CHANGING_STATUS
 
@@ -498,7 +517,15 @@ class SingleProductCart(PaymentPreparationMixin, BaseAbstractModel):
 
     @property
     def products(self) -> models.QuerySet[OrderProductRelation]:
-        return OrderProductRelation.objects.filter(id=self.order_product_relation_id)
+        return OrderProductRelation.objects.filter_active().filter(id=self.order_product_relation_id)
+
+    @functools.cached_property
+    def active_products(self) -> list[OrderProductRelation]:
+        return list(self.products)
+
+    @functools.cached_property
+    def active_payment_histories(self) -> list[PaymentHistory]:
+        return []
 
     @functools.cached_property
     def name(self) -> str:

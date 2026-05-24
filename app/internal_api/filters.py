@@ -28,9 +28,13 @@ class DeskSupportFilterSet(filters.FilterSet):
         if not (filtered_values := [v.strip() for v in values if v.strip()]):
             return qs
 
-        opor_order_qs = OrderProductRelation.objects.filter(
-            product__category__group__name__in=filtered_values,
-        ).values_list("order_id", flat=True)
+        opor_order_qs = (
+            OrderProductRelation.objects.filter_active()
+            .filter(
+                product__category__group__name__in=filtered_values,
+            )
+            .values_list("order_id", flat=True)
+        )
 
         return qs.filter(id__in=opor_order_qs)
 
@@ -38,9 +42,13 @@ class DeskSupportFilterSet(filters.FilterSet):
         if not (filtered_values := [v.strip() for v in values if v.strip()]):
             return qs
 
-        opor_order_qs = OrderProductRelation.objects.filter(
-            product__category__name__in=filtered_values,
-        ).values_list("order_id", flat=True)
+        opor_order_qs = (
+            OrderProductRelation.objects.filter_active()
+            .filter(
+                product__category__name__in=filtered_values,
+            )
+            .values_list("order_id", flat=True)
+        )
 
         return qs.filter(id__in=opor_order_qs)
 
@@ -48,15 +56,21 @@ class DeskSupportFilterSet(filters.FilterSet):
         if not value:
             return qs
 
-        return qs.filter(id__in=OrderProductRelation.objects.filter(id=value).values_list("order_id", flat=True))
+        return qs.filter(
+            id__in=OrderProductRelation.objects.filter_active().filter(id=value).values_list("order_id", flat=True)
+        )
 
     def filter_by_keywords(self, qs: OrderQuerySet, name: str, values: list[str]) -> OrderQuerySet:
         if not (filtered_values := [v.strip() for v in values if v.strip()]):
             return qs
 
-        opor_order_qs = OrderProductOptionRelation.objects.filter(
-            custom_response__in=filtered_values,
-        ).values_list("order_product_relation__order_id", flat=True)
+        opor_order_qs = (
+            OrderProductOptionRelation.objects.filter_active()
+            .filter(
+                custom_response__in=filtered_values,
+            )
+            .values_list("order_product_relation__order_id", flat=True)
+        )
         ci_order_qs = CustomerInfo.objects.filter(
             models.Q(name__in=filtered_values)
             | models.Q(email__in=filtered_values)

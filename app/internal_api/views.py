@@ -71,8 +71,8 @@ class DeskSupportViewSet(
             ),
             models.Prefetch(
                 "payment_histories",
-                queryset=PaymentHistory.objects.filter_active().order_by("-created_at"),
-                to_attr="_payment_histories_by_latest",
+                queryset=PaymentHistory.objects.filter_active(),
+                to_attr="_active_payment_histories",
             ),
         )
         .order_by("-created_at")

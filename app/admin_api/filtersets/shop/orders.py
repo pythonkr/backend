@@ -1,6 +1,7 @@
 from core.filter.multi_field import MultiFieldOrCharInFilter
+from django.db.models import Exists, OuterRef, QuerySet
 from django_filters import rest_framework as filters
-from shop.order.models import Order
+from shop.order.models import Order, OrderProductRelation
 
 
 class OrderAdminFilterSet(filters.FilterSet):
@@ -26,12 +27,24 @@ class OrderAdminFilterSet(filters.FilterSet):
     status_changed_at_after = filters.DateTimeFilter(field_name="status_changed_at", lookup_expr="gte")
     status_changed_at_before = filters.DateTimeFilter(field_name="status_changed_at", lookup_expr="lte")
 
-    product_id = filters.BaseInFilter(field_name="products__product_id", distinct=True)
-    category_id = filters.BaseInFilter(field_name="products__product__category_id", distinct=True)
-    category_group_id = filters.BaseInFilter(field_name="products__product__category__group_id", distinct=True)
+    product_id = filters.BaseCSVFilter(method="filter_by_active_opr_product_id")
+    category_id = filters.BaseCSVFilter(method="filter_by_active_opr_category_id")
+    category_group_id = filters.BaseCSVFilter(method="filter_by_active_opr_category_group_id")
 
     price_min = filters.NumberFilter(field_name="latest_price", lookup_expr="gte")
     price_max = filters.NumberFilter(field_name="latest_price", lookup_expr="lte")
+
+    def _filter_by_active_opr_exists(self, qs: QuerySet[Order], **kw: object) -> QuerySet[Order]:
+        return qs.filter(Exists(OrderProductRelation.objects.filter_active().filter(order_id=OuterRef("pk"), **kw)))
+
+    def filter_by_active_opr_product_id(self, qs: QuerySet[Order], n: str, vs: list[str]) -> QuerySet[Order]:
+        return self._filter_by_active_opr_exists(qs, product_id__in=vs) if vs else qs
+
+    def filter_by_active_opr_category_id(self, qs: QuerySet[Order], n: str, vs: list[str]) -> QuerySet[Order]:
+        return self._filter_by_active_opr_exists(qs, product__category_id__in=vs) if vs else qs
+
+    def filter_by_active_opr_category_group_id(self, qs: QuerySet[Order], n: str, v: list[str]) -> QuerySet[Order]:
+        return self._filter_by_active_opr_exists(qs, product__category__group_id__in=v) if v else qs
 
     class Meta:
         model = Order

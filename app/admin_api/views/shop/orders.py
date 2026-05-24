@@ -49,7 +49,8 @@ _PAYMENT_HISTORY_PREFETCH_QS = PaymentHistory.objects.filter_active().order_by("
 def _payment_history_created_at_subquery(*, latest: bool) -> models.Subquery:
     """Order 별 첫/마지막 PaymentHistory.created_at scalar subquery (filter/annotate 양쪽 용)."""
     return models.Subquery(
-        PaymentHistory.objects.filter(order_id=models.OuterRef("pk"))
+        PaymentHistory.objects.filter_active()
+        .filter(order_id=models.OuterRef("pk"))
         .order_by("-created_at" if latest else "created_at")
         .values("created_at")[:1]
     )
@@ -70,7 +71,7 @@ class OrderAdminViewSet(
     permission_classes = [IsSuperUser]
     queryset = (
         Order.objects.filter_has_payment_histories()
-        .filter(models.Exists(OrderProductRelation.objects.filter(order=models.OuterRef("pk"))))
+        .filter(models.Exists(OrderProductRelation.objects.filter_active().filter(order=models.OuterRef("pk"))))
         .select_related_with_user("user", "customer_info")
         .prefetch_related(
             models.Prefetch("products", queryset=_OPR_PREFETCH_QS),
@@ -118,7 +119,7 @@ class OrderAdminViewSet(
         pk: typing.Any = None,
         rel_id: typing.Any = None,
     ) -> response.Response:
-        order_product_rel = OrderProductRelation.objects.filter(order_id=pk, id=rel_id).first()
+        order_product_rel = OrderProductRelation.objects.filter_active().filter(order_id=pk, id=rel_id).first()
         if not order_product_rel:
             raise exceptions.NotFound("OrderProductRelation not found.")
 
@@ -208,15 +209,31 @@ class OrderAdminViewSet(
         statuses = PURCHASED_STATUSES if include_refunded else REFUNDABLE_STATUSES
 
         order_qs = (
-            Order.objects.annotate(current_status=PaymentHistory.objects.latest_per_order_field("status"))
+            Order.objects.filter_active()
+            .annotate(current_status=PaymentHistory.objects.latest_per_order_field("status"))
             .select_related("user")
-            .prefetch_related("products", "payment_histories")
-            .filter(products__product_id__in=product_ids, current_status__in=statuses)
+            .with_dto_prefetches()
+            .filter(
+                models.Exists(
+                    OrderProductRelation.objects.filter_active().filter(
+                        order_id=models.OuterRef("pk"), product_id__in=product_ids
+                    )
+                ),
+                current_status__in=statuses,
+            )
         )
         order_product_qs = (
-            OrderProductRelation.objects.filter(order__in=order_qs)
+            OrderProductRelation.objects.filter_active()
+            .filter(order__in=order_qs)
             .select_related("product")
-            .prefetch_related("options__product_option_group", "options__product_option")
+            .prefetch_related(
+                models.Prefetch(
+                    "options",
+                    queryset=OrderProductOptionRelation.objects.filter_active().select_related(
+                        "product_option_group", "product_option"
+                    ),
+                ),
+            )
             .distinct()
         )
 

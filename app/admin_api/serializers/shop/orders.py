@@ -139,7 +139,7 @@ class _OrderRecipientItemSerializer(serializers.Serializer):
             return None
         if not (recipient := getattr(customer_info, CUSTOMER_INFO_RECIPIENT_ATTR_BY_CHANNEL[channel], "")):
             return None
-        if not (order_product_rel := next(iter(order.products.all()), None)):
+        if not (order_product_rel := next(iter(order.products.filter_active()), None)):
             return None
 
         ctx: dict[str, Any] = {
@@ -148,7 +148,7 @@ class _OrderRecipientItemSerializer(serializers.Serializer):
                 if o_rel.product_option_group.is_custom_response
                 else (o_rel.product_option.name if o_rel.product_option else "")
             )
-            for o_rel in order_product_rel.options.all()
+            for o_rel in order_product_rel.options.filter_active()
         } | order.build_notification_context()
 
         return {"recipient": recipient, "context": ctx | self.context["context_override"]}
