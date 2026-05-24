@@ -482,7 +482,9 @@ class SingleProductCart(PaymentPreparationMixin, BaseAbstractModel):
         # cart→Order 승격은 결제 직전 단계이므로 prepared snapshot 을 유지한 채 OPR 의 parent FK 만 갱신.
         self.order_product_relation.save(clear_parent_preparation=False)
 
-        CustomerInfo.objects.filter(single_product_cart=self).update(order=order, single_product_cart=None)
+        CustomerInfo.objects.filter_active().filter(single_product_cart=self).update(
+            order=order, single_product_cart=None
+        )
 
         # cart 가 order 로 전환되면 cart 자체는 사라져야 하므로 hard delete (의도적).
         SingleProductCart.objects.filter(id=self.id).hard_delete()

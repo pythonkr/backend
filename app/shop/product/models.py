@@ -68,11 +68,13 @@ class Tag(BaseAbstractModel):
         return (
             (
                 self.stock
-                - OrderProductRelation.objects.filter(
+                - OrderProductRelation.objects.filter_active()
+                .filter(
                     product__tags__tag=self,
                     single_product_cart__isnull=True,
                     status__in=OrderProductRelation.PURCHASED_STOCK_STATUS,
-                ).count()
+                )
+                .count()
             )
             if self.stock
             else None
@@ -88,12 +90,16 @@ class Tag(BaseAbstractModel):
         if include_purchased:
             target_status |= OrderProductRelation.PURCHASED_STOCK_STATUS
 
-        return OrderProductRelation.objects.filter(
-            order__user=user,
-            product__tags__tag=self,
-            single_product_cart__isnull=True,
-            status__in=target_status,
-        ).count()
+        return (
+            OrderProductRelation.objects.filter_active()
+            .filter(
+                order__user=user,
+                product__tags__tag=self,
+                single_product_cart__isnull=True,
+                status__in=target_status,
+            )
+            .count()
+        )
 
 
 class ProductQuerySet(BaseAbstractModelQuerySet):
@@ -186,11 +192,13 @@ class Product(BaseAbstractModel):
         return (
             (
                 self.stock
-                - OrderProductRelation.objects.filter(
+                - OrderProductRelation.objects.filter_active()
+                .filter(
                     product=self,
                     single_product_cart__isnull=True,
                     status__in=OrderProductRelation.PURCHASED_STOCK_STATUS,
-                ).count()
+                )
+                .count()
             )
             if self.stock
             else None
@@ -206,12 +214,16 @@ class Product(BaseAbstractModel):
         if include_purchased:
             target_status |= OrderProductRelation.PURCHASED_STOCK_STATUS
 
-        return OrderProductRelation.objects.filter(
-            order__user=user,
-            product=self,
-            single_product_cart__isnull=True,
-            status__in=target_status,
-        ).count()
+        return (
+            OrderProductRelation.objects.filter_active()
+            .filter(
+                order__user=user,
+                product=self,
+                single_product_cart__isnull=True,
+                status__in=target_status,
+            )
+            .count()
+        )
 
 
 class ProductTagRelation(BaseAbstractModel):
@@ -316,27 +328,32 @@ class OptionGroup(BaseAbstractModel):
         if include_purchased:
             target_status |= OrderProductRelation.PURCHASED_STOCK_STATUS
 
-        return OrderProductOptionRelation.objects.filter(
-            order_product_relation__order__user=user,
-            order_product_relation__single_product_cart__isnull=True,
-            order_product_relation__status__in=target_status,
-            order_product_relation__deleted_at__isnull=True,
-            product_option_group=self,
-        ).count()
+        return (
+            OrderProductOptionRelation.objects.filter_active()
+            .filter(
+                order_product_relation__order__user=user,
+                order_product_relation__single_product_cart__isnull=True,
+                order_product_relation__status__in=target_status,
+                order_product_relation__deleted_at__isnull=True,
+                product_option_group=self,
+            )
+            .count()
+        )
 
     def is_group_stock_available(self) -> bool:
         """해당 옵션 그룹의 재고가 있는지 확인합니다."""
+        active_options = list(self.options.filter_active())
         if (
             self.is_custom_response
             or not self.min_quantity_per_product
-            or any(option.leftover_stock is None for option in self.options.all())
+            or any(option.leftover_stock is None for option in active_options)
         ):
             # 주문당 필수 구매 개수가 없거나 재고가 무한대인 옵션이 하나라도 있으면 재고가 충분하다고 판단합니다.
             return True
 
         # 모든 옵션의 재고를 합쳐서 해당 옵션 그룹의 최소 구매 수량과 비교했을 시,
         # 최소 구매 수량보다 크거나 같으면 재고가 충분하다고 판단합니다.
-        return self.min_quantity_per_product <= sum(option.leftover_stock for option in self.options.all())
+        return self.min_quantity_per_product <= sum(option.leftover_stock for option in active_options)
 
 
 class Option(BaseAbstractModel):
@@ -364,10 +381,14 @@ class Option(BaseAbstractModel):
         return (
             (
                 self.stock
-                - OrderProductOptionRelation.objects.filter(
+                - OrderProductOptionRelation.objects.filter_active()
+                .filter(
                     product_option=self,
+                    order_product_relation__single_product_cart__isnull=True,
+                    order_product_relation__deleted_at__isnull=True,
                     order_product_relation__status__in=OrderProductRelation.PURCHASED_STOCK_STATUS,
-                ).count()
+                )
+                .count()
             )
             if self.stock
             else None
@@ -383,9 +404,14 @@ class Option(BaseAbstractModel):
         if include_purchased:
             target_status |= OrderProductRelation.PURCHASED_STOCK_STATUS
 
-        return OrderProductOptionRelation.objects.filter(
-            order_product_relation__order__user=user,
-            order_product_relation__single_product_cart__isnull=True,
-            order_product_relation__status__in=target_status,
-            product_option=self,
-        ).count()
+        return (
+            OrderProductOptionRelation.objects.filter_active()
+            .filter(
+                order_product_relation__order__user=user,
+                order_product_relation__single_product_cart__isnull=True,
+                order_product_relation__deleted_at__isnull=True,
+                order_product_relation__status__in=target_status,
+                product_option=self,
+            )
+            .count()
+        )

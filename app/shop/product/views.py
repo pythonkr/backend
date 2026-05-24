@@ -11,7 +11,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from shop.order.models import OrderProductOptionRelation, OrderProductRelation
 from shop.product.filtersets import ProductFilterSet
-from shop.product.models import Option, OptionGroup, Product
+from shop.product.models import Option, OptionGroup, Product, ProductTagRelation
 from shop.product.serializers.dto import ProductDto, StockContext
 from user.models import UserExt
 
@@ -109,15 +109,19 @@ class ProductViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.
 
         if self.action == "retrieve" and isinstance(self.request.user, UserExt):
             # 단, 사용자가 구매한 상품인 경우, 노출 기간에 상관없이 상세 정보를 조회할 수 있어야 합니다.
-            purchased_product_ids = OrderProductRelation.objects.filter(
-                order__user=self.request.user,
-                single_product_cart__isnull=True,
-                status=OrderProductRelation.OrderProductStatus.paid,
-            ).values_list("product_id", flat=True)
+            purchased_product_ids = (
+                OrderProductRelation.objects.filter_active()
+                .filter(
+                    order__user=self.request.user,
+                    single_product_cart__isnull=True,
+                    status=OrderProductRelation.OrderProductStatus.paid,
+                )
+                .values_list("product_id", flat=True)
+            )
             base_qs = base_qs | Product.objects.filter_active().filter(id__in=purchased_product_ids)
 
         return base_qs.select_related("category", "category__group", "image").prefetch_related(
-            "tags",
+            Prefetch("tags", queryset=ProductTagRelation.objects.filter_active().select_related("tag")),
             Prefetch(
                 "option_groups",
                 queryset=OptionGroup.objects.filter_visible_now()

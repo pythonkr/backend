@@ -81,6 +81,26 @@ def test_scancode_user_token_returns_403_when_user_does_not_exist(anon_client):
 
 
 @pytest.mark.django_db
+def test_scancode_order_token_rejects_soft_deleted_order(anon_client, order_factory):
+    # soft-deleted Order 의 scancode 가 유효하면 안 됨 — from_short_id 가 filter_active() 로 제외.
+    order = order_factory(status="completed")
+    token = order.scancode_token  # delete 전에 cache
+    order.delete()
+    response = ScanCodeApi(http_client=anon_client).list({"token": token})
+    assert response.status_code == HTTP_404_NOT_FOUND  # refunded 와 동일 not-found 경로.
+
+
+@pytest.mark.django_db
+def test_scancode_opr_token_rejects_soft_deleted_opr(anon_client, order_factory):
+    order = order_factory(status="completed")
+    opr = order.products.first()
+    token = opr.scancode_token
+    opr.delete()
+    response = ScanCodeApi(http_client=anon_client).list({"token": token})
+    assert response.status_code == HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
 def test_scancode_order_token_returns_404_when_order_does_not_exist(anon_client):
     token = f"order:{shortuuid.encode(uuid.uuid4())}:fakesalt"
     response = ScanCodeApi(http_client=anon_client).list({"token": token})

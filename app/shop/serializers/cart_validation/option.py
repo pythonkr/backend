@@ -31,12 +31,12 @@ class OptionOrderableCheckSerializer(serializers.Serializer):
     """
 
     product_option_group = serializers.PrimaryKeyRelatedField(
-        queryset=OptionGroup.objects.filter(deleted_at__isnull=True),
+        queryset=OptionGroup.objects.filter_active(),
         required=True,
         allow_null=False,
     )
     product_option = serializers.PrimaryKeyRelatedField(
-        queryset=Option.objects.filter(deleted_at__isnull=True),
+        queryset=Option.objects.filter_active(),
         required=True,
         allow_null=True,
     )
@@ -52,7 +52,7 @@ class OptionOrderableCheckSerializer(serializers.Serializer):
         if not group:
             return None
         if isinstance(group, (str, uuid.UUID)):
-            return OptionGroup.objects.filter(pk=group).first()
+            return OptionGroup.objects.filter_active().filter(pk=group).first()
         return group
 
     def validate_product_option_group(self, group: OptionGroup) -> OptionGroup:

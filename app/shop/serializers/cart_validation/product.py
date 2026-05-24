@@ -155,7 +155,7 @@ class ProductOrderableCheckSerializer(serializers.ModelSerializer):
                 )
 
         # 상품군이 주문 불가능한 경우 주문 불가능
-        tags = [tag_rel.tag for tag_rel in product.tags.select_related("tag").all()]
+        tags = [tag_rel.tag for tag_rel in product.tags.filter_active().select_related("tag")]
         TagOrderableCheckSerializer(
             instance=tags,
             data=[{} for _ in tags],
@@ -178,7 +178,7 @@ class ProductOrderableCheckSerializer(serializers.ModelSerializer):
                 OptionGroupNotOrderableErrorMessages.OPTION_NOT_MATCH_PRODUCT.format(product.name)
             )
 
-        for group in product.option_groups.all():
+        for group in product.option_groups.filter_active():
             option_selected_count = len([o for o in options if o["product_option_group"] == group])
             # 그룹 단위 visible/orderable 기간 밖이면 거절 — visible 미래/과거인 그룹은 API 노출도 안 되지만
             # 직접 ID 로 주문 시도 차단을 위해 cart validation 에서도 함께 검사한다.

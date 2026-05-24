@@ -49,7 +49,7 @@ class OrderProductImportSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(required=True, allow_null=False, allow_blank=False)
     organization = serializers.RegexField(ALLOW_ALL_PATTERN, required=True, allow_null=False, allow_blank=True)
 
-    product_id = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all(), source="id")
+    product_id = serializers.PrimaryKeyRelatedField(queryset=Product.objects.filter_active(), source="id")
     donation_price = serializers.IntegerField(required=True)
     options = serializers.DictField(child=serializers.CharField(), required=True)
 
@@ -61,7 +61,7 @@ class OrderProductImportSerializer(serializers.ModelSerializer):
     @classmethod
     def get_template_csv(cls, product: Product) -> str:
         serializer_fields: list[str] = cls.Meta.fields_without_options
-        option_fields: list[str] = list(group.name for group in product.option_groups.all())
+        option_fields: list[str] = list(group.name for group in product.option_groups.filter_active())
         return pandas.DataFrame(columns=serializer_fields + option_fields).to_csv(index=False)
 
     @functools.cached_property
@@ -73,10 +73,12 @@ class OrderProductImportSerializer(serializers.ModelSerializer):
         prod_id = self.initial_data.get("product_id", "")
         prefetch = Prefetch(
             lookup="option_groups",
-            queryset=OptionGroup.objects.prefetch_related("options"),
+            queryset=OptionGroup.objects.filter_active().prefetch_related(
+                Prefetch("options", queryset=Option.objects.filter_active())
+            ),
             to_attr=OPTION_GROUP_PREFETCH,
         )
-        return Product.objects.prefetch_related(prefetch).filter(id=prod_id).first()
+        return Product.objects.filter_active().prefetch_related(prefetch).filter(id=prod_id).first()
 
     @functools.cached_property
     def option_input_data(self) -> list[OptionInputData]:
@@ -86,7 +88,7 @@ class OrderProductImportSerializer(serializers.ModelSerializer):
         input_options: dict[str, str] = {k: v for k, v in self.initial_data.items() if k not in self.Meta.fields}
         result: list[OptionInputData] = []
         groups: list[OptionGroup] = list(
-            getattr(self.product, OPTION_GROUP_PREFETCH, None) or self.product.option_groups.all()
+            getattr(self.product, OPTION_GROUP_PREFETCH, None) or self.product.option_groups.filter_active()
         )
         for group in groups:
             if not (value := input_options.get(group.name)):
@@ -96,7 +98,7 @@ class OrderProductImportSerializer(serializers.ModelSerializer):
                 result.append(OptionInputData(option_group=group, option=None, custom_response=value))
                 continue
 
-            if not (option := Option.objects.filter(group=group, name=value).first()):
+            if not (option := Option.objects.filter_active().filter(group=group, name=value).first()):
                 raise serializers.ValidationError(detail=f"Invalid option: '{group.name}' - {value}")
 
             result.append(OptionInputData(option_group=group, option=option, custom_response=None))

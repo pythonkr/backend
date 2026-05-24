@@ -13,6 +13,7 @@ from shop.product.models import OptionGroup
 class OptionProductOptionCustomResponseModifyRequestSerializer(serializers.Serializer):
     order_product_option_relation = serializers.PrimaryKeyRelatedField(
         queryset=OrderProductOptionRelation.objects.filter_active().filter(
+            order_product_relation__deleted_at__isnull=True,
             order_product_relation__status=OrderProductRelation.OrderProductStatus.paid,
             product_option_group__is_custom_response=True,
         ),

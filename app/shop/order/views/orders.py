@@ -125,7 +125,7 @@ class OrderViewSet(
         if not ((cart := self.get_queryset().first()) and cart.products.filter_active().exists()):
             raise serializers.ValidationError(CartNotOrderableErrorMessages.EMPTY)
 
-        customer_info = CustomerInfo.objects.filter(order=cart).first()
+        customer_info = CustomerInfo.objects.filter_active().filter(order=cart).first()
         customer_info_serializer = CustomerInfoCheckSerializer(instance=customer_info, data=request.data)
         customer_info_serializer.is_valid(raise_exception=True)
         customer_info_serializer.save(order=cart)

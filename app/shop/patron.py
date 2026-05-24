@@ -26,12 +26,17 @@ class PatronSerializer(serializers.ModelSerializer):
     def to_representation(self, instance: Order) -> dict[str, str]:
         result = super().to_representation(instance)
 
-        opor: OrderProductOptionRelation = OrderProductOptionRelation.objects.filter(
-            Q(product_option_group__name__contains="후원자") | Q(product_option_group__name__contains="message"),
-            order_product_relation__order=instance,
-            product_option_group__name__contains="후원자",
-            product_option_group__is_custom_response=True,
-        ).first()
+        opor: OrderProductOptionRelation = (
+            OrderProductOptionRelation.objects.filter_active()
+            .filter(
+                Q(product_option_group__name__contains="후원자") | Q(product_option_group__name__contains="message"),
+                order_product_relation__order=instance,
+                order_product_relation__deleted_at__isnull=True,
+                product_option_group__name__contains="후원자",
+                product_option_group__is_custom_response=True,
+            )
+            .first()
+        )
         return result | {"contribution_message": opor.custom_response if opor else ""}
 
 
@@ -44,10 +49,14 @@ class PatronSerializer(serializers.ModelSerializer):
 )
 class PatronViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     latest_status_sq = (
-        PaymentHistory.objects.filter(order_id=OuterRef("id")).order_by("-created_at").values("status")[:1]
+        PaymentHistory.objects.filter_active()
+        .filter(order_id=OuterRef("id"))
+        .order_by("-created_at")
+        .values("status")[:1]
     )
     total_paid_sq = (
-        OrderProductRelation.objects.filter(
+        OrderProductRelation.objects.filter_active()
+        .filter(
             order_id=OuterRef("id"),
             status__in=OrderProductRelation.PURCHASED_STOCK_STATUS,
         )
@@ -61,7 +70,7 @@ class PatronViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         .annotate(
             current_status=Subquery(latest_status_sq, output_field=CharField()),
             has_donation_product=Exists(
-                OrderProductRelation.objects.filter(
+                OrderProductRelation.objects.filter_active().filter(
                     order_id=OuterRef("id"),
                     product__donation_allowed=True,
                     status__in=OrderProductRelation.PURCHASED_STOCK_STATUS,
