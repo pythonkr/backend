@@ -38,7 +38,6 @@ def created_product(staff_client) -> dict:
             "name_en": "PyCon T-shirt",
             "price": 25000,
             "stock": 100,
-            "hidden": False,
             "visible_starts_at": FAR_PAST.isoformat(),
             "visible_ends_at": FAR_FUTURE.isoformat(),
             "orderable_starts_at": FAR_PAST.isoformat(),

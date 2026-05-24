@@ -129,7 +129,6 @@ class ProductAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, seria
             "image",
             "price",
             "stock",
-            "hidden",
             "max_quantity_per_user",
             "visible_starts_at",
             "visible_ends_at",

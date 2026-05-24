@@ -22,15 +22,6 @@ def test_product_list_returns_visible_products(anon_client, product):
     assert response.json() == ProductDto(instance=expected_qs, many=True).data
 
 
-@pytest.mark.django_db
-def test_product_list_excludes_hidden_products(anon_client, product):
-    product.hidden = True
-    product.save()
-    response = ProductsApi(http_client=anon_client).list()
-    assert response.status_code == HTTP_200_OK
-    assert response.json() == []
-
-
 @freeze_time(datetime(2010, 1, 1, tzinfo=timezone.utc))
 @pytest.mark.django_db
 def test_product_list_excludes_products_outside_visible_window(anon_client, product):

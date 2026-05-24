@@ -63,7 +63,6 @@ def test_admin_product_create_returns_201(api_client, product):
             "name_en": "New Product",
             "price": 1000,
             "stock": 10,
-            "hidden": False,
             "visible_starts_at": FAR_PAST.isoformat(),
             "visible_ends_at": FAR_FUTURE.isoformat(),
             "orderable_starts_at": FAR_PAST.isoformat(),

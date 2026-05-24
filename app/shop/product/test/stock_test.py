@@ -6,14 +6,6 @@ from shop.order.models import Order, OrderProductOptionRelation, OrderProductRel
 from shop.product.models import Option, Product, Tag
 
 
-@pytest.mark.django_db
-def test_product_current_status_returns_hidden_when_hidden_flag_set(product):
-    # hidden=True 는 모든 datetime 분기보다 우선.
-    product.hidden = True
-    product.save()
-    assert product.current_status == Product.CurrentStatus.HIDDEN
-
-
 @freeze_time(datetime(2010, 1, 1, tzinfo=timezone.utc))
 @pytest.mark.django_db
 def test_product_current_status_returns_out_of_visible_period_when_before_visible_window(product):

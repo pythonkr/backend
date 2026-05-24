@@ -106,7 +106,6 @@ class Tag(BaseAbstractModel):
 
 class Product(BaseAbstractModel):
     class CurrentStatus(models.TextChoices):
-        HIDDEN = "hidden", "비공개"
         OUT_OF_VISIBLE_PERIOD = "out_of_visible_period", "노출 기간 아님"
         OUT_OF_ORDERABLE_PERIOD = "out_of_orderable_period", "판매 기간 아님"
         ACTIVE = "active", "노출 중"
@@ -124,7 +123,6 @@ class Product(BaseAbstractModel):
 
     price = models.PositiveIntegerField()
     stock = models.IntegerField(default=0)
-    hidden = models.BooleanField(default=False)
 
     max_quantity_per_user = models.IntegerField(default=0)
     visible_starts_at = models.DateTimeField(default=datetime.datetime.min)
@@ -154,9 +152,6 @@ class Product(BaseAbstractModel):
 
     @property
     def current_status(self) -> "Product.CurrentStatus":
-        if self.hidden:
-            return self.CurrentStatus.HIDDEN
-
         now = now_aware()
         if (self.visible_starts_at and now < self.visible_starts_at) or (
             self.visible_ends_at and now > self.visible_ends_at

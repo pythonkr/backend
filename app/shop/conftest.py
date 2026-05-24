@@ -156,7 +156,6 @@ def products_by_status(product) -> dict[Product.CurrentStatus, Product]:
     }
     return {
         Product.CurrentStatus.ACTIVE: product,
-        Product.CurrentStatus.HIDDEN: Product.objects.create(name="hidden", hidden=True, **common),
         Product.CurrentStatus.OUT_OF_VISIBLE_PERIOD: Product.objects.create(
             **{**common, "visible_starts_at": FAR_FUTURE}, name="oov"
         ),

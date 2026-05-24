@@ -10,7 +10,6 @@ class ProductAdminFilterSet(filters.FilterSet):
     name = MultiFieldOrCharInFilter(field_names=["name_ko", "name_en"], lookup_expr="icontains")
     category = filters.BaseInFilter(field_name="category_id")
     category_group = filters.BaseInFilter(field_name="category__group_id")
-    hidden = filters.BooleanFilter(field_name="hidden")
     tag = filters.BaseInFilter(field_name="tag_set", distinct=True)
 
     price_min = filters.NumberFilter(field_name="price", lookup_expr="gte")
@@ -22,21 +21,17 @@ class ProductAdminFilterSet(filters.FilterSet):
         now = now_aware()
         q = Q()
         for value in values:
-            if value == Product.CurrentStatus.HIDDEN:
-                q |= Q(hidden=True)
-            elif value == Product.CurrentStatus.OUT_OF_VISIBLE_PERIOD:
-                q |= Q(hidden=False) & (Q(visible_starts_at__gt=now) | Q(visible_ends_at__lt=now))
+            if value == Product.CurrentStatus.OUT_OF_VISIBLE_PERIOD:
+                q |= Q(visible_starts_at__gt=now) | Q(visible_ends_at__lt=now)
             elif value == Product.CurrentStatus.OUT_OF_ORDERABLE_PERIOD:
                 q |= (
-                    Q(hidden=False)
-                    & Q(visible_starts_at__lte=now)
+                    Q(visible_starts_at__lte=now)
                     & Q(visible_ends_at__gte=now)
                     & (Q(orderable_starts_at__gt=now) | Q(orderable_ends_at__lt=now))
                 )
             elif value == Product.CurrentStatus.ACTIVE:
                 q |= (
-                    Q(hidden=False)
-                    & Q(visible_starts_at__lte=now)
+                    Q(visible_starts_at__lte=now)
                     & Q(visible_ends_at__gte=now)
                     & Q(orderable_starts_at__lte=now)
                     & Q(orderable_ends_at__gte=now)
@@ -50,7 +45,6 @@ class ProductAdminFilterSet(filters.FilterSet):
             "name",
             "category",
             "category_group",
-            "hidden",
             "tag",
             "price_min",
             "price_max",

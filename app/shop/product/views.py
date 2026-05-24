@@ -45,7 +45,7 @@ class ProductViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.
     def get_queryset(self) -> QuerySet[Product]:
         # 현재 노출 가능한 상품만 보여야 합니다.
         now = now_aware()
-        filter = Q(visible_starts_at__lte=now, visible_ends_at__gte=now, hidden=False)
+        filter = Q(visible_starts_at__lte=now, visible_ends_at__gte=now)
 
         if self.action == "retrieve" and isinstance(self.request.user, UserExt):
             # 단, 사용자가 구매한 상품인 경우, 노출 기간에 상관없이 상세 정보를 조회할 수 있어야 합니다.

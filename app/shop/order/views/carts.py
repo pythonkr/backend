@@ -80,8 +80,6 @@ class CartProductViewSet(mixins.CreateModelMixin, mixins.DestroyModelMixin, view
             ~Exists(PaymentHistory.objects.filter(order=OuterRef("order"))),
             order__deleted_at__isnull=True,
             order__user=self.request.user,
-            # 숨겨진 상품(추가 후원, 배송비 등)은 별도의 API를 통해서만 추가/삭제가 가능합니다.
-            product__hidden=False,
             single_product_cart__isnull=True,
             status=OrderProductRelation.OrderProductStatus.pending,
         ).all()
