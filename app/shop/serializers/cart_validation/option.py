@@ -11,7 +11,6 @@ from core.serializer.nested_model_serializer import InstanceListSerializer
 from django.contrib.auth.models import AnonymousUser
 from rest_framework import request, serializers
 from shop.product.models import Option, OptionGroup, Product
-from shop.serializers.cart_validation._base import OrderableCheckSerializerMode
 from user.models import UserExt
 
 
@@ -22,19 +21,13 @@ class OptionOrderableCheckTypedDict(typing.TypedDict):
 
 
 class OptionOrderableCheckSerializer(serializers.Serializer):
-    """
-    장바구니에 담긴 상품의 옵션이 주문 가능한지 확인합니다.
-    아래 조건에 해당될 경우 주문 불가능합니다.
+    """option entry 의 단건 정합성을 확인. 합산 stock / max_per_user 는 ProductOrderableCheckSerializer 가 처리.
 
-    ==================== 상품 옵션 그룹 (OptionGroup) ====================
-    - 상품 옵션 중 필수 옵션이 매진된 경우 주문 불가능
-    - 옵션 그룹이 custom_response를 받는 경우, custom_response가 올바른 형식으로 입력되지 않은 경우 주문 불가능
-    - 옵션 그룹이 custom_response를 받지 않는 경우, option이 선택되지 않았거나 옵션 그룹에 속하지 않은 경우 주문 불가능
-
-    ==================== 상품 옵션 (Option) ====================
-    - 옵션의 재고가 없는 경우 주문 불가능
-    - 옵션의 최대 구매 수량이 정해져있으면, 해당 사용자가 이미 구매한 수량이 최대 구매 수량을 초과하는 경우 주문 불가능
-    - 고객이 옵션의 재고를 초과하여 옵션을 장바구니에 담으면 주문 불가능
+    검사 항목:
+    - 옵션 그룹 단위 SOLDOUT (필수 옵션이 매진)
+    - custom_response 그룹의 패턴 일치
+    - 비 custom_response 그룹에서 option 의 그룹 소속 / 선택 여부
+    - 옵션 단건 SOLDOUT (leftover_stock <= 0)
     """
 
     product_option_group = serializers.PrimaryKeyRelatedField(
@@ -52,12 +45,6 @@ class OptionOrderableCheckSerializer(serializers.Serializer):
     class Meta:
         list_serializer_class = InstanceListSerializer
         fields = "__all__"
-
-    @property
-    def validation_mode(self) -> OrderableCheckSerializerMode:
-        if not (mode := self.context.get("mode")):
-            return OrderableCheckSerializerMode.ADD_SINGLE_PRODUCT_TO_CART
-        return mode
 
     @property
     def group(self) -> OptionGroup | None:
@@ -89,70 +76,10 @@ class OptionOrderableCheckSerializer(serializers.Serializer):
         if not (option and option.group_id == self.group.id):
             raise serializers.ValidationError(OptionGroupNotOrderableErrorMessages.OPTION_NOT_SELECTED)
 
-        product: Product = option.group.product
-        if option.leftover_stock is not None:
-            # 옵션의 재고가 없는 경우 주문 불가능
-            if option.leftover_stock <= 0:
-                raise serializers.ValidationError(
-                    OptionNotOrderableErrorMessages.SOLDOUT.format(product.name, option.name)
-                )
-
-            # 고객이 옵션의 재고를 초과하여 옵션을 장바구니에 담으면 주문 불가능
-            user_option_cart_included_count = option.get_user_taken_stock_count(
-                user=user,
-                include_cart=True,
-                include_purchased=False,
-            )
-            match self.validation_mode:
-                case OrderableCheckSerializerMode.ADD_SINGLE_PRODUCT_TO_CART:
-                    user_option_cart_included_count += 1
-                case OrderableCheckSerializerMode.CHECKOUT_SINGLE_PRODUCT:
-                    # 이미 재고 체크를 위에서 했으므로, 단일 주문의 경우 확인할 필요가 없습니다.
-                    user_option_cart_included_count = 0
-                case OrderableCheckSerializerMode.CHECKOUT_CART:
-                    pass
-                case _:  # pragma: no cover
-                    raise ValueError("Invalid validation mode")
-
-            if user_option_cart_included_count > option.leftover_stock:
-                raise serializers.ValidationError(
-                    OptionNotOrderableErrorMessages.TOO_MUCH_CART_OPTION.format(product.name, option.name)
-                )
-
-        # 옵션의 최대 구매 수량이 정해져있으면, 해당 사용자가 이미 구매한 수량이 최대 구매 수량을 초과하는 경우 주문 불가능
-        if option.max_quantity_per_user > 0:  # 0 = 무제한 sentinel
-            match self.validation_mode:
-                case OrderableCheckSerializerMode.ADD_SINGLE_PRODUCT_TO_CART:
-                    user_option_taken_count = (
-                        option.get_user_taken_stock_count(
-                            user=user,
-                            include_cart=True,
-                            include_purchased=True,
-                        )
-                        + 1
-                    )
-                case OrderableCheckSerializerMode.CHECKOUT_SINGLE_PRODUCT:
-                    user_option_taken_count = (
-                        option.get_user_taken_stock_count(
-                            user=user,
-                            include_cart=False,
-                            include_purchased=True,
-                        )
-                        + 1
-                    )
-                case OrderableCheckSerializerMode.CHECKOUT_CART:
-                    user_option_taken_count = option.get_user_taken_stock_count(
-                        user=user,
-                        include_cart=True,
-                        include_purchased=True,
-                    )
-                case _:  # pragma: no cover
-                    raise ValueError("Invalid validation mode")
-
-            if user_option_taken_count > option.max_quantity_per_user:
-                raise serializers.ValidationError(
-                    OptionNotOrderableErrorMessages.ALREADY_ORDERED_TOO_MUCH.format(product.name, option.name)
-                )
+        # 옵션의 재고가 없는 경우 주문 불가능 — 단건 SOLDOUT. 합산 stock / max_per_user 는 product-level 이 본다.
+        if option.leftover_stock is not None and option.leftover_stock <= 0:
+            product: Product = option.group.product
+            raise serializers.ValidationError(OptionNotOrderableErrorMessages.SOLDOUT.format(product.name, option.name))
 
         return option
 

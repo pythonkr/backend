@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import pytest
 from core.const.shop_error_messages import (
     OptionGroupNotOrderableErrorMessages,
+    OptionNotOrderableErrorMessages,
     ProductNotOrderableErrorMessages,
     SignInErrorMessages,
 )
@@ -392,6 +393,482 @@ def test_product_rejects_when_option_group_min_quantity_not_met(customer_user, p
             },
         ],
     }
+
+
+@freeze_time(datetime(2030, 1, 1, tzinfo=timezone.utc))
+@pytest.mark.django_db
+def test_product_rejects_when_option_group_visible_period_not_started(customer_user, product):
+    # 그룹의 visible_starts_at(2031) 가 미래 → API 노출 안 되지만 직접 ID 주문 시도도 cart validation 에서 차단.
+    group = OptionGroup.objects.create(
+        product=product, name="후공개", visible_starts_at=datetime(2031, 1, 1, tzinfo=timezone.utc)
+    )
+    opt = group.options.create(name="A")
+
+    serializer = ProductOrderableCheckSerializer(
+        data={
+            "product": str(product.id),
+            "options": [
+                {"product_option_group": str(group.id), "product_option": str(opt.id), "custom_response": None},
+            ],
+        },
+        context=make_serializer_context(customer_user),
+    )
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {
+        "non_field_errors": [
+            {
+                "detail": OptionGroupNotOrderableErrorMessages.NOT_ORDERABLE_TIME.format(product.name, group.name),
+                "code": "invalid",
+            },
+        ],
+    }
+
+
+@freeze_time(datetime(2030, 1, 1, tzinfo=timezone.utc))
+@pytest.mark.django_db
+def test_product_rejects_when_option_group_orderable_period_not_started(customer_user, product):
+    # 그룹의 orderable_starts_at(2031) 가 현재(2030) 보다 미래 → 거절.
+    group = OptionGroup.objects.create(
+        product=product,
+        name="얼리버드",
+        orderable_starts_at=datetime(2031, 1, 1, tzinfo=timezone.utc),
+    )
+    opt = group.options.create(name="A")
+
+    serializer = ProductOrderableCheckSerializer(
+        data={
+            "product": str(product.id),
+            "options": [
+                {"product_option_group": str(group.id), "product_option": str(opt.id), "custom_response": None},
+            ],
+        },
+        context=make_serializer_context(customer_user),
+    )
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {
+        "non_field_errors": [
+            {
+                "detail": OptionGroupNotOrderableErrorMessages.NOT_ORDERABLE_TIME.format(product.name, group.name),
+                "code": "invalid",
+            },
+        ],
+    }
+
+
+@freeze_time(datetime(2030, 1, 1, tzinfo=timezone.utc))
+@pytest.mark.django_db
+def test_product_passes_when_option_group_in_unselected_period(customer_user, product):
+    # 그룹은 기간 밖이지만 그 그룹에 옵션을 선택하지 않았으므로 검증 안 함.
+    OptionGroup.objects.create(
+        product=product,
+        name="얼리버드",
+        orderable_starts_at=datetime(2031, 1, 1, tzinfo=timezone.utc),
+    )
+    serializer = ProductOrderableCheckSerializer(
+        data={"product": str(product.id), "options": []},
+        context=make_serializer_context(customer_user),
+    )
+    assert serializer.is_valid()
+
+
+@pytest.mark.django_db
+def test_product_rejects_when_option_group_max_per_user_exceeded_in_single_request(customer_user, product):
+    # group max=2 인데 group 내 옵션을 3개 (A,B,C) 한 번에 선택 → group 합산 3 > 2 → 거절.
+    group = OptionGroup.objects.create(
+        product=product, name="티셔츠", max_quantity_per_product=10, max_quantity_per_user=2
+    )
+    opts = [group.options.create(name=n) for n in ("A", "B", "C")]
+
+    serializer = ProductOrderableCheckSerializer(
+        data={
+            "product": str(product.id),
+            "options": [
+                {"product_option_group": str(group.id), "product_option": str(o.id), "custom_response": None}
+                for o in opts
+            ],
+        },
+        context=make_serializer_context(customer_user),
+    )
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {
+        "non_field_errors": [
+            {
+                "detail": OptionGroupNotOrderableErrorMessages.ALREADY_ORDERED_TOO_MUCH.format(
+                    product.name, group.name
+                ),
+                "code": "invalid",
+            },
+        ],
+    }
+
+
+@pytest.mark.parametrize(
+    ("mode", "purchased_count", "cart_count", "in_request"),
+    [
+        # CHECKOUT_SINGLE: cart 무시, purchased + 이번 request → max=1 위배.
+        (OrderableCheckSerializerMode.CHECKOUT_SINGLE_PRODUCT, 1, 0, 1),
+        # CHECKOUT_CART: cart 누적 (자기 자신 포함, 이번 request 안 더함) → max=1 위배.
+        (OrderableCheckSerializerMode.CHECKOUT_CART, 1, 1, 1),
+    ],
+)
+@pytest.mark.django_db
+def test_product_rejects_when_option_group_max_per_user_exceeded_per_mode(
+    customer_user, product, mode, purchased_count, cart_count, in_request
+):
+    # OptionGroup max_per_user 검증의 CHECKOUT_* mode 분기 (#23).
+    group = OptionGroup.objects.create(
+        product=product, name="티셔츠", max_quantity_per_product=10, max_quantity_per_user=1
+    )
+    opt = group.options.create(name="A")
+    for _ in range(purchased_count):
+        opr = OrderProductRelation.objects.create(
+            order=Order.objects.create(user=customer_user, name="paid"),
+            product=product,
+            price=product.price,
+            status=OrderProductRelation.OrderProductStatus.paid,
+        )
+        OrderProductOptionRelation.objects.create(
+            order_product_relation=opr, product_option_group=group, product_option=opt
+        )
+    for _ in range(cart_count):
+        opr = OrderProductRelation.objects.create(
+            order=Order.objects.create(user=customer_user, name="cart"), product=product, price=product.price
+        )
+        OrderProductOptionRelation.objects.create(
+            order_product_relation=opr, product_option_group=group, product_option=opt
+        )
+
+    serializer = ProductOrderableCheckSerializer(
+        data={
+            "product": str(product.id),
+            "options": [
+                {"product_option_group": str(group.id), "product_option": str(opt.id), "custom_response": None}
+                for _ in range(in_request)
+            ],
+        },
+        context=make_serializer_context(customer_user, mode=mode),
+    )
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {
+        "non_field_errors": [
+            {
+                "detail": OptionGroupNotOrderableErrorMessages.ALREADY_ORDERED_TOO_MUCH.format(
+                    product.name, group.name
+                ),
+                "code": "invalid",
+            },
+        ],
+    }
+
+
+@pytest.mark.parametrize(
+    ("mode", "cart_count", "in_request"),
+    [
+        # CHECKOUT_SINGLE: cart 무시, request N 만 leftover 비교 — N=2 > leftover=1.
+        (OrderableCheckSerializerMode.CHECKOUT_SINGLE_PRODUCT, 0, 2),
+        # CHECKOUT_CART: cart 누적만 (자기 포함) 비교 — cart 2 > leftover=1.
+        (OrderableCheckSerializerMode.CHECKOUT_CART, 2, 1),
+    ],
+)
+@pytest.mark.django_db
+def test_product_rejects_when_aggregated_option_count_exceeds_leftover_per_mode(
+    customer_user, product, mode, cart_count, in_request
+):
+    # 동일 option 합산 stock 검증의 CHECKOUT_* mode 분기 (#22).
+    group = OptionGroup.objects.create(product=product, name="옵션", max_quantity_per_product=10)
+    opt = group.options.create(name="A", stock=1)
+    for _ in range(cart_count):
+        opr = OrderProductRelation.objects.create(
+            order=Order.objects.create(user=customer_user, name="cart"), product=product, price=product.price
+        )
+        OrderProductOptionRelation.objects.create(
+            order_product_relation=opr, product_option_group=group, product_option=opt
+        )
+
+    serializer = ProductOrderableCheckSerializer(
+        data={
+            "product": str(product.id),
+            "options": [
+                {"product_option_group": str(group.id), "product_option": str(opt.id), "custom_response": None}
+                for _ in range(in_request)
+            ],
+        },
+        context=make_serializer_context(customer_user, mode=mode),
+    )
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {
+        "non_field_errors": [
+            {
+                "detail": OptionNotOrderableErrorMessages.TOO_MUCH_CART_OPTION.format(product.name, opt.name),
+                "code": "invalid",
+            },
+        ],
+    }
+
+
+@pytest.mark.django_db
+def test_product_rejects_when_option_group_max_per_user_already_taken_in_cart(customer_user, product):
+    # group max=2, cart 에 이미 1개 + 이번 요청 2개 → 합산 3 > 2 → 거절.
+    group = OptionGroup.objects.create(
+        product=product, name="티셔츠", max_quantity_per_product=10, max_quantity_per_user=2
+    )
+    opt_a, opt_b = group.options.create(name="A"), group.options.create(name="B")
+
+    cart_opr = OrderProductRelation.objects.create(
+        order=Order.objects.create(user=customer_user, name="cart"),
+        product=product,
+        price=product.price,
+    )
+    OrderProductOptionRelation.objects.create(
+        order_product_relation=cart_opr, product_option_group=group, product_option=opt_a
+    )
+
+    serializer = ProductOrderableCheckSerializer(
+        data={
+            "product": str(product.id),
+            "options": [
+                {"product_option_group": str(group.id), "product_option": str(opt_a.id), "custom_response": None},
+                {"product_option_group": str(group.id), "product_option": str(opt_b.id), "custom_response": None},
+            ],
+        },
+        context=make_serializer_context(customer_user),
+    )
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {
+        "non_field_errors": [
+            {
+                "detail": OptionGroupNotOrderableErrorMessages.ALREADY_ORDERED_TOO_MUCH.format(
+                    product.name, group.name
+                ),
+                "code": "invalid",
+            },
+        ],
+    }
+
+
+@pytest.mark.django_db
+def test_product_allows_option_group_within_max_per_user(customer_user, product):
+    # group max=2, 이번 요청 2개 → 통과.
+    group = OptionGroup.objects.create(
+        product=product, name="티셔츠", max_quantity_per_product=10, max_quantity_per_user=2
+    )
+    opt_a, opt_b = group.options.create(name="A"), group.options.create(name="B")
+
+    serializer = ProductOrderableCheckSerializer(
+        data={
+            "product": str(product.id),
+            "options": [
+                {"product_option_group": str(group.id), "product_option": str(opt_a.id), "custom_response": None},
+                {"product_option_group": str(group.id), "product_option": str(opt_b.id), "custom_response": None},
+            ],
+        },
+        context=make_serializer_context(customer_user),
+    )
+    assert serializer.is_valid()
+
+
+@pytest.mark.django_db
+def test_option_group_get_user_taken_stock_count_counts_per_group(customer_user, product, other_user):
+    # 같은 group 의 옵션 2건 paid + 다른 group 옵션 1건 + 다른 user 옵션 1건 → 본 user, 본 group 만 2.
+    group = OptionGroup.objects.create(product=product, name="티셔츠", max_quantity_per_product=10)
+    other_group = OptionGroup.objects.create(product=product, name="모자", max_quantity_per_product=10)
+    opt_a = group.options.create(name="A")
+    opt_b = group.options.create(name="B")
+    other_opt = other_group.options.create(name="O")
+
+    for option in (opt_a, opt_b):
+        opr = OrderProductRelation.objects.create(
+            order=Order.objects.create(user=customer_user, name="paid"),
+            product=product,
+            price=product.price,
+            status=OrderProductRelation.OrderProductStatus.paid,
+        )
+        OrderProductOptionRelation.objects.create(
+            order_product_relation=opr, product_option_group=group, product_option=option
+        )
+    other_group_opr = OrderProductRelation.objects.create(
+        order=Order.objects.create(user=customer_user, name="paid"),
+        product=product,
+        price=product.price,
+        status=OrderProductRelation.OrderProductStatus.paid,
+    )
+    OrderProductOptionRelation.objects.create(
+        order_product_relation=other_group_opr, product_option_group=other_group, product_option=other_opt
+    )
+    other_user_opr = OrderProductRelation.objects.create(
+        order=Order.objects.create(user=other_user, name="paid"),
+        product=product,
+        price=product.price,
+        status=OrderProductRelation.OrderProductStatus.paid,
+    )
+    OrderProductOptionRelation.objects.create(
+        order_product_relation=other_user_opr, product_option_group=group, product_option=opt_a
+    )
+
+    assert group.get_user_taken_stock_count(user=customer_user, include_cart=False, include_purchased=True) == 2
+
+
+@pytest.mark.django_db
+def test_product_rejects_when_single_option_cart_count_exceeds_leftover_stock(customer_user, product):
+    # 단건 case — cart 에 이미 동일 option 1건 + 이번 1건 = 2 > leftover=1 → product-level 합산 검증이 거절.
+    group = OptionGroup.objects.create(product=product, name="옵션", max_quantity_per_product=10)
+    opt = group.options.create(name="A", stock=1)
+    cart_opr = OrderProductRelation.objects.create(
+        order=Order.objects.create(user=customer_user, name="cart"),
+        product=product,
+        price=product.price,
+    )
+    OrderProductOptionRelation.objects.create(
+        order_product_relation=cart_opr, product_option_group=group, product_option=opt
+    )
+
+    serializer = ProductOrderableCheckSerializer(
+        data={
+            "product": str(product.id),
+            "options": [
+                {"product_option_group": str(group.id), "product_option": str(opt.id), "custom_response": None},
+            ],
+        },
+        context=make_serializer_context(customer_user),
+    )
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {
+        "non_field_errors": [
+            {
+                "detail": OptionNotOrderableErrorMessages.TOO_MUCH_CART_OPTION.format(product.name, opt.name),
+                "code": "invalid",
+            },
+        ],
+    }
+
+
+@pytest.mark.parametrize(
+    ("mode", "purchased_count", "cart_count"),
+    [
+        # ADD: cart + purchased + 1 > max → 거절. 1 cart + 0 purchased + 1 new = 2 > max=1.
+        (OrderableCheckSerializerMode.ADD_SINGLE_PRODUCT_TO_CART, 0, 1),
+        # CHECKOUT_SINGLE: cart 무시, purchased + 1 > max. 1 purchased + 1 = 2 > max=1.
+        (OrderableCheckSerializerMode.CHECKOUT_SINGLE_PRODUCT, 1, 0),
+        # CHECKOUT_CART: cart + purchased > max. 1 cart + 1 purchased = 2 > max=1.
+        (OrderableCheckSerializerMode.CHECKOUT_CART, 1, 1),
+    ],
+)
+@pytest.mark.django_db
+def test_product_rejects_when_single_option_max_per_user_exceeded_per_mode(
+    customer_user, product, mode, purchased_count, cart_count
+):
+    # 단건 case — 통합 검증이 mode 별 cart / purchased 분기를 단건도 처리하는지 검증.
+    group = OptionGroup.objects.create(product=product, name="옵션", max_quantity_per_product=10)
+    opt = group.options.create(name="A", max_quantity_per_user=1)
+    for _ in range(purchased_count):
+        opr = OrderProductRelation.objects.create(
+            order=Order.objects.create(user=customer_user, name="paid"),
+            product=product,
+            price=product.price,
+            status=OrderProductRelation.OrderProductStatus.paid,
+        )
+        OrderProductOptionRelation.objects.create(
+            order_product_relation=opr, product_option_group=group, product_option=opt
+        )
+    for _ in range(cart_count):
+        opr = OrderProductRelation.objects.create(
+            order=Order.objects.create(user=customer_user, name="cart"), product=product, price=product.price
+        )
+        OrderProductOptionRelation.objects.create(
+            order_product_relation=opr, product_option_group=group, product_option=opt
+        )
+
+    serializer = ProductOrderableCheckSerializer(
+        data={
+            "product": str(product.id),
+            "options": [
+                {"product_option_group": str(group.id), "product_option": str(opt.id), "custom_response": None},
+            ],
+        },
+        context=make_serializer_context(customer_user, mode=mode),
+    )
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {
+        "non_field_errors": [
+            {
+                "detail": OptionNotOrderableErrorMessages.ALREADY_ORDERED_TOO_MUCH.format(product.name, opt.name),
+                "code": "invalid",
+            },
+        ],
+    }
+
+
+@pytest.mark.django_db
+def test_product_rejects_when_same_option_submitted_more_than_leftover_stock(customer_user, product):
+    # option stock=2 인데 같은 option 을 3번 제출 → option-level 의 +1 검사로는 통과하지만 합산 3 > 2 라서 product-level 에서 거절.
+    group = OptionGroup.objects.create(product=product, name="옵션", max_quantity_per_product=10)
+    opt = group.options.create(name="A", stock=2)
+
+    serializer = ProductOrderableCheckSerializer(
+        data={
+            "product": str(product.id),
+            "options": [
+                {"product_option_group": str(group.id), "product_option": str(opt.id), "custom_response": None}
+                for _ in range(3)
+            ],
+        },
+        context=make_serializer_context(customer_user),
+    )
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {
+        "non_field_errors": [
+            {
+                "detail": OptionNotOrderableErrorMessages.TOO_MUCH_CART_OPTION.format(product.name, opt.name),
+                "code": "invalid",
+            },
+        ],
+    }
+
+
+@pytest.mark.django_db
+def test_product_rejects_when_same_option_submitted_more_than_max_per_user(customer_user, product):
+    # max_quantity_per_user=2 인데 같은 option 을 3번 제출 → 합산 3 > 2 → 거절.
+    group = OptionGroup.objects.create(product=product, name="옵션", max_quantity_per_product=10)
+    opt = group.options.create(name="A", max_quantity_per_user=2)
+
+    serializer = ProductOrderableCheckSerializer(
+        data={
+            "product": str(product.id),
+            "options": [
+                {"product_option_group": str(group.id), "product_option": str(opt.id), "custom_response": None}
+                for _ in range(3)
+            ],
+        },
+        context=make_serializer_context(customer_user),
+    )
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {
+        "non_field_errors": [
+            {
+                "detail": OptionNotOrderableErrorMessages.ALREADY_ORDERED_TOO_MUCH.format(product.name, opt.name),
+                "code": "invalid",
+            },
+        ],
+    }
+
+
+@pytest.mark.django_db
+def test_product_allows_same_option_within_aggregate_stock(customer_user, product):
+    # stock=3, 합산 count=2 → 통과.
+    group = OptionGroup.objects.create(product=product, name="옵션", max_quantity_per_product=10)
+    opt = group.options.create(name="A", stock=3)
+
+    serializer = ProductOrderableCheckSerializer(
+        data={
+            "product": str(product.id),
+            "options": [
+                {"product_option_group": str(group.id), "product_option": str(opt.id), "custom_response": None}
+                for _ in range(2)
+            ],
+        },
+        context=make_serializer_context(customer_user),
+    )
+    assert serializer.is_valid()
 
 
 @pytest.mark.django_db

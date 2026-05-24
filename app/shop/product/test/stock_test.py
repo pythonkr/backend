@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import pytest
 from freezegun import freeze_time
 from shop.order.models import Order, OrderProductOptionRelation, OrderProductRelation, SingleProductCart
-from shop.product.models import Option, Product, Tag
+from shop.product.models import Option, OptionGroup, Product, Tag
 
 
 @freeze_time(datetime(2010, 1, 1, tzinfo=timezone.utc))
@@ -199,6 +199,59 @@ def test_option_leftover_stock_subtracts_purchased_option_relations(
     )
     refreshed = Option.objects.get(id=option.id)
     assert refreshed.leftover_stock == 2
+
+
+@freeze_time(datetime(2030, 1, 1, tzinfo=timezone.utc))
+@pytest.mark.django_db
+def test_option_group_effective_orderable_falls_back_to_product_when_null(product):
+    # 그룹 자체 값 None → Product 의 값 fallback. Product 의 fixture orderable 윈도우는 FAR_PAST~FAR_FUTURE.
+    group = OptionGroup.objects.create(product=product, name="size")
+    assert group.effective_orderable_period.starts_at == product.orderable_starts_at
+    assert group.effective_orderable_period.ends_at == product.orderable_ends_at
+    assert group.is_orderable_now() is True
+
+
+@freeze_time(datetime(2030, 1, 1, tzinfo=timezone.utc))
+@pytest.mark.django_db
+def test_option_group_is_orderable_now_false_when_group_window_in_future(product):
+    group = OptionGroup.objects.create(
+        product=product, name="late", orderable_starts_at=datetime(2031, 1, 1, tzinfo=timezone.utc)
+    )
+    assert group.is_orderable_now() is False
+
+
+@freeze_time(datetime(2030, 1, 1, tzinfo=timezone.utc))
+@pytest.mark.django_db
+def test_option_group_effective_visible_falls_back_to_product_when_null(product):
+    group = OptionGroup.objects.create(product=product, name="size")
+    assert group.effective_visible_period.starts_at == product.visible_starts_at
+    assert group.effective_visible_period.ends_at == product.visible_ends_at
+    assert group.is_visible_now() is True
+
+
+@freeze_time(datetime(2030, 1, 1, tzinfo=timezone.utc))
+@pytest.mark.django_db
+def test_option_group_is_visible_now_false_when_group_visible_in_future(product):
+    group = OptionGroup.objects.create(
+        product=product, name="후공개", visible_starts_at=datetime(2031, 1, 1, tzinfo=timezone.utc)
+    )
+    assert group.is_visible_now() is False
+
+
+@pytest.mark.django_db
+def test_option_group_taken_count_excludes_soft_deleted_opr(customer_user, option_group, option):
+    # P2-B: 사용자가 cart 에서 OPR 을 soft-delete 한 경우 group 인당 한도 카운트에 포함되면 안 된다.
+    opr = OrderProductRelation.objects.create(
+        order=Order.objects.create(user=customer_user, name="cart"),
+        product=option_group.product,
+        price=option_group.product.price,
+    )
+    OrderProductOptionRelation.objects.create(
+        order_product_relation=opr, product_option_group=option_group, product_option=option
+    )
+    opr.delete()  # soft-delete
+
+    assert option_group.get_user_taken_stock_count(user=customer_user, include_cart=True, include_purchased=False) == 0
 
 
 @pytest.mark.django_db
