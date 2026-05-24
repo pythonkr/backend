@@ -40,7 +40,7 @@ def reverse_seed_payment_completed_email_template(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("notification", "0002_emailnotificationhistorysentto_failure_reason_and_more"),
+        ("notification", "0003_emailnotificationtemplate_editor_source_and_more"),
     ]
 
     operations = [
