@@ -1,3 +1,5 @@
+import re
+
 from core.const.serializer import COMMON_ADMIN_FIELDS
 from core.serializer.base_abstract_serializer import BaseAbstractSerializer
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
@@ -93,6 +95,14 @@ class OptionGroupAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, N
                 parent_fk_name="group",
             ),
         }
+
+    def validate_custom_response_pattern(self, value: str | None) -> str | None:
+        if value:
+            try:
+                re.compile(value)
+            except re.error as exc:
+                raise serializers.ValidationError(f"유효하지 않은 정규표현식입니다: {exc}") from exc
+        return value
 
     def validate(self, attrs: dict) -> dict:
         # is_custom_response=True 면 패턴이 admin 계약 — 빈 답변 허용은 ".*", 비공란 강제는 ".+" 등으로 명시.

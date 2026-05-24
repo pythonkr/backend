@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import functools
+import re
 import typing
 
 from core.models import BaseAbstractModel
@@ -253,6 +254,11 @@ class OptionGroup(BaseAbstractModel):
             raise ValidationError(
                 {"custom_response_pattern": "is_custom_response=True 일 때 custom_response_pattern 은 필수입니다."}
             )
+        if self.custom_response_pattern:
+            try:
+                re.compile(self.custom_response_pattern)
+            except re.error as exc:
+                raise ValidationError({"custom_response_pattern": f"유효하지 않은 정규표현식입니다: {exc}"}) from exc
         super().clean()
 
     def is_group_stock_available(self) -> bool:

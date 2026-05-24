@@ -143,6 +143,22 @@ def test_admin_option_group_create_rejects_custom_response_without_pattern(api_c
     assert "custom_response_pattern" in str(response.json())
 
 
+@pytest.mark.django_db
+def test_admin_option_group_create_rejects_invalid_regex_pattern(api_client, product):
+    # invalid regex 가 저장되면 주문/수정 validation 시 re.match() runtime error 가 나므로 admin 단에서 막는다.
+    response = OptionGroupsAdminApi(http_client=api_client).create(
+        {
+            "product": str(product.id),
+            "name_ko": "요청사항",
+            "name_en": "Req",
+            "is_custom_response": True,
+            "custom_response_pattern": "[unclosed",
+        }
+    )
+    assert response.status_code == HTTP_400_BAD_REQUEST
+    assert "custom_response_pattern" in str(response.json())
+
+
 @pytest.mark.parametrize("status", list(Product.CurrentStatus))
 @pytest.mark.django_db
 def test_admin_product_list_filters_by_status(api_client, products_by_status, status):
