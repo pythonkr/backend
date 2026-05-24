@@ -122,8 +122,9 @@ class OrderViewSet(
 
         assert order_product_rel.single_product_cart  # nosec: B101
         cart = order_product_rel.single_product_cart
+        cart.prepare_payment()
 
-        portone_client.register_or_update_prepared_payment(merchant_id=str(cart.id), price=cart.first_paid_price)
+        portone_client.register_or_update_prepared_payment(merchant_id=cart.merchant_uid, price=cart.prepared_price)
 
         return response.Response(data=SingleProductCartDto(instance=cart).data, status=status.HTTP_201_CREATED)
 
@@ -180,11 +181,12 @@ class OrderViewSet(
             cart.name_ko += f" 외 {len(cart_product_rels) - 1}개"
             cart.name_en += f" and {len(cart_product_rels) - 1} more"
         cart.save()
+        cart.prepare_payment()
 
         # idempotent + forward-only — DB commit 후 비동기 호출. 실패 시 클라이언트 retry 가 자연 보상.
         transaction.on_commit(
             lambda: portone_client.register_or_update_prepared_payment(
-                merchant_id=str(cart.id), price=cart.first_paid_price
+                merchant_id=cart.merchant_uid, price=cart.prepared_price
             )
         )
 

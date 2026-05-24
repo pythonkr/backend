@@ -76,9 +76,12 @@ def test_create_single_product_order_creates_cart_and_calls_portone(
     assert response.status_code == HTTP_201_CREATED
     cart = SingleProductCart.objects.get(user=customer_user)
     assert response.json() == SingleProductCartDto(instance=cart).data
-    mock_portone_register.assert_called_once_with(merchant_id=str(cart.id), price=product.price)
+    assert cart.prepared_cart_snapshot is not None
+    assert cart.prepared_cart_hash is not None
+    assert cart.prepared_price == product.price
+    mock_portone_register.assert_called_once_with(merchant_id=cart.merchant_uid, price=product.price)
     # SingleProductCart + OPR 양쪽 history 생성 확인.
-    assert list(cart.history.values_list("history_type", flat=True)) == ["+"]
+    assert list(cart.history.order_by("history_date").values_list("history_type", flat=True)) == ["+", "~"]
     assert list(cart.order_product_relation.history.values_list("history_type", flat=True)) == ["+"]
 
 

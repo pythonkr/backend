@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from core.models import BaseAbstractModel, BaseAbstractModelQuerySet
 from django.db import models
 
@@ -53,3 +55,41 @@ class PaymentHistory(BaseAbstractModel):
     class Meta:
         ordering = ("-created_at",)
         indexes = (models.Index(fields=["imp_id"]), models.Index(fields=["status"]))
+
+
+class PaymentWebhookEvent(models.Model):
+    class EventType(models.TextChoices):
+        WEBHOOK_RECEIVED = "webhook_received", "Webhook received"
+        PAYMENT_LOOKUP_SUCCEEDED = "payment_lookup_succeeded", "Payment lookup succeeded"
+        PAYMENT_LOOKUP_FAILED = "payment_lookup_failed", "Payment lookup failed"
+        PAYMENT_ACCEPTED = "payment_accepted", "Payment accepted"
+        PAYMENT_REJECTED = "payment_rejected", "Payment rejected"
+        CANCEL_SUCCEEDED = "cancel_succeeded", "Cancel succeeded"
+        CANCEL_FAILED = "cancel_failed", "Cancel failed"
+
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+
+    order = models.ForeignKey("order.Order", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    single_product_cart = models.ForeignKey(
+        "order.SingleProductCart", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    payment_history = models.ForeignKey(
+        PaymentHistory, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+
+    event_type = models.CharField(max_length=64, choices=EventType.choices)
+    reason_code = models.CharField(max_length=128, null=True, blank=True)
+    reason = models.TextField(null=True, blank=True)
+
+    request_payload = models.JSONField(null=True, blank=True)
+    payment_lookup_response = models.JSONField(null=True, blank=True)
+    cancel_response = models.JSONField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = (
+            models.Index(fields=["event_type"]),
+            models.Index(fields=["reason_code"]),
+        )

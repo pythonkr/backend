@@ -51,6 +51,18 @@ def test_cart_add_product_appends_to_existing_unpaid_cart(customer_client, custo
 
 
 @pytest.mark.django_db
+def test_cart_add_product_invalidates_prepared_payment(customer_client, product, order_factory):
+    existing_cart = order_factory(status="prepared")
+
+    response = CartProductsApi(http_client=customer_client).create({"product": str(product.id), "options": []})
+
+    assert response.status_code == HTTP_201_CREATED
+    existing_cart.refresh_from_db()
+    assert existing_cart.prepared_cart_snapshot is None
+    assert existing_cart.prepared_cart_hash is None
+
+
+@pytest.mark.django_db
 def test_cart_add_product_creates_new_cart_when_none_exists(customer_client, customer_user, product):
     response = CartProductsApi(http_client=customer_client).create({"product": str(product.id), "options": []})
     assert response.status_code == HTTP_201_CREATED
@@ -80,6 +92,19 @@ def test_cart_remove_product_soft_deletes_pending_opr(customer_client, order_fac
     # soft delete 는 `BaseAbstractModel.delete()` 가 deleted_at 만 update 하는 save() 이므로 history_type='~' 로 기록.
     types = list(opr.history.order_by("history_date").values_list("history_type", flat=True))
     assert types == ["+", "~"]
+
+
+@pytest.mark.django_db
+def test_cart_remove_product_invalidates_prepared_payment(customer_client, order_factory):
+    pending_order = order_factory(status="prepared")
+    opr = pending_order.products.first()
+
+    response = CartProductsApi(http_client=customer_client).delete(opr.id)
+
+    assert response.status_code == HTTP_204_NO_CONTENT
+    pending_order.refresh_from_db()
+    assert pending_order.prepared_cart_snapshot is None
+    assert pending_order.prepared_cart_hash is None
 
 
 @pytest.mark.django_db

@@ -80,6 +80,7 @@ def test_order_dto_includes_scancode_url_and_nested_payload(product, order_facto
             "email": customer_info.email,
             "organization": None,
         },
+        "merchant_uid": None,
     }
 
 

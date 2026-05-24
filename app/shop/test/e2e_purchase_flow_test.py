@@ -126,12 +126,12 @@ def test_single_product_cart_full_flow_admin_setup_purchase_refund(
     )
     assert create_response.status_code == HTTP_201_CREATED
     cart = SingleProductCart.objects.get(user=customer_user)
-    mock_portone_register.assert_called_once_with(merchant_id=str(cart.id), price=cart.first_paid_price)
+    mock_portone_register.assert_called_once_with(merchant_id=cart.merchant_uid, price=cart.first_paid_price)
 
     # 2. PortOne 결제 완료 webhook 도착 → cart 가 Order 로 promote.
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=cart)
     webhook_response = PortOneWebhookApi(http_client=anon_client).notify(
-        merchant_uid=str(cart.id), ip=WEBHOOK_WHITELISTED_IP
+        merchant_uid=cart.merchant_uid, ip=WEBHOOK_WHITELISTED_IP
     )
     assert webhook_response.status_code == HTTP_200_OK
 
@@ -144,7 +144,7 @@ def test_single_product_cart_full_flow_admin_setup_purchase_refund(
     delete_response = OrdersApi(http_client=customer_client).delete(order.id)
     assert delete_response.status_code == HTTP_204_NO_CONTENT
     mock_portone_req_cancel_payment.assert_called_once_with(
-        merchant_id=str(order.id), refund_request_price=25000, current_leftover_price=25000
+        imp_id=order.latest_imp_id, refund_request_price=25000, current_leftover_price=25000
     )
     # cached_property 무효화 위해 재조회.
     refreshed = Order.objects.get(id=order.id)
@@ -212,11 +212,12 @@ def test_order_cart_full_flow_admin_setup_two_oprs_partial_then_full_refund(
     )
     assert checkout_response.status_code == HTTP_201_CREATED
     assert CustomerInfo.objects.filter(order=cart, name="홍길동").exists()
+    cart.refresh_from_db()
 
     # 3. PortOne 결제 완료 webhook 도착.
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=cart)
     webhook_response = PortOneWebhookApi(http_client=anon_client).notify(
-        merchant_uid=str(cart.id), ip=WEBHOOK_WHITELISTED_IP
+        merchant_uid=cart.merchant_uid, ip=WEBHOOK_WHITELISTED_IP
     )
     assert webhook_response.status_code == HTTP_200_OK
     refreshed = Order.objects.get(id=cart.id)
@@ -247,8 +248,8 @@ def test_order_cart_full_flow_admin_setup_two_oprs_partial_then_full_refund(
     #   (1) 부분 환불 = S OPR(25000), 호출 시점 leftover = 51000
     #   (2) 전체 환불 = 남은 L OPR(26000 = 25000 + 옵션 1000), leftover = 26000
     assert mock_portone_req_cancel_payment.call_args_list == [
-        call(merchant_id=str(cart.id), refund_request_price=25000, current_leftover_price=51000),
-        call(merchant_id=str(cart.id), refund_request_price=26000, current_leftover_price=26000),
+        call(imp_id=refreshed.latest_imp_id, refund_request_price=25000, current_leftover_price=51000),
+        call(imp_id=refreshed.latest_imp_id, refund_request_price=26000, current_leftover_price=26000),
     ]
 
 
@@ -343,4 +344,5 @@ def test_cart_get_reflects_added_products_for_e2e_setup(customer_client, custome
         "created_at": DateTimeField().to_representation(cart.created_at),
         "not_fully_refundable_reason": NotRefundableErrorMessages.ORDER_IMP_ID_NOT_EXIST,
         "customer_info": None,
+        "merchant_uid": None,
     }

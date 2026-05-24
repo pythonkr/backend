@@ -148,7 +148,7 @@ def make_portone_payment_info(*, order, **overrides) -> dict:
     """
     return {
         "imp_uid": "imp_test",
-        "merchant_uid": str(order.id),
+        "merchant_uid": order.merchant_uid,
         "amount": order.first_paid_price,
         "cancel_amount": 0,
         "currency": "KRW",

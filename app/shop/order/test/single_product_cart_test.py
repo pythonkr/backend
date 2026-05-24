@@ -54,8 +54,8 @@ def test_cart_payment_history_accessors_simulate_pending_order(single_product_ca
 
 
 @pytest.mark.django_db
-def test_cart_products_property_exposes_single_opr_as_list(single_product_cart):
-    assert single_product_cart.products == [single_product_cart.order_product_relation]
+def test_cart_products_property_exposes_single_opr_as_queryset(single_product_cart):
+    assert list(single_product_cart.products) == [single_product_cart.order_product_relation]
 
 
 @pytest.mark.django_db

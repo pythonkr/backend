@@ -149,19 +149,23 @@ class PortOneClient:
         raise PortOneException(f"결제 정보를 찾을 수 없습니다. {imp_uid=}")
 
     def req_cancel_payment(
-        self, merchant_id: str, refund_request_price: int, current_leftover_price: int, reason: str | None = None
+        self,
+        imp_id: str,
+        refund_request_price: int | float,
+        current_leftover_price: int | float,
+        reason: str | None = None,
     ) -> dict:
         """결제 환불 요청
         Args:
-            merchant_id (str): 결제 번호
-            refund_request_price (int): 환불 요청 금액
-            current_leftover_price (int): 현재 환불 가능한 남은 금액
+            imp_id (str): 포트원 거래고유번호
+            refund_request_price (int | float): 환불 요청 금액
+            current_leftover_price (int | float): 현재 환불 가능한 남은 금액
             reason (str | None): 환불 사유
         Returns:
             dict: 결제 사전 등록 또는 수정 응답
         """
         request_dto = {
-            "merchant_uid": merchant_id,
+            "imp_uid": imp_id,
             "amount": refund_request_price,
             "checksum": current_leftover_price,
             "reason": reason,

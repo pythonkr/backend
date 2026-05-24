@@ -1,5 +1,5 @@
 import pytest
-from core.const.shop_error_messages import PortOneWebhookFailureMessages as Msgs
+from core.const.shop_error_messages import PortOneWebhookFailureCode
 from core.external_apis.portone.client import PortOneException
 from django.test import override_settings
 from django.urls import reverse
@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_403_FORBIDDEN
 from rest_framework.test import APIClient
 from shop.conftest import WEBHOOK_WHITELISTED_IP
-from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
+from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus, PaymentWebhookEvent
 from shop.test.helpers import make_portone_payment_info, make_webhook_payload
 
 _NON_WHITELISTED_IP = "5.6.7.8"
@@ -44,10 +44,10 @@ def _post_webhook(*, merchant_uid: str, ip: str, status: str = "paid", imp_uid: 
 def test_ip_allowlist_respects_debug_bypass(
     debug, expected_status, expected_body, mock_portone_find_payment_info, order_factory
 ):
-    pending_order = order_factory()
+    pending_order = order_factory(status="prepared")
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=pending_order)
     with override_settings(DEBUG=debug):
-        response = _post_webhook(merchant_uid=str(pending_order.id), ip=_NON_WHITELISTED_IP)
+        response = _post_webhook(merchant_uid=pending_order.merchant_uid, ip=_NON_WHITELISTED_IP)
 
     assert response.status_code == expected_status
     assert response.json() == expected_body
@@ -66,9 +66,9 @@ def test_ip_allowlist_respects_debug_bypass(
 
 @pytest.mark.django_db
 def test_accepts_request_from_whitelisted_ip(mock_portone_find_payment_info, order_factory):
-    pending_order = order_factory()
+    pending_order = order_factory(status="prepared")
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=pending_order)
-    response = _post_webhook(merchant_uid=str(pending_order.id), ip=WEBHOOK_WHITELISTED_IP)
+    response = _post_webhook(merchant_uid=pending_order.merchant_uid, ip=WEBHOOK_WHITELISTED_IP)
     assert response.status_code == HTTP_200_OK
     assert response.json() == {"status": "success", "message": "일반 결제 성공"}
     assert PaymentHistory.objects.filter(
@@ -80,38 +80,74 @@ def test_accepts_request_from_whitelisted_ip(mock_portone_find_payment_info, ord
 
 
 @pytest.mark.django_db
-def test_atomic_rollback_on_validation_failure(mock_portone_find_payment_info, order_factory):
-    pending_order = order_factory()
+def test_atomic_rollback_on_validation_failure(
+    mock_portone_find_payment_info, mock_portone_req_cancel_payment, order_factory
+):
+    pending_order = order_factory(status="prepared")
     mock_portone_find_payment_info.return_value = make_portone_payment_info(
         order=pending_order, amount=pending_order.first_paid_price + 9999
     )
-    response = _post_webhook(merchant_uid=str(pending_order.id), ip=WEBHOOK_WHITELISTED_IP)
+    response = _post_webhook(merchant_uid=pending_order.merchant_uid, ip=WEBHOOK_WHITELISTED_IP)
     assert response.status_code == HTTP_400_BAD_REQUEST
     assert response.json() == {
         "type": "validation_error",
-        "errors": [{"code": "forgery", "detail": Msgs.UNEXPECTED_PAID_PRICE, "attr": "non_field_errors"}],
+        "errors": [
+            {
+                "code": "UNEXPECTED_PAID_PRICE",
+                "detail": PortOneWebhookFailureCode.UNEXPECTED_PAID_PRICE.label,
+                "attr": "non_field_errors",
+            }
+        ],
     }
     assert not PaymentHistory.objects.filter(order=pending_order).exists()
+    leftover_price = pending_order.first_paid_price + 9999
+    mock_portone_req_cancel_payment.assert_called_once_with(
+        imp_id="imp_test",
+        refund_request_price=leftover_price,
+        current_leftover_price=leftover_price,
+        reason=PortOneWebhookFailureCode.UNEXPECTED_PAID_PRICE.label,
+    )
 
 
 @pytest.mark.parametrize(
     ("status_value", "expected_error"),
     [
-        ("failed", {"code": "forgery", "detail": Msgs.PURCHASE_FAILED, "attr": "status"}),
-        ("ready", {"code": "unsupported", "detail": Msgs.VIRTUAL_ACCOUNT_NOT_SUPPORTED, "attr": "status"}),
-        ("cancelled", {"code": "unsupported", "detail": Msgs.CANCELLED_NOT_SUPPORTED, "attr": "status"}),
+        (
+            "failed",
+            {"code": "PURCHASE_FAILED", "detail": PortOneWebhookFailureCode.PURCHASE_FAILED.label, "attr": "status"},
+        ),
+        (
+            "ready",
+            {
+                "code": "VIRTUAL_ACCOUNT_NOT_SUPPORTED",
+                "detail": PortOneWebhookFailureCode.VIRTUAL_ACCOUNT_NOT_SUPPORTED.label,
+                "attr": "status",
+            },
+        ),
+        (
+            "cancelled",
+            {
+                "code": "CANCELLED_NOT_SUPPORTED",
+                "detail": PortOneWebhookFailureCode.CANCELLED_NOT_SUPPORTED.label,
+                "attr": "status",
+            },
+        ),
     ],
 )
 @pytest.mark.django_db
 def test_rejects_non_paid_status_with_standardized_error(
     status_value, expected_error, mock_portone_find_payment_info, order_factory
 ):
-    pending_order = order_factory()
-    response = _post_webhook(merchant_uid=str(pending_order.id), ip=WEBHOOK_WHITELISTED_IP, status=status_value)
+    pending_order = order_factory(status="prepared")
+    response = _post_webhook(merchant_uid=pending_order.merchant_uid, ip=WEBHOOK_WHITELISTED_IP, status=status_value)
     assert response.status_code == HTTP_400_BAD_REQUEST
     assert response.json() == {"type": "validation_error", "errors": [expected_error]}
     mock_portone_find_payment_info.assert_not_called()
     assert not PaymentHistory.objects.filter(order=pending_order).exists()
+    assert PaymentWebhookEvent.objects.filter(
+        event_type=PaymentWebhookEvent.EventType.PAYMENT_REJECTED,
+        reason_code=expected_error["code"],
+    ).exists()
 
 
 @pytest.mark.django_db
@@ -121,9 +157,19 @@ def test_rejects_unknown_merchant_uid(mock_portone_find_payment_info):
     assert response.status_code == HTTP_400_BAD_REQUEST
     assert response.json() == {
         "type": "validation_error",
-        "errors": [{"code": "forgery", "detail": Msgs.ORDER_NOT_FOUND, "attr": "non_field_errors"}],
+        "errors": [
+            {
+                "code": "ORDER_NOT_FOUND",
+                "detail": PortOneWebhookFailureCode.ORDER_NOT_FOUND.label,
+                "attr": "non_field_errors",
+            }
+        ],
     }
     mock_portone_find_payment_info.assert_not_called()
+    assert PaymentWebhookEvent.objects.filter(
+        event_type=PaymentWebhookEvent.EventType.PAYMENT_REJECTED,
+        reason_code="ORDER_NOT_FOUND",
+    ).exists()
 
 
 @pytest.mark.django_db
@@ -142,38 +188,64 @@ def test_rejects_missing_required_fields():
 
 
 @pytest.mark.django_db
-def test_rejects_when_currency_is_not_krw(mock_portone_find_payment_info, order_factory):
-    pending_order = order_factory()
+def test_rejects_when_currency_is_not_krw(
+    mock_portone_find_payment_info, mock_portone_req_cancel_payment, order_factory
+):
+    pending_order = order_factory(status="prepared")
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=pending_order, currency="USD")
-    response = _post_webhook(merchant_uid=str(pending_order.id), ip=WEBHOOK_WHITELISTED_IP)
+    response = _post_webhook(merchant_uid=pending_order.merchant_uid, ip=WEBHOOK_WHITELISTED_IP)
     assert response.status_code == HTTP_400_BAD_REQUEST
     assert response.json() == {
         "type": "validation_error",
-        "errors": [{"code": "forgery", "detail": Msgs.UNSUPPORTED_CURRENCY, "attr": "non_field_errors"}],
+        "errors": [
+            {
+                "code": "UNSUPPORTED_CURRENCY",
+                "detail": PortOneWebhookFailureCode.UNSUPPORTED_CURRENCY.label,
+                "attr": "non_field_errors",
+            }
+        ],
     }
     assert not PaymentHistory.objects.filter(order=pending_order).exists()
+    mock_portone_req_cancel_payment.assert_called_once_with(
+        imp_id="imp_test",
+        refund_request_price=pending_order.first_paid_price,
+        current_leftover_price=pending_order.first_paid_price,
+        reason=PortOneWebhookFailureCode.UNSUPPORTED_CURRENCY.label,
+    )
 
 
 @pytest.mark.django_db
 def test_rejects_duplicate_webhook_on_already_completed_order(mock_portone_find_payment_info, order_factory):
     completed_order = order_factory(status="completed")
+    completed_order.prepare_payment()
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=completed_order, imp_uid="imp_x")
-    response = _post_webhook(merchant_uid=str(completed_order.id), ip=WEBHOOK_WHITELISTED_IP)
+    response = _post_webhook(merchant_uid=completed_order.merchant_uid, ip=WEBHOOK_WHITELISTED_IP)
     assert response.status_code == HTTP_400_BAD_REQUEST
     assert response.json() == {
         "type": "validation_error",
         # `create()` 안에서 직접 raise 되므로 drf_standardized_errors 가 `attr=None` 으로 매핑.
-        "errors": [{"code": "illegal_transition", "detail": Msgs.ILLEGAL_STATUS_TRANSITION, "attr": None}],
+        "errors": [
+            {
+                "code": "ILLEGAL_STATUS_TRANSITION",
+                "detail": PortOneWebhookFailureCode.ILLEGAL_STATUS_TRANSITION.label,
+                "attr": None,
+            }
+        ],
     }
     # PaymentHistory 는 fixture 가 만든 1건만 유지.
     assert PaymentHistory.objects.filter(order=completed_order).count() == 1
+    assert PaymentWebhookEvent.objects.filter(
+        event_type=PaymentWebhookEvent.EventType.PAYMENT_REJECTED,
+        order=completed_order,
+        reason_code="ILLEGAL_STATUS_TRANSITION",
+    ).exists()
 
 
 @pytest.mark.django_db
 def test_rejects_when_portone_api_raises(mock_portone_find_payment_info, order_factory):
-    pending_order = order_factory()
+    pending_order = order_factory(status="prepared")
     mock_portone_find_payment_info.side_effect = PortOneException("PortOne 서버 통신 실패")
-    response = _post_webhook(merchant_uid=str(pending_order.id), ip=WEBHOOK_WHITELISTED_IP)
+    response = _post_webhook(merchant_uid=pending_order.merchant_uid, ip=WEBHOOK_WHITELISTED_IP)
     assert response.status_code == HTTP_400_BAD_REQUEST
     body = response.json()
     assert body["type"] == "validation_error"

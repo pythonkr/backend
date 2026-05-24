@@ -1,3 +1,7 @@
+from django.db import models
+from rest_framework.exceptions import ValidationError
+
+
 class CriticalErrorMessages:
     INVALID_LOGIC = "발생하면 안 되는 오류가 발생했습니다. PyCon 한국 준비 위원회에 문의해주세요.\n{}"
 
@@ -80,13 +84,19 @@ class OptionGroupNotModifiableErrorMessages:
     RESPONSE_NOT_MODIFIABLE = "해당 옵션은 수정할 수 없습니다. PyCon 한국 준비 위원회에 문의해주세요."
 
 
-class PortOneWebhookFailureMessages:
-    ORDER_NOT_FOUND = "주문 정보가 존재하지 않습니다."
-    PURCHASE_FAILED = "결제에 실패했습니다."
-    VIRTUAL_ACCOUNT_NOT_SUPPORTED = "가상계좌 결제는 지원하지 않습니다."
-    UNEXPECTED_RETRIEVED_ORDER_STATUS = "예상한 결제 상태가 아닙니다."
-    UNEXPECTED_RETRIEVED_ORDER_ID = "결제 ID가 일치하지 않습니다."
-    UNEXPECTED_PAID_PRICE = "결제 금액이 일치하지 않습니다."
-    UNSUPPORTED_CURRENCY = "지원하지 않는 통화입니다."
-    ILLEGAL_STATUS_TRANSITION = "이미 처리된 결제이거나 허용되지 않는 상태 전환입니다."
-    CANCELLED_NOT_SUPPORTED = "관리자 콘솔에서 결제 취소된 webhook 의 자동 처리는 아직 지원하지 않습니다."
+class PortOneWebhookFailureCode(models.TextChoices):
+    ORDER_NOT_FOUND = "ORDER_NOT_FOUND", "주문 정보가 존재하지 않습니다."
+    PURCHASE_FAILED = "PURCHASE_FAILED", "결제에 실패했습니다."
+    VIRTUAL_ACCOUNT_NOT_SUPPORTED = "VIRTUAL_ACCOUNT_NOT_SUPPORTED", "가상계좌 결제는 지원하지 않습니다."
+    UNEXPECTED_RETRIEVED_ORDER_STATUS = "UNEXPECTED_RETRIEVED_ORDER_STATUS", "예상한 결제 상태가 아닙니다."
+    UNEXPECTED_RETRIEVED_ORDER_ID = "UNEXPECTED_RETRIEVED_ORDER_ID", "결제 ID가 일치하지 않습니다."
+    UNEXPECTED_PAID_PRICE = "UNEXPECTED_PAID_PRICE", "결제 금액이 일치하지 않습니다."
+    UNSUPPORTED_CURRENCY = "UNSUPPORTED_CURRENCY", "지원하지 않는 통화입니다."
+    ILLEGAL_STATUS_TRANSITION = "ILLEGAL_STATUS_TRANSITION", "이미 처리된 결제이거나 허용되지 않는 상태 전환입니다."
+    CANCELLED_NOT_SUPPORTED = (
+        "CANCELLED_NOT_SUPPORTED",
+        "관리자 콘솔에서 결제 취소된 webhook 의 자동 처리는 아직 지원하지 않습니다.",
+    )
+
+    def as_error(self) -> ValidationError:
+        return ValidationError(detail=self.label, code=self.value)

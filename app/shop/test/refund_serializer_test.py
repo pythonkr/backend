@@ -27,7 +27,7 @@ def test_total_refund_happy_path_marks_all_oprs_refunded_and_records_payment_his
     serializer.refund()
 
     mock_portone_req_cancel_payment.assert_called_once_with(
-        merchant_id=str(completed_order.id),
+        imp_id=completed_order.latest_imp_id,
         refund_request_price=completed_order.first_paid_price,
         current_leftover_price=completed_order.first_paid_price,
     )
@@ -118,7 +118,11 @@ def test_total_refund_allows_expired_window_when_check_disabled(mock_portone_req
     )
     assert serializer.is_valid()
     serializer.refund()
-    mock_portone_req_cancel_payment.assert_called_once()
+    mock_portone_req_cancel_payment.assert_called_once_with(
+        imp_id=completed_order.latest_imp_id,
+        refund_request_price=completed_order.first_paid_price,
+        current_leftover_price=completed_order.first_paid_price,
+    )
 
 
 @pytest.mark.django_db
@@ -240,7 +244,7 @@ def test_partial_refund_calls_portone_with_correct_prices(mock_portone_req_cance
     serializer.refund()
 
     mock_portone_req_cancel_payment.assert_called_once_with(
-        merchant_id=str(completed_order.id),
+        imp_id=completed_order.latest_imp_id,
         refund_request_price=target_opr.price + target_opr.donation_price,
         current_leftover_price=expected_leftover,
     )

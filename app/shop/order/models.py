@@ -2,9 +2,17 @@ from __future__ import annotations
 
 import datetime
 import functools
+import json
 import typing
+from base64 import urlsafe_b64encode
+from collections.abc import Iterable
+from contextlib import suppress
+from hashlib import sha256
+from hmac import new as hmac_new
 from urllib.parse import urljoin
+from uuid import UUID, uuid4
 
+import shortuuid
 from core.const.shop_error_messages import NotRefundableErrorMessages
 from core.models import BaseAbstractModel, BaseAbstractModelQuerySet
 from core.scancode_mixin import ScanCodeMixin
@@ -17,9 +25,97 @@ from shop.payment_history.models import PURCHASED_STATUSES, PaymentHistory
 from simple_history.models import HistoricalRecords
 
 UserModel = get_user_model()
+PAYMENT_HASH_LENGTH = 16
 
 
-class OrderQuerySet(BaseAbstractModelQuerySet):
+class PaymentPreparationMixin:
+    id: UUID
+    prepared_cart_snapshot: dict[str, typing.Any] | None
+    prepared_cart_hash: str | None
+    first_paid_price: int
+    products: typing.Any
+
+    @property
+    def merchant_uid(self) -> str | None:
+        return f"{shortuuid.encode(self.id)}.{self.prepared_cart_hash}" if self.prepared_cart_hash else None
+
+    @property
+    def prepared_price(self) -> int | None:
+        return self.prepared_cart_snapshot["price"] if self.prepared_cart_snapshot else None
+
+    def get_current_cart_snapshot(self, *, attempt: dict[str, str] | None = None) -> dict[str, typing.Any]:
+        products = self.products.filter_active().prefetch_related(
+            models.Prefetch("options", queryset=OrderProductOptionRelation.objects.filter_active()),
+        )
+        return {
+            "attempt": attempt or {"id": str(uuid4()), "prepared_at": now_aware().isoformat()},
+            "price": self.first_paid_price,
+            "products": [
+                {
+                    "id": str(product_rel.id),
+                    "product": str(product_rel.product_id),
+                    "price": product_rel.price,
+                    "donation_price": product_rel.donation_price,
+                    "options": [
+                        {
+                            "id": str(option_rel.id),
+                            "product_option_group": str(option_rel.product_option_group_id),
+                            "product_option": (
+                                str(option_rel.product_option_id) if option_rel.product_option_id is not None else None
+                            ),
+                            "custom_response": option_rel.custom_response,
+                        }
+                        for option_rel in sorted(product_rel.options.all(), key=lambda option_rel: str(option_rel.id))
+                    ],
+                }
+                for product_rel in sorted(products, key=lambda rel: str(rel.id))
+            ],
+        }
+
+    @staticmethod
+    def _compute_cart_hash(snapshot: dict[str, typing.Any]) -> str:
+        digest = hmac_new(
+            settings.SECRET_KEY.encode(),
+            json.dumps(snapshot, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode(),
+            sha256,
+        ).digest()
+        return urlsafe_b64encode(digest[:12]).decode().rstrip("=")
+
+    def get_current_cart_hash(self, *, attempt: dict[str, str] | None = None) -> str:
+        return self._compute_cart_hash(self.get_current_cart_snapshot(attempt=attempt))
+
+    def prepare_payment(self) -> None:
+        snapshot = self.get_current_cart_snapshot()
+        self.prepared_cart_snapshot = snapshot
+        self.prepared_cart_hash = self._compute_cart_hash(snapshot)
+        self.save(update_fields={"prepared_cart_snapshot", "prepared_cart_hash"})
+
+    def matches_payment_preparation(self, merchant_uid: str, amount: int | float) -> bool:
+        if not self.prepared_cart_snapshot:
+            return False
+        try:
+            amount_int = int(amount)
+        except (TypeError, ValueError):
+            return False
+        attempt = self.prepared_cart_snapshot.get("attempt")
+        if not isinstance(attempt, dict):
+            return False
+        return (
+            self.merchant_uid == merchant_uid
+            and amount == self.prepared_price == amount_int
+            and self.prepared_cart_hash == self.get_current_cart_hash(attempt=attempt)
+        )
+
+
+class BaseCartQuerySet(BaseAbstractModelQuerySet):
+    def filter_by_merchant_uid(self, merchant_uid: object) -> models.QuerySet:
+        with suppress(AttributeError, TypeError, ValueError):
+            encoded_id, cart_hash = merchant_uid.split(".", 1)
+            return self.filter_active().filter(id=shortuuid.decode(encoded_id), prepared_cart_hash=cart_hash)
+        return self.none()
+
+
+class OrderQuerySet(BaseCartQuerySet):
     def filter_has_payment_histories(self) -> models.QuerySet[Order]:
         return self.filter_active().filter(models.Exists(PaymentHistory.objects.filter(order=models.OuterRef("id"))))
 
@@ -67,11 +163,13 @@ class OrderQuerySet(BaseAbstractModelQuerySet):
         return self.filter(created_at__gte=datetime.date.today() - datetime.timedelta(days=183))
 
 
-class Order(ScanCodeMixin, BaseAbstractModel):
+class Order(PaymentPreparationMixin, ScanCodeMixin, BaseAbstractModel):
     scancode_prefix = "order"
 
     user = models.ForeignKey(UserModel, on_delete=models.PROTECT)
     name = models.TextField()
+    prepared_cart_snapshot = models.JSONField(null=True, blank=True)
+    prepared_cart_hash = models.CharField(max_length=PAYMENT_HASH_LENGTH, null=True, blank=True)
 
     payment_histories: BaseManager[PaymentHistory]
     products: BaseManager[OrderProductRelation]
@@ -234,6 +332,37 @@ class OrderProductRelation(ScanCodeMixin, BaseAbstractModel):
     def __str__(self) -> str:  # pragma: no cover
         return f"[{self.order}] {self.product} ({self.get_status_display()})"
 
+    def save(  # type: ignore[override]
+        self,
+        *,
+        force_insert: bool = False,
+        force_update: bool = False,
+        using: str | None = None,
+        update_fields: Iterable[str] | None = None,
+        clear_parent_preparation: bool = True,
+    ) -> None:
+        super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
+        if clear_parent_preparation:
+            self._clear_parent_payment_preparation()
+
+    def delete(self, using: str | None = None) -> None:
+        self._clear_parent_payment_preparation()
+        super().delete(using=using)
+
+    def _clear_parent_payment_preparation(self) -> None:
+        if self.status != OrderProductRelation.OrderProductStatus.pending:
+            return
+
+        # `filter().update()` — snapshot 이 존재하는 row 만 매칭하는 단일 UPDATE.
+        # 대부분의 cart 편집은 snapshot 없는 상태라 fetch 없이 0 row UPDATE 로 끝남.
+        has_snapshot = models.Q(prepared_cart_snapshot__isnull=False) | models.Q(prepared_cart_hash__isnull=False)
+        cleared = {"prepared_cart_snapshot": None, "prepared_cart_hash": None}
+
+        if self.order_id:
+            Order.objects.filter(id=self.order_id).filter(has_snapshot).update(**cleared)
+            return
+        SingleProductCart.objects.filter(order_product_relation_id=self.id).filter(has_snapshot).update(**cleared)
+
     @property
     def not_refundable_reason(self) -> str | None:
         """
@@ -280,14 +409,43 @@ class OrderProductOptionRelation(BaseAbstractModel):
         name = self.product_option.name if self.product_option else self.custom_response
         return f"{self.product_option_group.name} - {name}"
 
+    def save(  # type: ignore[override]
+        self,
+        *,
+        force_insert: bool = False,
+        force_update: bool = False,
+        using: str | None = None,
+        update_fields: Iterable[str] | None = None,
+    ) -> None:
+        super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
+        self._clear_parent_payment_preparation()
 
-class SingleProductCart(BaseAbstractModel):
+    def delete(self, using: str | None = None) -> None:
+        self._clear_parent_payment_preparation()
+        super().delete(using=using)
+
+    def _clear_parent_payment_preparation(self) -> None:
+        order_product_relation = self.order_product_relation
+        if order_product_relation.status != OrderProductRelation.OrderProductStatus.pending:
+            return
+        order_product_relation._clear_parent_payment_preparation()
+
+
+class SingleProductCartQuerySet(BaseCartQuerySet):
+    pass
+
+
+class SingleProductCart(PaymentPreparationMixin, BaseAbstractModel):
     user = models.ForeignKey(UserModel, on_delete=models.PROTECT)
     order_product_relation = models.OneToOneField(
         OrderProductRelation,
         on_delete=models.PROTECT,
         related_name="single_product_cart",
     )
+    prepared_cart_snapshot = models.JSONField(null=True, blank=True)
+    prepared_cart_hash = models.CharField(max_length=PAYMENT_HASH_LENGTH, null=True, blank=True)
+
+    objects: SingleProductCartQuerySet = SingleProductCartQuerySet.as_manager()  # type: ignore[assignment, misc]
 
     history = HistoricalRecords()
 
@@ -298,9 +456,12 @@ class SingleProductCart(BaseAbstractModel):
             name=self.order_product_relation.product.name,
             name_ko=self.order_product_relation.product.name_ko,
             name_en=self.order_product_relation.product.name_en,
+            prepared_cart_snapshot=self.prepared_cart_snapshot,
+            prepared_cart_hash=self.prepared_cart_hash,
         )
         self.order_product_relation.order = order
-        self.order_product_relation.save()
+        # cart→Order 승격은 결제 직전 단계이므로 prepared snapshot 을 유지한 채 OPR 의 parent FK 만 갱신.
+        self.order_product_relation.save(clear_parent_preparation=False)
 
         CustomerInfo.objects.filter(single_product_cart=self).update(order=order, single_product_cart=None)
 
@@ -335,9 +496,9 @@ class SingleProductCart(BaseAbstractModel):
     def payment_histories(self) -> list[PaymentHistory]:
         return []
 
-    @functools.cached_property
-    def products(self) -> list[OrderProductRelation]:
-        return [self.order_product_relation]
+    @property
+    def products(self) -> models.QuerySet[OrderProductRelation]:
+        return OrderProductRelation.objects.filter(id=self.order_product_relation_id)
 
     @functools.cached_property
     def name(self) -> str:

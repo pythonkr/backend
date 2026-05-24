@@ -197,7 +197,7 @@ def single_product_cart(customer_user, product) -> SingleProductCart:
     return cart
 
 
-OrderStatus = Literal["empty", "cart", "completed", "refunded", "partial_refunded"]
+OrderStatus = Literal["empty", "cart", "prepared", "completed", "refunded", "partial_refunded"]
 
 
 @pytest.fixture
@@ -208,6 +208,7 @@ def order_factory(customer_user, product, donation_product):
         status:
             - ``"empty"``: OPR / CustomerInfo 없는 빈 Order (donation 인자 무시)
             - ``"cart"``: PH 없음, OPR pending
+            - ``"prepared"``: ``"cart"`` + 결제 준비 snapshot/hash 저장
             - ``"completed"``: PH completed + OPR paid
             - ``"refunded"``: 전액 환불 — PH refunded(price=0) 추가 + OPR refunded
             - ``"partial_refunded"``: 부분 환불 — PH partial_refunded 추가
@@ -231,6 +232,9 @@ def order_factory(customer_user, product, donation_product):
         CustomerInfo.objects.create(order=order, name="홍길동", phone="01012345678", email="customer@example.com")
 
         if status == "cart":
+            return order
+        if status == "prepared":
+            order.prepare_payment()
             return order
 
         # status >= 'completed' — OPR paid + PH completed.
@@ -304,6 +308,7 @@ def mock_portone_req_cancel_payment():
     환불 호출은 반환값을 호출자가 사용하지 않으므로 (호출 인자/횟수만 검증), 명시 세팅 없이도 None 반환 허용.
     """
     with patch.object(portone_client, "req_cancel_payment") as mocked:
+        mocked.return_value = None
         yield mocked
 
 

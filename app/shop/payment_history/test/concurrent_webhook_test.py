@@ -23,6 +23,8 @@ def test_concurrent_webhooks_for_same_cart_create_exactly_one_payment_history(
 ):
     cart_id = single_product_cart.id
     expected_price = single_product_cart.first_paid_price
+    single_product_cart.prepare_payment()
+    merchant_uid = single_product_cart.merchant_uid
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=single_product_cart)
 
     barrier = threading.Barrier(2)
@@ -32,10 +34,10 @@ def test_concurrent_webhooks_for_same_cart_create_exactly_one_payment_history(
     def worker() -> None:
         try:
             barrier.wait()
-            serializer = PortOneV1WebhookRequestSerializer(data=make_webhook_payload(merchant_uid=str(cart_id)))
+            serializer = PortOneV1WebhookRequestSerializer(data=make_webhook_payload(merchant_uid=merchant_uid))
             # 두 스레드 모두 is_valid 단계에서는 cart 가 보임 (cached_property 캐시) — race 는 create() 진입 시점.
             if serializer.is_valid():
-                serializer.create(serializer.validated_data)
+                serializer.save()
                 outcome: tuple[str, object] = ("ok", None)
             else:
                 outcome = ("validation_error", serializer.errors)

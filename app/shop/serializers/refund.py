@@ -94,7 +94,7 @@ class OrderTotalRefundSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(reason)
 
         portone_client.req_cancel_payment(
-            merchant_id=str(order.id),
+            imp_id=order.latest_imp_id,
             refund_request_price=self.expected_refund_price,
             current_leftover_price=self.expected_refund_price,
         )
@@ -170,7 +170,7 @@ class OrderProductRefundSerializer(serializers.ModelSerializer):
         after_leftover_price = before_leftover_price - refund_request_price
 
         portone_client.req_cancel_payment(
-            merchant_id=str(order.id),
+            imp_id=order.latest_imp_id,
             refund_request_price=refund_request_price,
             current_leftover_price=before_leftover_price,
         )

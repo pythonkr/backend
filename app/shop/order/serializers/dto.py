@@ -99,6 +99,7 @@ class OrderDto(serializers.ModelSerializer):
             "created_at",
             "not_fully_refundable_reason",
             "customer_info",
+            "merchant_uid",
         )
         model = Order
 
@@ -124,5 +125,6 @@ class SingleProductCartDto(serializers.ModelSerializer):
             "current_status",
             "created_at",
             "customer_info",
+            "merchant_uid",
         )
         model = SingleProductCart
