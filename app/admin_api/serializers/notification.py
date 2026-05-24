@@ -142,7 +142,15 @@ class _NotiTemplateAdminSerializerBase(BaseAbstractSerializer, JsonSchemaSeriali
     template_variables = serializers.SerializerMethodField()
 
     class Meta:
-        fields = COMMON_ADMIN_FIELDS + ("code", "title", "description", "data", "sent_from", "template_variables")
+        fields = COMMON_ADMIN_FIELDS + (
+            "code",
+            "title",
+            "description",
+            "data",
+            "editor_source",
+            "sent_from",
+            "template_variables",
+        )
 
     def get_template_variables(self, obj: NotificationTemplateBase) -> list[str]:
         return sorted(obj.template_variables)

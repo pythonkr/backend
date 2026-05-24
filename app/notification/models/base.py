@@ -58,6 +58,10 @@ class NotificationTemplateBase(BaseAbstractModel):
     description = models.TextField(null=True, blank=True)
     data = models.TextField()
 
+    # 에디터(예: @react-email/renderer)가 다루는 source-of-truth.
+    # 발송 경로는 data만 사용하며, 에디터가 저장 시점에 컴파일된 결과를 data에 기록.
+    editor_source = models.TextField(null=True, blank=True)
+
     # Email: from address, SMS: 발신번호, Kakao: sender key
     sent_from = models.CharField(max_length=256)
 
