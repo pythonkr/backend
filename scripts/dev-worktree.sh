@@ -55,13 +55,25 @@ cmd_add() {
   local wt_dir="${2:-$REPO_ROOT/../backend-$slug}"
 
   load_db_env "$SRC_ENV"
-  local new_db="${DB_NAME}__${slug}"
-  [ "${#new_db}" -le 63 ] || die "db name '$new_db' exceeds PG 63-char limit"
+  # PG identifier limit is 63 chars; pytest-django auto-creates test_<dbname>,
+  # so reserve 5 more for that prefix.
+  local db_prefix="${DB_NAME}__"
+  local max_db_slug=$((63 - 5 - ${#db_prefix}))
+  [ "$max_db_slug" -ge 10 ] \
+    || die "DATABASE_NAME '$DB_NAME' leaves <10 chars for a worktree slug"
+  local db_slug="$slug"
+  if [ "${#db_slug}" -gt "$max_db_slug" ]; then
+    local hash; hash=$(printf '%s' "$branch" | shasum | cut -c1-6)
+    db_slug="${db_slug:0:$((max_db_slug - 7))}_${hash}"
+  fi
+  local new_db="${db_prefix}${db_slug}"
   [ "$new_db" != "$DB_NAME" ] || die "computed db name collides with source"
 
   echo "→ worktree dir : $wt_dir"
   echo "→ branch       : $branch"
   echo "→ database     : $new_db"
+  [ "$db_slug" = "$slug" ] \
+    || echo "  (slug truncated for PG 63-char limit: $slug → $db_slug)"
 
   if [ -d "$wt_dir" ]; then
     echo "  worktree dir already exists — skipping git worktree add"
@@ -119,7 +131,10 @@ cmd_remove() {
 
   pg dropdb --if-exists "$DB_NAME"
   pg dropdb --if-exists "test_$DB_NAME"
-  git -C "$REPO_ROOT" worktree remove "$wt_dir"
+  # --force: envfile/.env.local is tracked but rewritten with a per-worktree
+  # DATABASE_NAME on add, and the tree may contain .venv/__pycache__/coverage
+  # artifacts. The y/N prompt above is the safety gate.
+  git -C "$REPO_ROOT" worktree remove --force "$wt_dir"
 }
 
 main() {
