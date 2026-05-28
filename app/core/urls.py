@@ -15,14 +15,13 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
+from core.route.dev.set_cookie import dev_set_cookie
+from core.route.health_check import livez, readyz
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path, re_path, resolvers
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
-
-from app.core.route.dev.set_cookie import dev_set_cookie
-from app.core.route.health_check import livez, readyz
 
 # type: ignore[assignment]
 v1_apis: list[resolvers.URLPattern | resolvers.URLResolver] = [
