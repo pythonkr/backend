@@ -15,12 +15,14 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
-import core.health_check
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path, re_path, resolvers
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+
+from app.core.route.dev.set_cookie import dev_set_cookie
+from app.core.route.health_check import livez, readyz
 
 # type: ignore[assignment]
 v1_apis: list[resolvers.URLPattern | resolvers.URLResolver] = [
@@ -39,8 +41,8 @@ v1_apis: list[resolvers.URLPattern | resolvers.URLResolver] = [
 
 urlpatterns = [
     # Health Check
-    path("readyz/", core.health_check.readyz),
-    path("livez/", core.health_check.livez),
+    path("readyz/", readyz),
+    path("livez/", livez),
     # Admin
     path("admin/", admin.site.urls),
     # Django-Allauth
@@ -58,4 +60,5 @@ urlpatterns = [
 if settings.DEBUG:
     urlpatterns += [
         path("api/schema/v1/swagger/", SpectacularSwaggerView.as_view(url_name="v1-schema"), name="swagger-v1-ui"),
+        path("dev/set-cookie/", dev_set_cookie, name="dev-set-cookie"),
     ]
