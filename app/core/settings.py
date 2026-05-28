@@ -453,8 +453,8 @@ PORTONE = types.SimpleNamespace(
 
 # NHN KCP Settings
 NHN_KCP = types.SimpleNamespace(
-    pg_api_cert=env.str("NHN_KCP_PG_API_CERT", default=""),
-    pg_api_private_key=env.str("NHN_KCP_PG_API_PRIVATE_KEY", default=""),
+    pg_api_cert=env.str("NHN_KCP_PG_API_CERT", default="").replace("\\n", "\n"),
+    pg_api_private_key=env.str("NHN_KCP_PG_API_PRIVATE_KEY", default="").replace("\\n", "\n"),
     pg_api_password=env.str("NHN_KCP_PG_API_PASSWORD", default=""),
 )
 
