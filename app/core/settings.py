@@ -156,6 +156,10 @@ MIDDLEWARE = [
     # Django-Allauth
     "allauth.account.middleware.AccountMiddleware",
     "core.middleware.append_session_token_for_local_callback.AppendSessionTokenForLocalCallbackMiddleware",
+    # session-check endpoint 응답에 항상 Set-Cookie sessionid 부착 (rolling expiry + localhost cookie 동기화).
+    # 반드시 SessionMiddleware보다 뒤에 둘 것 — response phase가 역순이라 이 미들웨어가 먼저 실행되어
+    # session.modified=True 플래그를 세팅한 뒤 SessionMiddleware의 response 처리가 그걸 보고 cookie를 쓴다.
+    "core.middleware.force_session_save_on_session_check.ForceSessionSaveOnSessionCheckMiddleware",
     # Thread Local Middleware
     "core.middleware.thread_middleware.ThreadLocalMiddleware",
     # Request Response Logger
