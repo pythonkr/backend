@@ -76,6 +76,7 @@ class PortOneClient:
         method: RequestMethodType,
         route: str,
         json: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
         timeout: TimeoutTypes = DEFAULT_TIMEOUT,
         action_desc: str = "UNDEFINED_ACTION",
@@ -84,6 +85,7 @@ class PortOneClient:
             method=method,
             url=route,
             json=json,
+            params=params,
             headers={"Authorization": self._access_token, "Content-Type": "application/json"} | (headers or {}),
             timeout=timeout,
         )
@@ -143,7 +145,11 @@ class PortOneClient:
                 raise PortOneExceptionGroup(f"결제금액 사전 등록 또는 수정에 실패했습니다. {merchant_id=}", [e1, e2])
 
     def find_payment_info(self, imp_uid: str) -> dict:
-        if payment_data := self._request(method="GET", route=f"/payments/{imp_uid}").get("response"):
+        if payment_data := self._request(
+            method="GET",
+            route=f"/payments/{imp_uid}",
+            params={"include_sandbox": "true"},
+        ).get("response"):
             return payment_data
 
         raise PortOneException(f"결제 정보를 찾을 수 없습니다. {imp_uid=}")
