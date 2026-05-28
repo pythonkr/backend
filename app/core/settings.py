@@ -155,6 +155,7 @@ MIDDLEWARE = [
     "simple_history.middleware.HistoryRequestMiddleware",
     # Django-Allauth
     "allauth.account.middleware.AccountMiddleware",
+    "core.middleware.append_session_token_for_local_callback.AppendSessionTokenForLocalCallbackMiddleware",
     # Thread Local Middleware
     "core.middleware.thread_middleware.ThreadLocalMiddleware",
     # Request Response Logger
@@ -349,7 +350,7 @@ COOKIE_TRUSTED_ORIGIN_SET = {
 SESSION_COOKIE_NAME = f"{COOKIE_PREFIX}sessionid"
 SESSION_COOKIE_SAMESITE = COOKIE_SAMESITE
 SESSION_COOKIE_SECURE = COOKIE_SECURE
-SESSION_COOKIE_HTTPONLY = COOKIE_HTTPONLY
+SESSION_COOKIE_HTTPONLY = env.bool("SESSION_COOKIE_HTTPONLY", default=COOKIE_HTTPONLY)
 SESSION_COOKIE_DOMAIN = COOKIE_DOMAIN
 
 CSRF_COOKIE_NAME = f"{COOKIE_PREFIX}csrftoken"
