@@ -27,21 +27,23 @@ class SocialAccountLoggingAdapter(DefaultSocialAccountAdapter):
     def on_authentication_error(
         self,
         request: HttpRequest,
-        provider: Provider,
+        provider: Provider | str,
         error: SocialAuthError | None = None,
         exception: Exception | None = None,
         extra_context: dict | None = None,
     ) -> None:
+        # headless RedirectToProviderView 는 form 검증 실패 시 provider 를 Provider 인스턴스가 아닌 raw string id 로 넘김.
+        if isinstance(provider, str):
+            provider_data = {"id": provider, "name": None, "slug": None}
+        else:
+            provider_data = {"id": provider.id, "name": provider.name, "slug": provider.get_slug()}
+
         request_logger.info(
             msg="allauth_authentication_error",
             extra={
                 "data": {
                     "request": get_request_log_data(request),
-                    "provider": {
-                        "id": provider.id,
-                        "name": provider.name,
-                        "slug": provider.get_slug(),
-                    },
+                    "provider": provider_data,
                     "error": error,
                     "exception": "".join(traceback.format_exception(exception)),
                     "extra_context_keys": extra_context.keys() if extra_context else None,
