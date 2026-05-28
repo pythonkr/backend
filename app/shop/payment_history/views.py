@@ -13,6 +13,12 @@ from shop.payment_history.serializers import PortOneV1WebhookRequestSerializer, 
 logger = logging.getLogger(__name__)
 
 
+def _get_client_ip(request: request.Request) -> str | None:
+    if xff := request.META.get("HTTP_X_FORWARDED_FOR", ""):
+        return xff.split(",")[0].strip()
+    return request.META.get("HTTP_X_REAL_IP") or request.META.get("REMOTE_ADDR")
+
+
 class PaymentHistoryViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
     queryset = PaymentHistory.objects.all()
     serializer_class = PortOneV1WebhookRequestSerializer
@@ -30,7 +36,7 @@ class PaymentHistoryViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
     def create(  # type: ignore[override]
         self, request: request.Request, *args: typing.Any, **kwargs: typing.Any
     ) -> response.Response:
-        if not (settings.DEBUG or request.META.get("REMOTE_ADDR") in settings.PORTONE.ip_list):
+        if not (settings.DEBUG or _get_client_ip(request) in settings.PORTONE.ip_list):
             raise exceptions.PermissionDenied()
 
         logger.info(f"PortOne Webhook Request: {request.data}")

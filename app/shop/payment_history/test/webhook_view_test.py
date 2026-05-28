@@ -13,12 +13,27 @@ from shop.test.helpers import make_portone_payment_info, make_webhook_payload
 _NON_WHITELISTED_IP = "5.6.7.8"
 
 
-def _post_webhook(*, merchant_uid: str, ip: str, status: str = "paid", imp_uid: str = "imp_x") -> Response:
+def _post_webhook(
+    *,
+    merchant_uid: str,
+    ip: str | None = None,
+    xff: str | None = None,
+    x_real_ip: str | None = None,
+    status: str = "paid",
+    imp_uid: str = "imp_x",
+) -> Response:
+    meta: dict[str, str] = {}
+    if ip is not None:
+        meta["REMOTE_ADDR"] = ip
+    if xff is not None:
+        meta["HTTP_X_FORWARDED_FOR"] = xff
+    if x_real_ip is not None:
+        meta["HTTP_X_REAL_IP"] = x_real_ip
     return APIClient().post(
         path=reverse("v1:payment_histories-list"),
         data=make_webhook_payload(merchant_uid=merchant_uid, status=status, imp_uid=imp_uid),
         format="json",
-        REMOTE_ADDR=ip,
+        **meta,
     )
 
 
@@ -64,11 +79,26 @@ def test_ip_allowlist_respects_debug_bypass(
         assert not PaymentHistory.objects.filter(order=pending_order).exists()
 
 
+@pytest.mark.parametrize(
+    "post_kwargs",
+    [
+        # 테스트 환경에서 REMOTE_ADDR 만 직접 지정 (프록시 없음).
+        {"ip": WEBHOOK_WHITELISTED_IP},
+        # nginx 뒤 운영: REMOTE_ADDR 은 nginx 컨테이너 IP, 실제 IP 는 X-Forwarded-For 만.
+        {"ip": _NON_WHITELISTED_IP, "xff": WEBHOOK_WHITELISTED_IP},
+        # 프록시가 X-Real-IP 만 채우는 변형.
+        {"ip": _NON_WHITELISTED_IP, "x_real_ip": WEBHOOK_WHITELISTED_IP},
+        # nginx 가 두 헤더 모두 채우는 일반적인 구성.
+        {"ip": _NON_WHITELISTED_IP, "xff": WEBHOOK_WHITELISTED_IP, "x_real_ip": WEBHOOK_WHITELISTED_IP},
+        # 다중 hop X-Forwarded-For — leftmost(원 클라이언트) 가 화이트리스트면 통과.
+        {"ip": _NON_WHITELISTED_IP, "xff": f"{WEBHOOK_WHITELISTED_IP}, 10.0.0.1, 10.0.0.2"},
+    ],
+)
 @pytest.mark.django_db
-def test_accepts_request_from_whitelisted_ip(mock_portone_find_payment_info, order_factory):
+def test_accepts_request_from_whitelisted_ip(post_kwargs, mock_portone_find_payment_info, order_factory):
     pending_order = order_factory(status="prepared")
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=pending_order)
-    response = _post_webhook(merchant_uid=pending_order.merchant_uid, ip=WEBHOOK_WHITELISTED_IP)
+    response = _post_webhook(merchant_uid=pending_order.merchant_uid, **post_kwargs)
     assert response.status_code == HTTP_200_OK
     assert response.json() == {"status": "success", "message": "일반 결제 성공"}
     assert PaymentHistory.objects.filter(
