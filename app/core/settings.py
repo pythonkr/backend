@@ -261,9 +261,8 @@ SOCIALACCOUNT_PROVIDERS = {
 }
 
 HEADLESS_ONLY = True
-HEADLESS_FRONTEND_URLS = {
-    "socialaccount_login_error": env("HEADLESS_SOCIALACCOUNT_LOGIN_ERROR_URL", default=""),
-}
+HEADLESS_ADAPTER = "core.authn.allauth_adapter.PyConKRHeadlessAdapter"
+HEADLESS_FRONTEND_URLS: dict[str, str] = {}
 
 
 # Internationalization

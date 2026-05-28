@@ -1,12 +1,15 @@
 import logging
 import traceback
-from typing import Literal
+from typing import Any, Literal
+from urllib.parse import urlparse
 
 from allauth.account.adapter import DefaultAccountAdapter
+from allauth.headless.adapter import DefaultHeadlessAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from allauth.socialaccount.models import SocialLogin
 from allauth.socialaccount.providers.base import Provider
 from core.logger.util.django_helper import get_request_log_data
+from django.conf import settings
 from django.http.request import HttpRequest
 
 # allauth.socialaccount.providers.base.AuthError 상수의 가능한 값 (UNKNOWN / CANCELLED / DENIED)
@@ -50,3 +53,33 @@ class SocialAccountLoggingAdapter(DefaultSocialAccountAdapter):
                 },
             },
         )
+
+
+def _to_origin(value: str) -> str | None:
+    if not value:
+        return None
+    parsed = urlparse(value if "://" in value else f"https://{value}")
+    if not parsed.netloc:
+        return None
+    return f"{parsed.scheme or 'https'}://{parsed.netloc}"
+
+
+def _allowed_frontend_origins() -> tuple[str, ...]:
+    return tuple(o for url in settings.FRONTEND_DOMAIN.main if (o := _to_origin(url)))
+
+
+class PyConKRHeadlessAdapter(DefaultHeadlessAdapter):
+    def get_frontend_url(self, urlname: str, **kwargs: Any) -> str | None:
+        if urlname != "socialaccount_login_error":
+            return super().get_frontend_url(urlname, **kwargs)
+
+        allowed = _allowed_frontend_origins()
+        origin: str | None = None
+        for header in ("HTTP_X_FRONTEND_DOMAIN", "HTTP_ORIGIN", "HTTP_REFERER"):
+            if (candidate := _to_origin(self.request.META.get(header))) and candidate in allowed:
+                origin = candidate
+                break
+
+        if not origin:
+            origin = next(iter(allowed), "")
+        return f"{origin}/account/sign-in" if origin else None
