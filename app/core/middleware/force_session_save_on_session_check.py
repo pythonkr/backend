@@ -1,4 +1,5 @@
 from core.middleware.type import GetResponseCallable
+from django.conf import settings
 from django.http.request import HttpRequest
 from django.http.response import HttpResponseBase
 from django.utils.deprecation import MiddlewareMixin
@@ -16,9 +17,13 @@ class ForceSessionSaveOnSessionCheckMiddleware(MiddlewareMixin):
         if request.path not in _TARGET_PATHS:
             return response
 
-        session = getattr(request, "session", None)
-        if session is None or not session.session_key:
+        if not (session := getattr(request, "session", None)):
             return response
+
+        if not session.session_key:
+            if not settings.DEBUG:
+                return response
+            session["__pyconkr_bootstrap__"] = True
 
         session.modified = True
         return response
