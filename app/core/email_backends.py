@@ -79,6 +79,8 @@ class GmailOAuth2Backend(EmailBackend):
         if not self.username:
             raise SMTPAuthenticationError(530, b"EMAIL_HOST_USER must be set to the Gmail address.")
 
+        # STARTTLS 이후 smtplib가 ehlo_resp를 비워두기 때문에, docmd("AUTH") 전에 EHLO를 재전송해야 503을 피할 수 있다.
+        self.connection.ehlo_or_helo_if_needed()
         auth_payload = f"user={self.username}\x01auth=Bearer {self._access_token}\x01\x01"
         auth_payload = f"XOAUTH2 {b64encode(auth_payload.encode()).decode()}"
         code, response = self.connection.docmd("AUTH", auth_payload)
