@@ -249,6 +249,10 @@ django_extensions/*
 static
 static/*
 
+# Django media (self-hosted FileSystemStorage uploads)
+media
+media/*
+
 # Jupyter Notebook
 .ipynb_checkpoints
 .ipynb_checkpoints/*
