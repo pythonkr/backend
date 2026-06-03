@@ -21,7 +21,7 @@ class CategoryGroupAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer,
 
         class Meta:
             model = Category
-            fields = COMMON_ADMIN_FIELDS + ("group", "name", "priority")
+            fields = COMMON_ADMIN_FIELDS + ("group", "name", "priority", "is_ticket")
             # group 은 NestedFieldSpec.parent_fk_name 으로 부모 인스턴스에서 주입되므로 입력 시 생략 가능.
             # validators=[] — auto UniqueTogetherValidator(group, name) 가 group 누락 시 required 로 막음.
             # DB unique constraint(uq__cat__grp_nm) 가 여전히 enforce.

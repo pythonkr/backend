@@ -37,6 +37,8 @@ class Category(BaseAbstractModel):
     name = models.CharField(max_length=100)
     priority = models.IntegerField(default=0)
 
+    is_ticket = models.BooleanField(default=False)
+
     history = HistoricalRecords()
 
     class Meta:

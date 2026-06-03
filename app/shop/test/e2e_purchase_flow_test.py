@@ -330,7 +330,7 @@ def test_cart_get_reflects_added_products_for_e2e_setup(customer_client, custome
                 "status": OrderProductRelation.OrderProductStatus.pending,
                 "price": 25000,
                 "donation_price": 0,
-                # 카테고리 "티셔츠" — "티켓" 미포함 → scancode_url None.
+                # 카테고리 "티셔츠" — is_ticket=False → scancode_url None.
                 "not_refundable_reason": NotRefundableErrorMessages.ORDER_NOT_REFUNDABLE,
                 "scancode_url": None,
             },

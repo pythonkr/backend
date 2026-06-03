@@ -114,7 +114,7 @@ def staff_client(staff_user) -> APIClient:
 def product(db) -> Product:
     # category_group / category 는 Product 의 FK 체인을 만들기 위한 중간 단계 — 직접 참조하는 테스트가 생기는 시점에 별도 fixture 로 분리.
     category_group = CategoryGroup.objects.create(name="기본")
-    category = Category.objects.create(group=category_group, name="티켓")
+    category = Category.objects.create(group=category_group, name="티켓", is_ticket=True)
     return Product.objects.create(
         category=category,
         name="파이콘 한국 2026 티켓",

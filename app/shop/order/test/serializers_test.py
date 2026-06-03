@@ -47,6 +47,27 @@ def test_order_product_relation_dto_scancode_url_none_for_non_ticket_category(cu
 
 @override_settings(BACKEND_DOMAIN=_TEST_BACKEND_DOMAIN)
 @pytest.mark.django_db
+def test_order_product_relation_dto_scancode_url_follows_is_ticket_not_name(customer_user):
+    # 노출 여부는 Category.is_ticket 으로만 결정된다 — 이름의 "티켓" 포함 여부와 무관.
+    group = CategoryGroup.objects.create(name="기타")
+    named_ticket_flag_off = Category.objects.create(group=group, name="옛 티켓", is_ticket=False)
+    unnamed_flag_on = Category.objects.create(group=group, name="입장권", is_ticket=True)
+
+    flag_off_product = Product.objects.create(category=named_ticket_flag_off, name="옛 티켓", price=5000)
+    flag_on_product = Product.objects.create(category=unnamed_flag_on, name="입장권", price=5000)
+    order = Order.objects.create(user=customer_user, name="주문")
+    flag_off_opr = OrderProductRelation.objects.create(order=order, product=flag_off_product, price=5000)
+    flag_on_opr = OrderProductRelation.objects.create(order=order, product=flag_on_product, price=5000)
+
+    assert OrderProductRelationDto(instance=flag_off_opr).data["scancode_url"] is None
+    assert (
+        OrderProductRelationDto(instance=flag_on_opr).data["scancode_url"]
+        == f"{_TEST_BACKEND_DOMAIN}{flag_on_opr.scancode_path}"
+    )
+
+
+@override_settings(BACKEND_DOMAIN=_TEST_BACKEND_DOMAIN)
+@pytest.mark.django_db
 def test_order_dto_includes_scancode_url_and_nested_payload(product, order_factory):
     pending_order = order_factory()
     opr = pending_order.products.first()

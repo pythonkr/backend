@@ -65,7 +65,7 @@ class OrderProductRelationDto(serializers.ModelSerializer):
         model = OrderProductRelation
 
     def get_scancode_url(self, obj: OrderProductRelation) -> str | None:
-        if "티켓" not in obj.product.category.name:
+        if not obj.product.category.is_ticket:
             return None
 
         return urljoin(settings.BACKEND_DOMAIN, obj.scancode_path)
