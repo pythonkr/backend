@@ -182,6 +182,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "django.template.context_processors.request",
             ],
+            "builtins": ["core.templatetags.data_uri"],
         },
     },
 ]
