@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ko-kr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>문서 검증 · PyCon Korea</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Pretendard, "Apple SD Gothic Neo", "Noto Sans CJK KR", sans-serif;
+      background: #f2f3f5; color: #1a1a1a; padding: 1.5rem; word-break: keep-all;
+    }
+    .card {
+      max-width: 480px; margin: 2rem auto; background: #fff; border-radius: 1rem;
+      box-shadow: 0 3px 12px rgba(0,0,0,.1); overflow: hidden;
+    }
+    .banner { padding: 1.5rem; text-align: center; color: #fff; }
+    .banner .mark { font-size: 2.4rem; line-height: 1; }
+    .notice { padding: 1rem 1.25rem; font-size: .8rem; color: #888; }
+
+    .valid .banner { background: #1f9d55; }
+    .valid table { width: 100%; border-collapse: collapse; }
+    .valid th, .valid td { padding: .85rem 1.25rem; text-align: left; font-size: .95rem; border-bottom: 1px solid #eee; }
+    .valid th { width: 35%; color: #666; font-weight: 600; }
+
+    .error .card { text-align: center; }
+    .error .banner { background: #b23b3b; }
+    .error .notice { padding: 1.25rem; font-size: .9rem; color: #555; line-height: 1.5; }
+  </style>
+</head>
+<body class="{% block page_class %}{% endblock %}">
+  <div class="card">
+    <div class="banner">
+      <div class="mark">{% block mark %}{% endblock %}</div>
+    </div>
+    {% block body %}{% endblock %}
+    <div class="notice">{% block notice %}{% endblock %}</div>
+  </div>
+</body>
+</html>

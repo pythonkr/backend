@@ -1,0 +1,12 @@
+{% extends "document_verify_base.html" %}
+{% block page_class %}valid{% endblock %}
+{% block mark %}&#10003;{% endblock %}
+{% block body %}
+    <table>
+      <tr><th>문서번호</th><td>{{ document_number }}</td></tr>
+      {% for label, value in fields.items %}<tr><th>{{ label }}</th><td>{{ value }}</td></tr>{% endfor %}
+      <tr><th>발급일시</th><td>{{ issued_at }}</td></tr>
+    </table>
+{% endblock %}
+{% block notice %}본 결과는 발급 기관 서버의 현재 상태를 기준으로 합니다.
+      화면 캡처본 또는 임의로 편집된 파일은 공식 증빙으로 인정되지 않습니다.{% endblock %}

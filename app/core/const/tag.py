@@ -10,6 +10,8 @@ class OpenAPITag:
     SHOP_ORDER_REFUND = "Shop > 환불"
     SHOP_PORTONE_WEBHOOK = "Shop > PortOne 결제 Webhook"
 
+    DOCUMENT = "Document > 발급/검증"
+
     ADMIN_ACCOUNT = "Admin > Sign-In & Sign-Out"
     ADMIN_USER = "Admin > User"
     ADMIN_ALLAUTH = "Admin > Allauth"
