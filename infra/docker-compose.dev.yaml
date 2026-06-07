@@ -8,10 +8,10 @@ volumes:
 
 services:
   pyconkr-backend-postgres:
-    image: postgres:17.2
+    image: postgres:18
     restart: unless-stopped
     volumes:
-      - postgres-data:/var/lib/postgresql/data:rw
+      - postgres-data:/var/lib/postgresql:rw
 
     environment:
       TZ: Asia/Seoul
