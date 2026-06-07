@@ -82,3 +82,13 @@ def test_build_verify_display_maps_frozen_context():
 def test_is_document_downloadable_by_only_order_owner(used_ticket_opr, other_user):
     assert used_ticket_opr.is_document_downloadable_by(used_ticket_opr.order.user) is True
     assert used_ticket_opr.is_document_downloadable_by(other_user) is False
+
+
+@pytest.mark.django_db
+def test_issue_document_rejected_for_invalid_opr(used_ticket_opr):
+    # event 연결을 끊으면 is_document_valid=False → 모델 경계 가드가 직접 발급(view 우회)을 막는다.
+    category = used_ticket_opr.product.category
+    category.event = None
+    category.save(update_fields=["event"])
+    with pytest.raises(OrderProductRelation.NotIssuableError):
+        used_ticket_opr.get_or_issue_document()

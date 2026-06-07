@@ -12,6 +12,9 @@ if TYPE_CHECKING:
 class IssuableMixin:
     ISSUED_DOCUMENT_TYPE: ClassVar[str]
 
+    class NotIssuableError(Exception):
+        """is_document_valid() 조건을 충족하지 않는 issuable 에 대한 발급 시도 — 도메인 경계 가드."""
+
     class DocumentStatus(models.TextChoices):
         not_issuable = "not_issuable", "발급 불가"  # is_document_valid 조건 미충족
         issuable = "issuable", "발급 가능"  # 조건 충족, 아직 미발급
@@ -38,6 +41,8 @@ class IssuableMixin:
     def issue_document(self) -> IssuedDocument:
         from document.models import DocumentTemplate, IssuedDocument
 
+        if not self.is_document_valid():
+            raise self.NotIssuableError(f"{type(self).__name__} 은 현재 발급 가능 상태가 아닙니다.")
         return IssuedDocument.objects.create(
             issuable=self,
             template=DocumentTemplate.objects.get_active(self.ISSUED_DOCUMENT_TYPE),

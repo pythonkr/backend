@@ -11,6 +11,7 @@ from core.serializer.nested_model_serializer import (
 )
 from core.util.timespan import TimeSpan
 from document.models import IssuedDocument
+from event.models import Event
 from file.models import PublicFile
 from rest_framework import serializers
 from shop.order.models import OrderProductRelation
@@ -20,6 +21,9 @@ from shop.product.models import Category, CategoryGroup, Option, OptionGroup, Pr
 class CategoryGroupAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, NestedFieldModelSerializer):
     class CategoryAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, NestedModelSerializer):
         id = serializers.UUIDField(required=False, help_text="기존 Category 수정 시 PK 전달, 새로 추가 시 생략")
+        event = serializers.PrimaryKeyRelatedField(
+            queryset=Event.objects.filter_active(), allow_null=True, required=False
+        )
 
         class Meta:
             model = Category

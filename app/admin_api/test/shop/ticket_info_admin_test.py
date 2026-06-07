@@ -1,5 +1,6 @@
 import pytest
 from admin_api.test.helpers import CategoryGroupsAdminApi, OrdersAdminApi
+from model_bakery import baker
 from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST
 from shop.conftest import VALID_TICKET_INFO
 from shop.order.models import TicketInfo
@@ -70,3 +71,29 @@ def test_admin_order_exposes_ticket_info(api_client, ticket_opr):
     assert response.status_code == HTTP_200_OK
     product_dto = next(p for p in response.json()["products"] if p["id"] == str(ticket_opr.id))
     assert product_dto["ticket_info"] == {**VALID_TICKET_INFO, "contribution_message": "응원"}
+
+
+# ==================== category.event — soft-deleted Event 연결 거부 ====================
+
+
+@pytest.mark.django_db
+def test_admin_category_rejects_soft_deleted_event(api_client, ticket_product):
+    deleted_event = baker.make("event.Event", name="삭제된 행사")
+    deleted_event.delete()  # soft-delete → filter_active() 에서 제외되어야 함.
+    category = ticket_product.category
+    response = CategoryGroupsAdminApi(http_client=api_client).update(
+        category.group_id,
+        {
+            "categories": [
+                {
+                    "id": str(category.id),
+                    "name": category.name,
+                    "priority": category.priority,
+                    "event": str(deleted_event.id),
+                }
+            ]
+        },
+    )
+    assert response.status_code == HTTP_400_BAD_REQUEST
+    category.refresh_from_db()
+    assert category.event_id is None
