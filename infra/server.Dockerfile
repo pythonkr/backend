@@ -23,9 +23,13 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 COPY --chown=nobody:nobody pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     apt-get update \
-    && apt-get install -y --no-install-recommends gcc curl libpq-dev \
+    && apt-get install -y --no-install-recommends gcc curl libpq-dev libpango-1.0-0 libpangoft2-1.0-0 fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/* \
     && uv sync --no-default-groups --frozen
+
+# The nobody user has no writable fontconfig cache dir, which triggers "Fontconfig error: No writable cache directories" on every WeasyPrint render.
+# Give it a writable cache path.
+ENV XDG_CACHE_HOME=/tmp
 
 ARG GIT_HASH
 ARG RELEASE_VERSION=unknown

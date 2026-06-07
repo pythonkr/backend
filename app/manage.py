@@ -7,6 +7,12 @@ import sys
 
 def main() -> None:
     """Run administrative tasks."""
+    # WeasyPrint dlopen()s Homebrew's pango/cairo at import time; macOS needs them on dyld's path.
+    if sys.platform == "darwin":
+        fallback = os.environ.get("DYLD_FALLBACK_LIBRARY_PATH", "")
+        if "/opt/homebrew/lib" not in fallback.split(":"):
+            os.environ["DYLD_FALLBACK_LIBRARY_PATH"] = ":".join(filter(None, ["/opt/homebrew/lib", fallback]))
+
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings")
     try:
         from django.core.management import execute_from_command_line
