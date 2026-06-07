@@ -131,6 +131,7 @@ INSTALLED_APPS = [
     "shop.product",
     "shop.payment_history",
     "notification",
+    "document",
     "admin_api",
     "internal_api",
     "participant_portal_api",
@@ -484,6 +485,11 @@ NHN_KCP = types.SimpleNamespace(
 SHOP = types.SimpleNamespace(
     order_scancode_salt=env("ORDER_SCANCODE_SALT", default="local_order_scancode_salt"),
     refund_authorizer_secret_key=env("REFUND_AUTHORIZER_SECRET_KEY", default="local_refund_authorizer_secret_key"),
+)
+
+# Document Settings
+DOCUMENT = types.SimpleNamespace(
+    verify_salt=env("DOCUMENT_VERIFY_SALT", default="local_document_verify_salt"),
 )
 
 # Notification Settings

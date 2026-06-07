@@ -36,6 +36,7 @@ v1_apis: list[resolvers.URLPattern | resolvers.URLResolver] = [
     path("shop/products/", include("shop.product.urls")),
     path("shop/payment-histories/", include("shop.payment_history.urls")),
     path("shop/patron/", include("shop.patron")),
+    path("document/", include("document.urls")),
 ]
 
 urlpatterns = [
