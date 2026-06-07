@@ -1,4 +1,5 @@
 import typing
+from urllib.parse import urljoin
 
 from core.const.regex import UUID_V4_PATTERN
 from core.const.shop_error_messages import CartNotOrderableErrorMessages
@@ -7,13 +8,15 @@ from core.external_apis.portone.client import PortOneException, portone_client
 from core.openapi.schemas import build_html_responses
 from django.conf import settings
 from django.db import models, transaction
+from django.urls import reverse
+from document.models import DocumentTemplate, IssuedDocument
 from drf_spectacular.openapi import OpenApiParameter, OpenApiTypes
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from drf_standardized_errors.openapi_serializers import ErrorResponse403Serializer, ValidationErrorResponseSerializer
 from rest_framework import mixins, renderers, request, response, serializers, status, viewsets
 from rest_framework.decorators import action
 from shop.order.models import CustomerInfo, Order, OrderProductRelation, OrderQuerySet
-from shop.order.serializers.dto import OrderDto, SingleProductCartDto
+from shop.order.serializers.dto import CertificateIssueResponseDto, OrderDto, SingleProductCartDto
 from shop.order.serializers.validator import (
     OptionProductOptionCustomResponseModifyRequestSerializer,
     OrderProductUpdateSerializer,
@@ -261,24 +264,28 @@ class OrderViewSet(
 class OrderProductViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
     lookup_url_kwarg = "order_product_rel_id"
     serializer_class = OrderProductUpdateSerializer
-    http_method_names = ["patch", "delete", "head", "options"]
+    http_method_names = ["post", "patch", "delete", "head", "options"]
 
     def get_queryset(self) -> models.QuerySet[OrderProductRelation]:
         if not isinstance(self.request.user, UserExt):
             return OrderProductRelation.objects.none()
 
-        return (
-            OrderProductRelation.objects.filter_active()
-            .filter(
-                models.Exists(PaymentHistory.objects.filter_active().filter(order=models.OuterRef("order"))),
-                order_id=self.kwargs["order_id"],
-                order__deleted_at__isnull=True,
-                order__user=self.request.user,
-                single_product_cart__isnull=True,
-                status=OrderProductRelation.OrderProductStatus.paid,
-            )
-            .distinct()
+        owned = OrderProductRelation.objects.filter_active().filter(
+            order_id=self.kwargs["order_id"],
+            order__deleted_at__isnull=True,
+            order__user=self.request.user,
+            single_product_cart__isnull=True,
         )
+        if self.action == "issue_certificate":
+            return owned.filter(
+                status=OrderProductRelation.OrderProductStatus.used,
+                product__category__is_ticket=True,
+                product__category__event__isnull=False,
+            ).select_related("product__category__event", "order__customer_info", "ticket_info")
+        return owned.filter(
+            models.Exists(PaymentHistory.objects.filter_active().filter(order=models.OuterRef("order"))),
+            status=OrderProductRelation.OrderProductStatus.paid,
+        ).distinct()
 
     def update(
         self, request: request.Request, *args: tuple[typing.Any], **kwargs: dict[str, typing.Any]
@@ -339,3 +346,35 @@ class OrderProductViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, vie
         serializer.is_valid(raise_exception=True)
         serializer.refund()
         return response.Response(status=status.HTTP_204_NO_CONTENT)
+
+    @extend_schema(
+        summary="주문 상품의 참가확인서 발급 및 다운로드 URL 반환",
+        description="발급 가능한(used + 티켓 + 행사) 상품이면 확인서를 발급(이미 있으면 재사용)하고 다운로드 URL 을 반환한다.",
+        tags=[OpenAPITag.SHOP_ORDER],
+        parameters=[
+            OpenApiParameter(
+                name="order_product_rel_id",
+                type=OpenApiTypes.UUID,
+                location=OpenApiParameter.PATH,
+                required=True,
+            )
+        ],
+        request=None,
+        responses={status.HTTP_200_OK: CertificateIssueResponseDto},
+    )
+    @action(detail=True, methods=["POST"], url_path="certificate", url_name="certificate")
+    def issue_certificate(
+        self, request: request.Request, *args: tuple[typing.Any], **kwargs: dict[str, typing.Any]
+    ) -> response.Response:
+        order_product_rel: OrderProductRelation = self.get_object()
+        try:
+            document = order_product_rel.get_or_issue_document()
+        except IssuedDocument.RevokedError:
+            return response.Response(data={"detail": "취소된 문서입니다."}, status=status.HTTP_410_GONE)
+        except DocumentTemplate.DoesNotExist:
+            return response.Response(
+                data={"detail": "문서 템플릿이 설정되지 않았습니다."}, status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+
+        download_url = urljoin(settings.BACKEND_DOMAIN, reverse("v1:document-download", kwargs={"pk": document.pk}))
+        return response.Response(data={"download_url": download_url})

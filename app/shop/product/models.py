@@ -38,6 +38,7 @@ class Category(BaseAbstractModel):
     priority = models.IntegerField(default=0)
 
     is_ticket = models.BooleanField(default=False)
+    event = models.ForeignKey("event.Event", on_delete=models.PROTECT, null=True, blank=True)
 
     history = HistoricalRecords()
 

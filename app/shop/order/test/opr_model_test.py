@@ -58,3 +58,27 @@ def test_opr_not_refundable_reason_returns_none_for_refundable_opr(order_factory
     completed_order = order_factory(status="completed")
     opr = completed_order.products.first()
     assert opr.not_refundable_reason is None
+
+
+def test_build_verify_display_maps_frozen_context():
+    assert OrderProductRelation().build_verify_display(
+        {
+            "event_name": "PyCon Korea",
+            "event_date": "2026년 6월 6일(토)",
+            "participant_name": "홍길동",
+            "organization": "PSK",
+            "email": "hong@example.com",
+        }
+    ) == {
+        "참가자명": "홍길동",
+        "소속": "PSK",
+        "이메일": "hong@example.com",
+        "행사명": "PyCon Korea",
+        "행사 일시": "2026년 6월 6일(토)",
+    }
+
+
+@pytest.mark.django_db
+def test_is_document_downloadable_by_only_order_owner(used_ticket_opr, other_user):
+    assert used_ticket_opr.is_document_downloadable_by(used_ticket_opr.order.user) is True
+    assert used_ticket_opr.is_document_downloadable_by(other_user) is False

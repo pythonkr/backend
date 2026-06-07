@@ -64,6 +64,11 @@ class OrderProductRelationDto(serializers.ModelSerializer):
     options = OrderProductOptionRelationDto(many=True)
     scancode_url = serializers.SerializerMethodField()
     ticket_info = TicketInfoDto(allow_null=True)
+    certificate_status = serializers.ChoiceField(
+        source="document_status",
+        choices=OrderProductRelation.DocumentStatus.choices,
+        read_only=True,
+    )
 
     class Meta:
         fields = (
@@ -76,6 +81,7 @@ class OrderProductRelationDto(serializers.ModelSerializer):
             "not_refundable_reason",
             "scancode_url",
             "ticket_info",
+            "certificate_status",
         )
         model = OrderProductRelation
 
@@ -84,6 +90,10 @@ class OrderProductRelationDto(serializers.ModelSerializer):
             return None
 
         return urljoin(settings.BACKEND_DOMAIN, obj.scancode_path)
+
+
+class CertificateIssueResponseDto(serializers.Serializer):
+    download_url = serializers.URLField(help_text="발급(또는 기존 발급본)된 참가확인서 PDF 다운로드 URL")
 
 
 class CustomerInfoDto(serializers.ModelSerializer):

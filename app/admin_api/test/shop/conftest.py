@@ -1,4 +1,5 @@
 import pytest
+from document.test.conftest import certificate_issuable_opr, certificate_template, issued_document  # noqa: F401
 from notification.models import EmailNotificationTemplate
 from shop.conftest import (  # noqa: F401
     anon_client,
@@ -22,6 +23,7 @@ from shop.conftest import (  # noqa: F401
     tag,
     ticket_opr,
     ticket_product,
+    used_ticket_opr,
 )
 
 

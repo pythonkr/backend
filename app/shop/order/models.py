@@ -17,10 +17,14 @@ from core.const.shop_error_messages import NotRefundableErrorMessages
 from core.models import BaseAbstractModel, BaseAbstractModelQuerySet
 from core.scancode_mixin import ScanCodeMixin
 from core.util.dateutil import now_aware
+from core.util.strutil import format_korean_date_period
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.fields import GenericRelation
 from django.db import models
 from django.db.models.manager import BaseManager
+from document.issuable import IssuableMixin
+from document.models import DocumentType, IssuedDocument
 from shop.payment_history.models import PURCHASED_STATUSES, PaymentHistory
 from simple_history.models import HistoricalRecords
 
@@ -141,7 +145,7 @@ class OrderQuerySet(BaseCartQuerySet):
                 "products",
                 queryset=(
                     OrderProductRelation.objects.filter_active()
-                    .select_related("product", "ticket_info")
+                    .select_related("product__category", "ticket_info")
                     .prefetch_related(
                         models.Prefetch(
                             "options",
@@ -150,6 +154,7 @@ class OrderQuerySet(BaseCartQuerySet):
                                 "product_option",
                             ),
                         ),
+                        models.Prefetch("issued_documents", queryset=IssuedDocument.objects.filter_active()),
                     )
                 ),
                 to_attr="_active_products",
@@ -325,7 +330,8 @@ class Order(PaymentPreparationMixin, ScanCodeMixin, BaseAbstractModel):
         return None
 
 
-class OrderProductRelation(ScanCodeMixin, BaseAbstractModel):
+class OrderProductRelation(ScanCodeMixin, IssuableMixin, BaseAbstractModel):
+    ISSUED_DOCUMENT_TYPE = DocumentType.confirmation_of_participation
     scancode_prefix = "opr"
 
     class OrderProductStatus(models.TextChoices):
@@ -346,6 +352,11 @@ class OrderProductRelation(ScanCodeMixin, BaseAbstractModel):
     single_product_cart: SingleProductCart | None
     options: BaseManager[OrderProductOptionRelation]
 
+    issued_documents = GenericRelation(
+        "document.IssuedDocument",
+        content_type_field="issuable_content_type",
+        object_id_field="issuable_object_id",
+    )
     history = HistoricalRecords()
 
     def __str__(self) -> str:  # pragma: no cover
@@ -411,6 +422,40 @@ class OrderProductRelation(ScanCodeMixin, BaseAbstractModel):
             return NotRefundableErrorMessages.PRODUCT_PRICE_IS_ZERO
 
         return None
+
+    def build_document_context(self) -> dict:
+        try:
+            participant = self.ticket_info
+        except TicketInfo.DoesNotExist:
+            participant = getattr(self.order or self.single_product_cart, "customer_info", None)
+        event = self.product.category.event
+        return {
+            "event_name": event.name_ko,
+            "event_name_en": event.name_en,
+            "event_date": format_korean_date_period(event.event_start_at, event.event_end_at),
+            "participant_name": (participant.name if participant else "") or "",
+            "organization": (participant.organization if participant else "") or "",
+            "email": (participant.email if participant else "") or "",
+        }
+
+    def build_verify_display(self, context: dict) -> dict[str, str]:
+        return {
+            "참가자명": context.get("participant_name", ""),
+            "소속": context.get("organization", ""),
+            "이메일": context.get("email", ""),
+            "행사명": context.get("event_name", ""),
+            "행사 일시": context.get("event_date", ""),
+        }
+
+    def is_document_downloadable_by(self, user) -> bool:
+        return self.order is not None and self.order.user_id == user.id and self.is_document_valid()
+
+    def is_document_valid(self) -> bool:
+        return (
+            self.status == OrderProductRelation.OrderProductStatus.used
+            and self.product.category.is_ticket
+            and self.product.category.event_id is not None
+        )
 
 
 class OrderProductOptionRelation(BaseAbstractModel):

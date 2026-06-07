@@ -1,9 +1,9 @@
 import pytest
+from admin_api.test.helpers import CategoryGroupsAdminApi, OrdersAdminApi
 from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST
 from shop.conftest import VALID_TICKET_INFO
 from shop.order.models import TicketInfo
 from shop.product.models import Category
-from shop.test.helpers import CategoryGroupsAdminApi, OrdersAdminApi
 
 
 def _patch_is_ticket(api_client, category: Category, *, is_ticket: bool):

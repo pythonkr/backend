@@ -29,6 +29,7 @@ def test_order_product_relation_dto_scancode_url_for_ticket_category(ticket_prod
         "not_refundable_reason": opr.not_refundable_reason,
         "scancode_url": f"{_TEST_BACKEND_DOMAIN}{opr.scancode_path}",
         "ticket_info": None,
+        "certificate_status": "not_issuable",  # status != used
     }
 
 
@@ -49,6 +50,7 @@ def test_order_product_relation_dto_scancode_url_none_for_non_ticket_category(cu
         "not_refundable_reason": opr.not_refundable_reason,
         "scancode_url": None,
         "ticket_info": None,
+        "certificate_status": "not_issuable",
     }
 
 
@@ -99,6 +101,7 @@ def test_order_dto_includes_scancode_url_and_nested_payload(ticket_product, orde
                 "not_refundable_reason": opr.not_refundable_reason,
                 "scancode_url": f"{_TEST_BACKEND_DOMAIN}{opr.scancode_path}",
                 "ticket_info": None,
+                "certificate_status": "not_issuable",
             },
         ],
         "scancode_url": f"{_TEST_BACKEND_DOMAIN}{pending_order.scancode_path}",

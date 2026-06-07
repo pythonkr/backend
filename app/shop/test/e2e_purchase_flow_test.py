@@ -3,6 +3,7 @@
 from unittest.mock import call
 
 import pytest
+from admin_api.test.helpers import CategoryGroupsAdminApi, OptionGroupsAdminApi, ProductsAdminApi
 from core.const.shop_error_messages import NotRefundableErrorMessages
 from django.test import override_settings
 from rest_framework.fields import DateTimeField
@@ -13,12 +14,9 @@ from shop.payment_history.models import PaymentHistoryStatus
 from shop.test.helpers import (
     CartApi,
     CartProductsApi,
-    CategoryGroupsAdminApi,
-    OptionGroupsAdminApi,
     OrderProductsApi,
     OrdersApi,
     PortOneWebhookApi,
-    ProductsAdminApi,
     make_portone_payment_info,
 )
 
@@ -330,10 +328,11 @@ def test_cart_get_reflects_added_products_for_e2e_setup(customer_client, custome
                 "status": OrderProductRelation.OrderProductStatus.pending,
                 "price": 25000,
                 "donation_price": 0,
-                # 카테고리 "티셔츠" — is_ticket=False → scancode_url None.
+                # 카테고리 "티셔츠" — is_ticket=False → scancode_url None, certificate 발급 불가.
                 "not_refundable_reason": NotRefundableErrorMessages.ORDER_NOT_REFUNDABLE,
                 "scancode_url": None,
                 "ticket_info": None,
+                "certificate_status": "not_issuable",
             },
         ],
         "scancode_url": f"{_TEST_BACKEND_DOMAIN}{cart.scancode_path}",

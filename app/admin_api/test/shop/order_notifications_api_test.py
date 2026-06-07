@@ -1,11 +1,11 @@
 from urllib.parse import urljoin
 
 import pytest
+from admin_api.test.helpers import OrderNotificationsAdminApi
 from django.conf import settings
 from notification.models.email import EmailNotificationHistory, EmailNotificationTemplate
 from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_400_BAD_REQUEST, HTTP_403_FORBIDDEN
 from shop.order.models import CustomerInfo
-from shop.test.helpers import OrderNotificationsAdminApi
 
 
 @pytest.mark.django_db

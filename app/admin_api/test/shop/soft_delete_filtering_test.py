@@ -5,12 +5,13 @@ from io import BytesIO
 
 import pandas
 import pytest
+from admin_api.test.helpers import OrdersAdminApi
 from freezegun import freeze_time
 from rest_framework.status import HTTP_200_OK, HTTP_404_NOT_FOUND
 from shop.order.models import Order, OrderProductRelation
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
 from shop.product.models import Product
-from shop.test.helpers import OrdersAdminApi, valid_refund_totp
+from shop.test.helpers import valid_refund_totp
 
 
 @pytest.mark.django_db

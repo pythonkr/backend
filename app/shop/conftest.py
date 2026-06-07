@@ -7,6 +7,7 @@ from unittest.mock import DEFAULT, patch
 import pytest
 from core.external_apis.portone.client import portone_client
 from django.test import override_settings
+from model_bakery import baker
 from rest_framework.test import APIClient
 from shop.order.models import CustomerInfo, Order, OrderProductOptionRelation, OrderProductRelation, SingleProductCart
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
@@ -312,6 +313,18 @@ def ticket_opr(order_factory) -> OrderProductRelation:
 @pytest.fixture
 def non_ticket_opr(order_factory) -> OrderProductRelation:
     return order_factory(status="completed", is_ticket=False).products.get()
+
+
+@pytest.fixture
+def used_ticket_opr(order_factory) -> OrderProductRelation:
+    """status=used + is_ticket + category.event 연결된 OPR — 티켓 사용 완료(참가확인서 발급 가능) 상태."""
+    order = order_factory(status="completed")
+    order.products.update(status=OrderProductRelation.OrderProductStatus.used)
+    opr = order.products.select_related("order__customer_info", "product__category").get()
+    category = opr.product.category
+    category.event = baker.make("event.Event", name="파이콘 한국 2026")
+    category.save(update_fields=["event"])
+    return opr
 
 
 @pytest.fixture

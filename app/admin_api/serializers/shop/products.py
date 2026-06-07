@@ -10,6 +10,7 @@ from core.serializer.nested_model_serializer import (
     NestedModelSerializer,
 )
 from core.util.timespan import TimeSpan
+from document.models import IssuedDocument
 from file.models import PublicFile
 from rest_framework import serializers
 from shop.order.models import OrderProductRelation
@@ -22,7 +23,7 @@ class CategoryGroupAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer,
 
         class Meta:
             model = Category
-            fields = COMMON_ADMIN_FIELDS + ("group", "name", "priority", "is_ticket")
+            fields = COMMON_ADMIN_FIELDS + ("group", "name", "priority", "is_ticket", "event")
             # group 은 NestedFieldSpec.parent_fk_name 으로 부모 인스턴스에서 주입되므로 입력 시 생략 가능.
             # validators=[] — auto UniqueTogetherValidator(group, name) 가 group 누락 시 required 로 막음.
             # DB unique constraint(uq__cat__grp_nm) 가 여전히 enforce.
@@ -31,10 +32,12 @@ class CategoryGroupAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer,
             list_serializer_class = InstanceListSerializer
 
         def validate(self, attrs: dict) -> dict:
-            if self.instance is not None:
-                new_is_ticket = attrs.get("is_ticket", self.instance.is_ticket)
-                if new_is_ticket != self.instance.is_ticket:
-                    self._validate_is_ticket_change(new_is_ticket=new_is_ticket)
+            if self.instance is None:
+                return attrs
+            new_is_ticket = attrs.get("is_ticket", self.instance.is_ticket)
+            if new_is_ticket != self.instance.is_ticket:
+                self._validate_is_ticket_change(new_is_ticket=new_is_ticket)
+            self._validate_issued_certificate_prerequisites(attrs)
             return attrs
 
         def _validate_is_ticket_change(self, *, new_is_ticket: bool) -> None:
@@ -49,6 +52,21 @@ class CategoryGroupAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer,
             elif purchased.filter(ticket_info__isnull=False).exists():
                 msg = "참가자 정보가 수집된 티켓 구매 건이 있어 티켓 설정을 해제할 수 없습니다."
                 raise serializers.ValidationError({"is_ticket": msg})
+
+        def _validate_issued_certificate_prerequisites(self, attrs: dict) -> None:
+            errors = {}
+            if not attrs.get("is_ticket", self.instance.is_ticket):
+                errors["is_ticket"] = "이미 발급된 참가확인서가 있어 is_ticket 을 해제할 수 없습니다."
+            if not attrs.get("event", self.instance.event_id):
+                errors["event"] = "이미 발급된 참가확인서가 있어 event 연결을 해제할 수 없습니다."
+            if not errors:
+                return
+            if (
+                OrderProductRelation.objects.filter_active()
+                .filter(product__category=self.instance, issued_documents__in=IssuedDocument.objects.filter_active())
+                .exists()
+            ):
+                raise serializers.ValidationError(errors)
 
     categories = CategoryAdminSerializer(many=True, required=False, source="category_set")
     category_count = serializers.IntegerField(read_only=True)

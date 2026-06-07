@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 import pytest
+from admin_api.test.helpers import CategoryGroupsAdminApi, OptionGroupsAdminApi, ProductsAdminApi, TagsAdminApi
 from rest_framework.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -10,7 +11,6 @@ from rest_framework.status import (
 )
 from shop.conftest import FAR_FUTURE, FAR_PAST
 from shop.product.models import Category, CategoryGroup, OptionGroup, Product, Tag
-from shop.test.helpers import CategoryGroupsAdminApi, OptionGroupsAdminApi, ProductsAdminApi, TagsAdminApi
 
 
 @pytest.mark.parametrize("api_cls", [CategoryGroupsAdminApi, TagsAdminApi, ProductsAdminApi])
@@ -37,6 +37,65 @@ def test_admin_category_group_create_rejects_duplicate_name(api_client):
     response = CategoryGroupsAdminApi(http_client=api_client).create({"name": "굿즈", "priority": 0})
     # UniqueConstraint → DRF 가 400 으로 변환.
     assert response.status_code == HTTP_400_BAD_REQUEST
+
+
+def _patch_category(api_client, category: Category, **fields) -> object:
+    # 카테고리는 CategoryGroup nested 로만 수정 — 그룹에 카테고리 1개뿐이므로 단건 전송이 전체 목록.
+    return CategoryGroupsAdminApi(http_client=api_client).update(
+        category.group_id, {"categories": [{"id": str(category.id), "name": category.name, **fields}]}
+    )
+
+
+@pytest.mark.django_db
+def test_admin_category_is_ticket_unset_blocked_when_certificate_issued(api_client, issued_document):
+    category = issued_document.issuable.product.category
+    response = CategoryGroupsAdminApi(http_client=api_client).update(
+        category.group_id,
+        {"categories": [{"id": str(category.id), "is_ticket": False}]},
+    )
+    assert response.status_code == HTTP_400_BAD_REQUEST
+    category.refresh_from_db()
+    assert category.is_ticket is True
+
+
+@pytest.mark.django_db
+def test_admin_category_event_unset_blocked_when_certificate_issued(api_client, issued_document):
+    category = issued_document.issuable.product.category
+    response = CategoryGroupsAdminApi(http_client=api_client).update(
+        category.group_id,
+        {"categories": [{"id": str(category.id), "event": None}]},
+    )
+    assert response.status_code == HTTP_400_BAD_REQUEST
+    category.refresh_from_db()
+    assert category.event_id is not None
+
+
+@pytest.mark.django_db
+def test_admin_category_update_allowed_when_certificate_issued_without_unset(api_client, issued_document):
+    # 발급 이력이 있어도 is_ticket/event 를 유지(미해제)하면 수정 허용.
+    category = issued_document.issuable.product.category
+    response = CategoryGroupsAdminApi(http_client=api_client).update(
+        category.group_id,
+        {"categories": [{"id": str(category.id), "name": "이름만 변경"}]},
+    )
+    assert response.status_code == HTTP_200_OK
+    category.refresh_from_db()
+    assert category.is_ticket is True
+    assert category.event_id is not None
+
+
+@pytest.mark.django_db
+def test_admin_category_is_ticket_unset_allowed_without_certificate(api_client):
+    # 발급 이력이 없는 카테고리는 자유롭게 is_ticket 해제 가능.
+    group = CategoryGroup.objects.create(name="굿즈")
+    category = Category.objects.create(group=group, name="셔츠", is_ticket=True)
+    response = CategoryGroupsAdminApi(http_client=api_client).update(
+        group.id,
+        {"categories": [{"id": str(category.id), "is_ticket": False}]},
+    )
+    assert response.status_code == HTTP_200_OK
+    category.refresh_from_db()
+    assert category.is_ticket is False
 
 
 @pytest.mark.django_db

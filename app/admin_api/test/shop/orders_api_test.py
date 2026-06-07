@@ -4,6 +4,7 @@ from io import BytesIO
 import pandas
 import pytest
 from admin_api.serializers.shop.orders import OrderAdminSerializer
+from admin_api.test.helpers import OrdersAdminApi
 from admin_api.views.shop.orders import OrderAdminViewSet
 from freezegun import freeze_time
 from rest_framework.fields import DateTimeField
@@ -17,7 +18,7 @@ from rest_framework.status import (
 )
 from shop.order.models import CustomerInfo, Order, OrderProductRelation
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
-from shop.test.helpers import OrdersAdminApi, valid_refund_totp
+from shop.test.helpers import valid_refund_totp
 
 
 @pytest.mark.parametrize("client_fixture", ["anon_client", "customer_client"])
