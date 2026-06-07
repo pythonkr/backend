@@ -9,7 +9,7 @@ from shop.test.helpers import make_serializer_context
 
 @pytest.mark.django_db
 def test_tag_rejects_when_soldout(customer_user, tag, other_user):
-    # tag.stock=1, 다른 user 가 해당 tag 의 product 를 1건 paid → leftover=0.
+    # tag.stock=1, 다른 user 가 해당 tag 의 ticket_product 를 1건 paid → leftover=0.
     tag.stock = 1
     tag.save()
     OrderProductRelation.objects.create(
@@ -29,13 +29,13 @@ def test_tag_rejects_when_soldout(customer_user, tag, other_user):
 
 
 @pytest.mark.django_db
-def test_tag_rejects_when_user_max_quantity_exceeded(customer_user, tag, product):
+def test_tag_rejects_when_user_max_quantity_exceeded(customer_user, tag, ticket_product):
     tag.max_quantity_per_user = 1
     tag.save()
     OrderProductRelation.objects.create(
         order=Order.objects.create(user=customer_user, name="purchased"),
-        product=product,
-        price=product.price,
+        product=ticket_product,
+        price=ticket_product.price,
         status=OrderProductRelation.OrderProductStatus.paid,
     )
 
@@ -84,21 +84,23 @@ def test_tag_rejects_when_user_not_signed_in(tag):
     ],
 )
 @pytest.mark.django_db
-def test_tag_max_quantity_per_user_exceeded_per_mode(customer_user, tag, product, mode, purchased_count, cart_count):
+def test_tag_max_quantity_per_user_exceeded_per_mode(
+    customer_user, tag, ticket_product, mode, purchased_count, cart_count
+):
     tag.max_quantity_per_user = 1
     tag.save()
     for _ in range(purchased_count):
         OrderProductRelation.objects.create(
             order=Order.objects.create(user=customer_user, name="paid"),
-            product=product,
-            price=product.price,
+            product=ticket_product,
+            price=ticket_product.price,
             status=OrderProductRelation.OrderProductStatus.paid,
         )
     for _ in range(cart_count):
         OrderProductRelation.objects.create(
             order=Order.objects.create(user=customer_user, name="cart"),
-            product=product,
-            price=product.price,
+            product=ticket_product,
+            price=ticket_product.price,
         )
 
     serializer = TagOrderableCheckSerializer(

@@ -9,7 +9,7 @@ from shop.test.helpers import make_serializer_context
 
 @pytest.mark.django_db
 def test_cart_rejects_other_users_cart_via_queryset_boundary(other_user, order_factory):
-    pending_order = order_factory()
+    pending_order = order_factory(is_ticket=False)
     serializer = CartOrderableCheckSerializer(
         data={"cart": str(pending_order.id)}, context=make_serializer_context(other_user)
     )
@@ -20,7 +20,7 @@ def test_cart_rejects_other_users_cart_via_queryset_boundary(other_user, order_f
 
 @pytest.mark.django_db
 def test_cart_rejects_already_paid_cart_via_queryset_boundary(customer_user, order_factory):
-    completed_order = order_factory(status="completed")
+    completed_order = order_factory(status="completed", is_ticket=False)
     serializer = CartOrderableCheckSerializer(
         data={"cart": str(completed_order.id)}, context=make_serializer_context(customer_user)
     )
@@ -30,7 +30,7 @@ def test_cart_rejects_already_paid_cart_via_queryset_boundary(customer_user, ord
 
 @pytest.mark.django_db
 def test_cart_rejects_when_contains_paid_product(customer_user, order_factory):
-    pending_order = order_factory()
+    pending_order = order_factory(is_ticket=False)
     pending_order.products.update(status=OrderProductRelation.OrderProductStatus.paid)
     serializer = CartOrderableCheckSerializer(
         data={"cart": str(pending_order.id)}, context=make_serializer_context(customer_user)
@@ -42,7 +42,7 @@ def test_cart_rejects_when_contains_paid_product(customer_user, order_factory):
 
 
 @pytest.mark.django_db
-def test_cart_rejects_when_price_is_zero_or_negative(customer_user, product):
+def test_cart_rejects_when_price_is_zero_or_negative(customer_user):
     # OPR 없이 빈 cart — first_paid_price=0 → CART_PRICE_TOO_LOW.
     empty_cart = Order.objects.create(user=customer_user, name="empty")
     serializer = CartOrderableCheckSerializer(
@@ -55,10 +55,10 @@ def test_cart_rejects_when_price_is_zero_or_negative(customer_user, product):
 
 
 @pytest.mark.django_db
-def test_cart_rejects_when_price_too_high(customer_user, product):
+def test_cart_rejects_when_price_too_high(customer_user, non_ticket_product):
     # OPR 가격 1_000_000 이상 → CART_PRICE_TOO_HIGH.
     cart = Order.objects.create(user=customer_user, name="expensive")
-    OrderProductRelation.objects.create(order=cart, product=product, price=1_000_000)
+    OrderProductRelation.objects.create(order=cart, product=non_ticket_product, price=1_000_000)
     serializer = CartOrderableCheckSerializer(
         data={"cart": str(cart.id)}, context=make_serializer_context(customer_user)
     )
@@ -70,7 +70,7 @@ def test_cart_rejects_when_price_too_high(customer_user, product):
 
 @pytest.mark.django_db
 def test_cart_passes_for_valid_pending_cart(customer_user, order_factory):
-    pending_order = order_factory()
+    pending_order = order_factory(is_ticket=False)
     serializer = CartOrderableCheckSerializer(
         data={"cart": str(pending_order.id)}, context=make_serializer_context(customer_user)
     )
@@ -79,7 +79,7 @@ def test_cart_passes_for_valid_pending_cart(customer_user, order_factory):
 
 @pytest.mark.django_db
 def test_cart_validate_defensively_rejects_paid_cart(customer_user, order_factory):
-    completed_order = order_factory(status="completed")
+    completed_order = order_factory(status="completed", is_ticket=False)
     serializer = CartOrderableCheckSerializer(context=make_serializer_context(customer_user))
     with pytest.raises(ValidationError) as exc_info:
         serializer.validate({"cart": completed_order})

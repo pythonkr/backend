@@ -89,7 +89,7 @@ def test_total_refund_rejects_when_any_opr_is_used(mock_portone_req_cancel_payme
     mock_portone_req_cancel_payment.assert_not_called()
 
 
-# _FAR_FUTURE (2099-12-31) 이후로 시간 이동 — product.refundable_ends_at 가 지남.
+# _FAR_FUTURE (2099-12-31) 이후로 시간 이동 — ticket_product.refundable_ends_at 가 지남.
 @freeze_time(datetime(2100, 1, 1, tzinfo=timezone.utc))
 @pytest.mark.django_db
 def test_total_refund_rejects_when_refund_window_expired(mock_portone_req_cancel_payment, order_factory):

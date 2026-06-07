@@ -104,12 +104,12 @@ def test_order_product_relation_save_invalidates_single_product_cart_preparation
 
 @pytest.mark.django_db
 def test_order_product_option_relation_create_update_delete_invalidates_pending_order_preparation(
-    product, order_factory
+    ticket_product, order_factory
 ):
     order = order_factory(status="prepared")
     opr = order.products.first()
     option_group = OptionGroup.objects.create(
-        product=product,
+        product=ticket_product,
         name="요청사항",
         is_custom_response=True,
         custom_response_pattern=r"^.*$",

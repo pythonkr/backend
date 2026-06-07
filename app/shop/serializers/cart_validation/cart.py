@@ -50,4 +50,8 @@ class CartOrderableCheckSerializer(serializers.Serializer):
         if cart.first_paid_price >= 1_000_000:
             raise serializers.ValidationError(CartNotOrderableErrorMessages.CART_PRICE_TOO_HIGH)
 
+        # 티켓 상품은 결제 전 참가자 정보(TicketInfo)가 반드시 있어야 함
+        if cart.products.filter_active().filter(product__category__is_ticket=True, ticket_info__isnull=True).exists():
+            raise serializers.ValidationError(CartNotOrderableErrorMessages.TICKET_INFO_REQUIRED)
+
         return data

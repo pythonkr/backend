@@ -12,7 +12,7 @@ from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_404_NOT_FO
 from rest_framework.test import APIClient
 from shop.conftest import WEBHOOK_WHITELISTED_IP
 from shop.order.exports import OrderProductExportSerializer
-from shop.order.models import Order, OrderProductOptionRelation, OrderProductRelation
+from shop.order.models import Order, OrderProductOptionRelation, OrderProductRelation, TicketInfo
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
 from shop.product.models import OptionGroup
 from shop.serializers.refund import OrderProductRefundSerializer
@@ -22,11 +22,11 @@ from shop.test.helpers import make_portone_payment_info, make_webhook_payload
 
 
 @pytest.mark.django_db
-def test_first_paid_price_excludes_soft_deleted_opr(order_factory, product):
+def test_first_paid_price_excludes_soft_deleted_opr(order_factory, ticket_product):
     """OPR 두 건 중 하나 soft-delete → first_paid_price 는 남은 active OPR 만 합산."""
     order = order_factory()
     keep = order.products.first()
-    extra = OrderProductRelation.objects.create(order=order, product=product, price=7777, donation_price=1111)
+    extra = OrderProductRelation.objects.create(order=order, product=ticket_product, price=7777, donation_price=1111)
 
     extra.delete()
 
@@ -35,12 +35,12 @@ def test_first_paid_price_excludes_soft_deleted_opr(order_factory, product):
 
 
 @pytest.mark.django_db
-def test_not_fully_refundable_reason_ignores_soft_deleted_opr(order_factory, product):
+def test_not_fully_refundable_reason_ignores_soft_deleted_opr(order_factory, ticket_product):
     """soft-deleted paid OPR 은 refund target / expected_refund_price 계산에서 제외 — invariant 깨지지 않음."""
     completed = order_factory(status="completed")
     stale = OrderProductRelation.objects.create(
         order=completed,
-        product=product,
+        product=ticket_product,
         price=99999,
         donation_price=0,
         status=OrderProductRelation.OrderProductStatus.paid,
@@ -84,15 +84,15 @@ def test_prefetched_payment_history_accessors_exclude_soft_deleted(order_factory
 
 
 @pytest.mark.django_db
-def test_order_retrieve_dto_excludes_soft_deleted_opr_and_options(customer_client, order_factory, product):
+def test_order_retrieve_dto_excludes_soft_deleted_opr_and_options(customer_client, order_factory, ticket_product):
     """retrieve 응답의 products 배열에 soft-deleted OPR / option 이 노출되지 않는다."""
     completed = order_factory(status="completed")
     keep_opr = completed.products.first()
-    keep_group = OptionGroup.objects.create(product=product, name="활성옵션")
+    keep_group = OptionGroup.objects.create(product=ticket_product, name="활성옵션")
     keep_option = OrderProductOptionRelation.objects.create(
         order_product_relation=keep_opr, product_option_group=keep_group, custom_response="alive"
     )
-    stale_group = OptionGroup.objects.create(product=product, name="삭제옵션")
+    stale_group = OptionGroup.objects.create(product=ticket_product, name="삭제옵션")
     stale_option = OrderProductOptionRelation.objects.create(
         order_product_relation=keep_opr, product_option_group=stale_group, custom_response="dead"
     )
@@ -100,7 +100,7 @@ def test_order_retrieve_dto_excludes_soft_deleted_opr_and_options(customer_clien
 
     stale_opr = OrderProductRelation.objects.create(
         order=completed,
-        product=product,
+        product=ticket_product,
         price=12345,
         status=OrderProductRelation.OrderProductStatus.paid,
     )
@@ -130,11 +130,15 @@ def test_order_retrieve_dto_excludes_soft_deleted_payment_history(customer_clien
 
 @pytest.mark.django_db
 def test_checkout_response_dto_excludes_soft_deleted_rows(
-    customer_client, order_factory, product, mock_portone_register
+    customer_client, order_factory, ticket_product, mock_portone_register
 ):
     """checkout (POST /shop/orders/) 응답에 soft-deleted OPR 가 노출되지 않는다."""
     cart = order_factory(status="cart")
-    stale_opr = OrderProductRelation.objects.create(order=cart, product=product, price=99999)
+    # 티켓 OPR 은 결제 전 참가자 정보가 있어야 결제 통과.
+    TicketInfo.objects.create(
+        order_product_relation=cart.products.get(), name="김참가", phone="010-9999-8888", email="a@b.com"
+    )
+    stale_opr = OrderProductRelation.objects.create(order=cart, product=ticket_product, price=99999)
     stale_opr.delete()
 
     response = customer_client.post(
@@ -145,18 +149,18 @@ def test_checkout_response_dto_excludes_soft_deleted_rows(
     assert response.status_code == HTTP_201_CREATED, response.content
     body = response.json()
     assert all(p["id"] != str(stale_opr.id) for p in body["products"])
-    assert body["first_paid_price"] == product.price
+    assert body["first_paid_price"] == ticket_product.price
 
 
 # ---------- 4. Webhook: paid 전환이 soft-deleted OPR 를 건너뜀 ----------
 
 
 @pytest.mark.django_db
-def test_webhook_paid_transition_skips_soft_deleted_opr(mock_portone_find_payment_info, order_factory, product):
+def test_webhook_paid_transition_skips_soft_deleted_opr(mock_portone_find_payment_info, order_factory, ticket_product):
     """webhook PAID 처리 시 soft-deleted OPR 는 paid 로 전환되지 않고 deleted 상태가 유지된다."""
     order = order_factory(status="cart")
     active_opr = order.products.get()
-    stale_opr = OrderProductRelation.objects.create(order=order, product=product, price=product.price)
+    stale_opr = OrderProductRelation.objects.create(order=order, product=ticket_product, price=ticket_product.price)
     stale_opr.delete()
     order.prepare_payment()
 
@@ -180,15 +184,15 @@ def test_webhook_paid_transition_skips_soft_deleted_opr(mock_portone_find_paymen
 
 
 @pytest.mark.django_db
-def test_order_product_export_excludes_soft_deleted_options(order_factory, product):
+def test_order_product_export_excludes_soft_deleted_options(order_factory, ticket_product):
     """관리자 export 의 OrderProductExportSerializer.to_representation 이 soft-deleted option 을 행에 포함시키지 않는다."""
     completed = order_factory(status="completed")
     opr = completed.products.first()
-    keep_group = OptionGroup.objects.create(product=product, name="활성그룹", is_custom_response=True)
+    keep_group = OptionGroup.objects.create(product=ticket_product, name="활성그룹", is_custom_response=True)
     OrderProductOptionRelation.objects.create(
         order_product_relation=opr, product_option_group=keep_group, custom_response="alive"
     )
-    stale_group = OptionGroup.objects.create(product=product, name="삭제그룹", is_custom_response=True)
+    stale_group = OptionGroup.objects.create(product=ticket_product, name="삭제그룹", is_custom_response=True)
     stale_option = OrderProductOptionRelation.objects.create(
         order_product_relation=opr, product_option_group=stale_group, custom_response="dead"
     )
@@ -203,14 +207,16 @@ def test_order_product_export_excludes_soft_deleted_options(order_factory, produ
 
 
 @pytest.mark.django_db
-def test_partial_refund_status_check_ignores_soft_deleted_opr(order_factory, mock_portone_req_cancel_payment, product):
+def test_partial_refund_status_check_ignores_soft_deleted_opr(
+    order_factory, mock_portone_req_cancel_payment, ticket_product
+):
     """부분 환불 직후 partial/full 분기 — soft-deleted paid OPR 가 남아있어도 full refund 로 인식돼야 한다."""
     completed = order_factory(status="completed")
     target_opr = completed.products.first()
 
     stale = OrderProductRelation.objects.create(
         order=completed,
-        product=product,
+        product=ticket_product,
         price=1,
         status=OrderProductRelation.OrderProductStatus.paid,
     )
@@ -246,20 +252,20 @@ def test_filter_has_payment_histories_ignores_soft_deleted_ph(order_factory):
 
 
 @pytest.mark.django_db
-def test_cart_list_dto_excludes_soft_deleted_opr_and_options(customer_client, order_factory, product):
+def test_cart_list_dto_excludes_soft_deleted_opr_and_options(customer_client, order_factory, ticket_product):
     """장바구니 조회 응답이 soft-deleted OPR / option 을 노출하지 않는다."""
     cart = order_factory(status="cart")
     active_opr = cart.products.get()
-    active_group = OptionGroup.objects.create(product=product, name="활성옵션")
+    active_group = OptionGroup.objects.create(product=ticket_product, name="활성옵션")
     active_option = OrderProductOptionRelation.objects.create(
         order_product_relation=active_opr, product_option_group=active_group, custom_response="alive"
     )
-    stale_group = OptionGroup.objects.create(product=product, name="삭제옵션")
+    stale_group = OptionGroup.objects.create(product=ticket_product, name="삭제옵션")
     stale_option = OrderProductOptionRelation.objects.create(
         order_product_relation=active_opr, product_option_group=stale_group, custom_response="dead"
     )
     stale_option.delete()
-    stale_opr = OrderProductRelation.objects.create(order=cart, product=product, price=99999)
+    stale_opr = OrderProductRelation.objects.create(order=cart, product=ticket_product, price=99999)
     stale_opr.delete()
 
     response = customer_client.get(reverse("v1:cart-list"))
@@ -275,12 +281,12 @@ def test_cart_list_dto_excludes_soft_deleted_opr_and_options(customer_client, or
 
 @pytest.mark.django_db
 def test_modify_options_response_dto_excludes_soft_deleted_sibling(
-    customer_client, order_factory, modifiable_option_relation, product
+    customer_client, order_factory, modifiable_option_relation, ticket_product
 ):
     """modify_options 응답의 products[] 가 soft-deleted sibling OPR 을 노출하지 않는다."""
     completed = modifiable_option_relation.order_product_relation.order
     stale_opr = OrderProductRelation.objects.create(
-        order=completed, product=product, price=12345, status=OrderProductRelation.OrderProductStatus.paid
+        order=completed, product=ticket_product, price=12345, status=OrderProductRelation.OrderProductStatus.paid
     )
     stale_opr.delete()
 
@@ -300,11 +306,11 @@ def test_modify_options_response_dto_excludes_soft_deleted_sibling(
 
 
 @pytest.mark.django_db
-def test_user_partial_refund_returns_404_for_soft_deleted_opr(customer_client, order_factory, product):
+def test_user_partial_refund_returns_404_for_soft_deleted_opr(customer_client, order_factory, ticket_product):
     """soft-deleted paid OPR 에 대한 부분 환불 DELETE 는 get_queryset 에서 제외돼 404."""
     completed = order_factory(status="completed")
     stale_opr = OrderProductRelation.objects.create(
-        order=completed, product=product, price=12345, status=OrderProductRelation.OrderProductStatus.paid
+        order=completed, product=ticket_product, price=12345, status=OrderProductRelation.OrderProductStatus.paid
     )
     stale_opr.delete()
 

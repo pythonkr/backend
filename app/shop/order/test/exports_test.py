@@ -36,9 +36,9 @@ def test_order_export_returns_empty_dataframe_for_empty_queryset():
 
 
 @pytest.mark.django_db
-def test_order_product_export_flattens_options_as_dynamic_columns(product, order_factory):
+def test_order_product_export_flattens_options_as_dynamic_columns(ticket_product, order_factory):
     completed_order = order_factory(status="completed")
-    size_group = OptionGroup.objects.create(product=product, name="사이즈")
+    size_group = OptionGroup.objects.create(product=ticket_product, name="사이즈")
     opr = completed_order.products.first()
     OrderProductOptionRelation.objects.create(
         order_product_relation=opr,
@@ -48,7 +48,7 @@ def test_order_product_export_flattens_options_as_dynamic_columns(product, order
     OrderProductOptionRelation.objects.create(
         order_product_relation=opr,
         product_option_group=OptionGroup.objects.create(
-            product=product,
+            product=ticket_product,
             name="요청사항",
             is_custom_response=True,
             custom_response_pattern=r"^.*$",
@@ -61,8 +61,8 @@ def test_order_product_export_flattens_options_as_dynamic_columns(product, order
     assert df.to_dict(orient="records") == [
         {
             "주문 번호": completed_order.id,
-            "상품 ID": product.id,
-            "상품명": product.name,
+            "상품 ID": ticket_product.id,
+            "상품명": ticket_product.name,
             "상태": opr.status,
             "결제 금액": opr.price,
             "추가 기부액": opr.donation_price,

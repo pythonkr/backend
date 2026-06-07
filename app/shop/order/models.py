@@ -141,7 +141,7 @@ class OrderQuerySet(BaseCartQuerySet):
                 "products",
                 queryset=(
                     OrderProductRelation.objects.filter_active()
-                    .select_related("product")
+                    .select_related("product", "ticket_info")
                     .prefetch_related(
                         models.Prefetch(
                             "options",
@@ -519,7 +519,11 @@ class SingleProductCart(PaymentPreparationMixin, BaseAbstractModel):
 
     @property
     def products(self) -> models.QuerySet[OrderProductRelation]:
-        return OrderProductRelation.objects.filter_active().filter(id=self.order_product_relation_id)
+        return (
+            OrderProductRelation.objects.filter_active()
+            .select_related("product", "ticket_info")
+            .filter(id=self.order_product_relation_id)
+        )
 
     @functools.cached_property
     def active_products(self) -> list[OrderProductRelation]:
@@ -544,6 +548,28 @@ class CustomerInfo(BaseAbstractModel):
     phone = models.TextField()
     email = models.TextField()
     organization = models.TextField(null=True, blank=True)
+
+    history = HistoricalRecords()
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["name"]),
+            models.Index(fields=["phone"]),
+            models.Index(fields=["email"]),
+            models.Index(fields=["organization"]),
+        ]
+
+
+class TicketInfo(BaseAbstractModel):
+    order_product_relation = models.OneToOneField(
+        OrderProductRelation, on_delete=models.PROTECT, related_name="ticket_info"
+    )
+
+    name = models.TextField()
+    phone = models.TextField()
+    email = models.TextField()
+    organization = models.TextField(null=True, blank=True)
+    contribution_message = models.TextField(null=True, blank=True)
 
     history = HistoricalRecords()
 

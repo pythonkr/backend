@@ -8,17 +8,20 @@ from shop.conftest import (  # noqa: F401
     mock_portone_register,
     mock_portone_req_cancel_payment,
     modifiable_option_relation,
+    non_ticket_opr,
+    non_ticket_product,
     option,
     option_group,
     order_factory,
     other_client,
     other_user,
-    product,
     products_by_status,
     single_product_cart,
     staff_client,
     staff_user,
     tag,
+    ticket_opr,
+    ticket_product,
 )
 
 

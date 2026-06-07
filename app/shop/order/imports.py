@@ -9,7 +9,7 @@ from core.const.regex import ALLOW_ALL_PATTERN, PHONE_PATTERN
 from django.db import transaction
 from django.db.models import Prefetch
 from rest_framework import serializers
-from shop.order.models import CustomerInfo, Order, OrderProductOptionRelation, OrderProductRelation
+from shop.order.models import CustomerInfo, Order, OrderProductOptionRelation, OrderProductRelation, TicketInfo
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
 from shop.product.models import Option, OptionGroup, Product
 from shop.serializers.cart_validation import OrderableCheckSerializerMode, ProductOrderableCheckSerializer
@@ -116,16 +116,20 @@ class OrderProductImportSerializer(serializers.ModelSerializer):
         if not self.user:
             raise serializers.ValidationError("User does not exists")
 
+        check_data = {
+            "product": self.product.id,
+            "donation_price": data["donation_price"],
+            "options": [d.to_dict() for d in self.option_input_data],
+        }
+        if self.product.category.is_ticket:
+            check_data["ticket_info"] = {field: data[field] for field in CUSTOMER_INFO_FIELDS}
+
         ProductOrderableCheckSerializer(
             context={
                 "mode": OrderableCheckSerializerMode.CHECKOUT_SINGLE_PRODUCT,
                 "request": types.SimpleNamespace(user=self.user),
             },
-            data={
-                "product": self.product.id,
-                "donation_price": data["donation_price"],
-                "options": [d.to_dict() for d in self.option_input_data],
-            },
+            data=check_data,
         ).is_valid(raise_exception=True)
         return data
 
@@ -141,9 +145,10 @@ class OrderProductImportSerializer(serializers.ModelSerializer):
             price=total_price,
             donation_price=validated_data["donation_price"],
         )
-        CustomerInfo.objects.create(
-            order=order_product.order, **{field: validated_data[field] for field in CUSTOMER_INFO_FIELDS}
-        )
+        customer_info_data = {field: validated_data[field] for field in CUSTOMER_INFO_FIELDS}
+        CustomerInfo.objects.create(order=order_product.order, **customer_info_data)
+        if self.product.category.is_ticket:
+            TicketInfo.objects.create(order_product_relation=order_product, **customer_info_data)
 
         for data in self.option_input_data:
             OrderProductOptionRelation.objects.create(

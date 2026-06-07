@@ -34,12 +34,15 @@ def test_modify_options_rejects_other_users_opr(modifiable_option_relation, othe
 
 @pytest.mark.django_db
 def test_destroy_order_product_refunds_partially(
-    customer_client, product, mock_portone_req_cancel_payment, order_factory
+    customer_client, ticket_product, mock_portone_req_cancel_payment, order_factory
 ):
     completed_order = order_factory(status="completed")
     target_opr = completed_order.products.first()
     OrderProductRelation.objects.create(
-        order=completed_order, product=product, price=product.price, status=OrderProductRelation.OrderProductStatus.paid
+        order=completed_order,
+        product=ticket_product,
+        price=ticket_product.price,
+        status=OrderProductRelation.OrderProductStatus.paid,
     )
     response = OrderProductsApi(http_client=customer_client).delete_partial(completed_order.id, target_opr.id)
     assert response.status_code == HTTP_204_NO_CONTENT

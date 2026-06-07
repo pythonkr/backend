@@ -39,11 +39,15 @@ def test_opr_not_refundable_reason_when_refund_window_expired(order_factory):
 
 
 @pytest.mark.django_db
-def test_opr_not_refundable_reason_when_price_is_zero(customer_user, product):
+def test_opr_not_refundable_reason_when_price_is_zero(customer_user, ticket_product):
     # paid OPR + price=0 + donation=0 → PRODUCT_PRICE_IS_ZERO.
     order = Order.objects.create(user=customer_user, name="zero")
     opr = OrderProductRelation.objects.create(
-        order=order, product=product, price=0, donation_price=0, status=OrderProductRelation.OrderProductStatus.paid
+        order=order,
+        product=ticket_product,
+        price=0,
+        donation_price=0,
+        status=OrderProductRelation.OrderProductStatus.paid,
     )
     PaymentHistory.objects.create(order=order, imp_id="imp_z", status=PaymentHistoryStatus.completed, price=0)
     assert opr.not_refundable_reason == NotRefundableErrorMessages.PRODUCT_PRICE_IS_ZERO

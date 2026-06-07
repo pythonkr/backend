@@ -19,14 +19,17 @@ def test_latest_per_order_field_returns_most_recent_field_per_order(order_factor
 
 
 @pytest.mark.django_db
-def test_latest_per_order_field_correlates_per_outer_order(customer_user, product, order_factory):
+def test_latest_per_order_field_correlates_per_outer_order(customer_user, ticket_product, order_factory):
     completed_order = order_factory(status="completed")
     other_order = Order.objects.create(user=customer_user, name="other")
     OrderProductRelation.objects.create(
-        order=other_order, product=product, price=product.price, status=OrderProductRelation.OrderProductStatus.paid
+        order=other_order,
+        product=ticket_product,
+        price=ticket_product.price,
+        status=OrderProductRelation.OrderProductStatus.paid,
     )
     PaymentHistory.objects.create(
-        order=other_order, imp_id="imp_other", status=PaymentHistoryStatus.completed, price=product.price
+        order=other_order, imp_id="imp_other", status=PaymentHistoryStatus.completed, price=ticket_product.price
     )
 
     subquery = PaymentHistory.objects.latest_per_order_field("imp_id")

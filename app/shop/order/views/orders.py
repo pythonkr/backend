@@ -14,7 +14,10 @@ from rest_framework import mixins, renderers, request, response, serializers, st
 from rest_framework.decorators import action
 from shop.order.models import CustomerInfo, Order, OrderProductRelation, OrderQuerySet
 from shop.order.serializers.dto import OrderDto, SingleProductCartDto
-from shop.order.serializers.validator import OptionProductOptionCustomResponseModifyRequestSerializer
+from shop.order.serializers.validator import (
+    OptionProductOptionCustomResponseModifyRequestSerializer,
+    OrderProductUpdateSerializer,
+)
 from shop.payment_history.models import PaymentHistory
 from shop.serializers.cart_validation import (
     CartOrderableCheckSerializer,
@@ -244,9 +247,21 @@ class OrderViewSet(
         )
 
 
-class OrderProductViewSet(mixins.DestroyModelMixin, viewsets.GenericViewSet):
+@extend_schema_view(
+    partial_update=extend_schema(
+        summary="주문 상품 수정 (옵션 답변 / 티켓 참가자 정보)",
+        tags=[OpenAPITag.SHOP_ORDER],
+        responses={
+            status.HTTP_204_NO_CONTENT: None,
+            status.HTTP_400_BAD_REQUEST: ValidationErrorResponseSerializer,
+            status.HTTP_403_FORBIDDEN: ErrorResponse403Serializer,
+        },
+    ),
+)
+class OrderProductViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
     lookup_url_kwarg = "order_product_rel_id"
-    serializer_class = None
+    serializer_class = OrderProductUpdateSerializer
+    http_method_names = ["patch", "delete", "head", "options"]
 
     def get_queryset(self) -> models.QuerySet[OrderProductRelation]:
         if not isinstance(self.request.user, UserExt):
@@ -265,17 +280,16 @@ class OrderProductViewSet(mixins.DestroyModelMixin, viewsets.GenericViewSet):
             .distinct()
         )
 
+    def update(
+        self, request: request.Request, *args: tuple[typing.Any], **kwargs: dict[str, typing.Any]
+    ) -> response.Response:
+        super().update(request, *args, **kwargs)
+        return response.Response(status=status.HTTP_204_NO_CONTENT)
+
     @extend_schema(
         summary="주문 중 특정 상품의 옵션 수정",
+        deprecated=True,
         tags=[OpenAPITag.SHOP_ORDER],
-        parameters=[
-            OpenApiParameter(
-                name="order_product_rel_id",
-                type=OpenApiTypes.UUID,
-                location=OpenApiParameter.PATH,
-                required=True,
-            )
-        ],
         request=OptionProductOptionCustomResponseModifyRequestSerializer(many=True),
         responses={
             status.HTTP_200_OK: OrderDto,

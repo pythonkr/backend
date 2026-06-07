@@ -7,6 +7,7 @@ from rest_framework.status import (
     HTTP_400_BAD_REQUEST,
     HTTP_404_NOT_FOUND,
 )
+from shop.conftest import VALID_TICKET_INFO
 from shop.order.models import Order, OrderProductRelation
 from shop.order.serializers.dto import OrderDto
 from shop.test.helpers import CartApi, CartProductsApi
@@ -43,18 +44,30 @@ def test_cart_returns_empty_when_request_unauthenticated(anon_client):
 
 
 @pytest.mark.django_db
-def test_cart_add_product_appends_to_existing_unpaid_cart(customer_client, customer_user, product):
+def test_cart_add_product_appends_to_existing_unpaid_cart(customer_client, customer_user, ticket_product):
     existing_cart = Order.objects.create(user=customer_user, name="cart")
-    response = CartProductsApi(http_client=customer_client).create({"product": str(product.id), "options": []})
+    response = CartProductsApi(http_client=customer_client).create(
+        {
+            "product": str(ticket_product.id),
+            "options": [],
+            "ticket_info": VALID_TICKET_INFO,
+        }
+    )
     assert response.status_code == HTTP_201_CREATED
-    assert OrderProductRelation.objects.filter(order=existing_cart, product=product).exists()
+    assert OrderProductRelation.objects.filter(order=existing_cart, product=ticket_product).exists()
 
 
 @pytest.mark.django_db
-def test_cart_add_product_invalidates_prepared_payment(customer_client, product, order_factory):
+def test_cart_add_product_invalidates_prepared_payment(customer_client, ticket_product, order_factory):
     existing_cart = order_factory(status="prepared")
 
-    response = CartProductsApi(http_client=customer_client).create({"product": str(product.id), "options": []})
+    response = CartProductsApi(http_client=customer_client).create(
+        {
+            "product": str(ticket_product.id),
+            "options": [],
+            "ticket_info": VALID_TICKET_INFO,
+        }
+    )
 
     assert response.status_code == HTTP_201_CREATED
     existing_cart.refresh_from_db()
@@ -63,11 +76,17 @@ def test_cart_add_product_invalidates_prepared_payment(customer_client, product,
 
 
 @pytest.mark.django_db
-def test_cart_add_product_creates_new_cart_when_none_exists(customer_client, customer_user, product):
-    response = CartProductsApi(http_client=customer_client).create({"product": str(product.id), "options": []})
+def test_cart_add_product_creates_new_cart_when_none_exists(customer_client, customer_user, ticket_product):
+    response = CartProductsApi(http_client=customer_client).create(
+        {
+            "product": str(ticket_product.id),
+            "options": [],
+            "ticket_info": VALID_TICKET_INFO,
+        }
+    )
     assert response.status_code == HTTP_201_CREATED
     cart = Order.objects.get(user=customer_user)
-    opr = cart.products.get(product=product)
+    opr = cart.products.get(product=ticket_product)
     # 신규 Order / OPR 양쪽 모두 history 생성 (+) 확인 — REST 경로 통과 검증.
     assert list(cart.history.values_list("history_type", flat=True)) == ["+"]
     assert list(opr.history.values_list("history_type", flat=True)) == ["+"]

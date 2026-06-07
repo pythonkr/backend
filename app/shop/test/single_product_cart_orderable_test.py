@@ -1,14 +1,15 @@
 import pytest
-from shop.order.models import CustomerInfo, SingleProductCart
+from shop.conftest import VALID_TICKET_INFO
+from shop.order.models import CustomerInfo, SingleProductCart, TicketInfo
 from shop.serializers.cart_validation import OrderableCheckSerializerMode, SingleProductCartOrderableCheckSerializer
 from shop.test.helpers import make_serializer_context
 
 
 @pytest.mark.django_db
-def test_single_product_cart_create_persists_opr_cart_and_customer_info(customer_user, product):
+def test_single_product_cart_create_persists_opr_cart_and_customer_info(customer_user, ticket_product):
     serializer = SingleProductCartOrderableCheckSerializer(
         data={
-            "product": str(product.id),
+            "product": str(ticket_product.id),
             "options": [],
             "customer_info": {
                 "name": "홍길동",
@@ -16,6 +17,7 @@ def test_single_product_cart_create_persists_opr_cart_and_customer_info(customer
                 "email": "buyer@example.com",
                 "organization": "",
             },
+            "ticket_info": VALID_TICKET_INFO,
         },
         context=make_serializer_context(customer_user),
     )
@@ -23,18 +25,19 @@ def test_single_product_cart_create_persists_opr_cart_and_customer_info(customer
 
     opr = serializer.save()
 
-    assert opr.product == product
+    assert opr.product == ticket_product
     cart = SingleProductCart.objects.get(order_product_relation=opr)
     assert cart.user == customer_user
     assert CustomerInfo.objects.filter(single_product_cart=cart, name="홍길동").exists()
+    assert TicketInfo.objects.filter(order_product_relation=opr, name="김참가", organization="PSK").exists()
 
 
 @pytest.mark.django_db
-def test_single_product_cart_forces_checkout_single_product_mode(customer_user, product):
+def test_single_product_cart_forces_checkout_single_product_mode(customer_user, ticket_product):
     # context 에 mode 를 임의 override 해도 validation_mode property 가 강제로 CHECKOUT_SINGLE_PRODUCT 반환.
     serializer = SingleProductCartOrderableCheckSerializer(
         data={
-            "product": str(product.id),
+            "product": str(ticket_product.id),
             "options": [],
             "customer_info": {
                 "name": "홍길동",

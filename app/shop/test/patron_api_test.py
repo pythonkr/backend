@@ -40,10 +40,10 @@ def test_patron_list_year_filter_matches_order_year(anon_client, order_factory):
 
 
 @pytest.mark.django_db
-def test_patron_list_returns_contribution_message_from_donation_option(anon_client, product, order_factory):
+def test_patron_list_returns_contribution_message_from_donation_option(anon_client, ticket_product, order_factory):
     donation_completed_order = order_factory(status="completed", donation=5000)
     group = OptionGroup.objects.create(
-        product=product,
+        product=ticket_product,
         name="후원자 한마디",
         is_custom_response=True,
         custom_response_pattern=r"^.*$",

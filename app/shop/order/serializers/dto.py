@@ -2,7 +2,14 @@ from urllib.parse import urljoin
 
 from django.conf import settings
 from rest_framework import serializers
-from shop.order.models import CustomerInfo, Order, OrderProductOptionRelation, OrderProductRelation, SingleProductCart
+from shop.order.models import (
+    CustomerInfo,
+    Order,
+    OrderProductOptionRelation,
+    OrderProductRelation,
+    SingleProductCart,
+    TicketInfo,
+)
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
 from shop.product.models import Option, OptionGroup, Product
 
@@ -46,10 +53,17 @@ class OrderProductOptionRelationDto(serializers.ModelSerializer):
         model = OrderProductOptionRelation
 
 
+class TicketInfoDto(serializers.ModelSerializer):
+    class Meta:
+        fields = ("name", "phone", "email", "organization", "contribution_message")
+        model = TicketInfo
+
+
 class OrderProductRelationDto(serializers.ModelSerializer):
     product = SimpleProductDto()
     options = OrderProductOptionRelationDto(many=True)
     scancode_url = serializers.SerializerMethodField()
+    ticket_info = TicketInfoDto(allow_null=True)
 
     class Meta:
         fields = (
@@ -61,6 +75,7 @@ class OrderProductRelationDto(serializers.ModelSerializer):
             "donation_price",
             "not_refundable_reason",
             "scancode_url",
+            "ticket_info",
         )
         model = OrderProductRelation
 

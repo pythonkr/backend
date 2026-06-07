@@ -10,11 +10,11 @@ from shop.product.models import OptionGroup
 
 
 @pytest.fixture
-def paid_custom_option_relation(product, order_factory):
+def paid_custom_option_relation(ticket_product, order_factory):
     completed_order = order_factory(status="completed")
     """결제 완료된 OPR 의 custom_response 옵션 — 수정 가능 그룹 (response_modifiable_ends_at 미래)."""
     group = OptionGroup.objects.create(
-        product=product,
+        product=ticket_product,
         name="추가 요청사항",
         is_custom_response=True,
         custom_response_pattern=r"^.{1,100}$",
@@ -49,10 +49,10 @@ def test_modify_rejects_when_relation_belongs_to_different_order_product(paid_cu
 
 
 @pytest.mark.django_db
-def test_modify_rejects_when_response_modifiable_ends_at_is_none(product, order_factory):
+def test_modify_rejects_when_response_modifiable_ends_at_is_none(ticket_product, order_factory):
     completed_order = order_factory(status="completed")
     group = OptionGroup.objects.create(
-        product=product,
+        product=ticket_product,
         name="lock",
         is_custom_response=True,
         custom_response_pattern=r"^.*$",
@@ -90,10 +90,10 @@ def test_modify_rejects_when_modifiable_deadline_passed(paid_custom_option_relat
 
 
 @pytest.mark.django_db
-def test_modify_rejects_when_custom_response_pattern_mismatch(product, order_factory):
+def test_modify_rejects_when_custom_response_pattern_mismatch(ticket_product, order_factory):
     completed_order = order_factory(status="completed")
     group = OptionGroup.objects.create(
-        product=product,
+        product=ticket_product,
         name="numeric",
         is_custom_response=True,
         custom_response_pattern=r"^\d{6}$",
@@ -149,9 +149,9 @@ def test_modify_rejects_refunded_opr_option_via_queryset_filter(paid_custom_opti
 
 
 @pytest.mark.django_db
-def test_modify_rejects_non_custom_response_group_option_via_queryset_filter(product, order_factory):
+def test_modify_rejects_non_custom_response_group_option_via_queryset_filter(ticket_product, order_factory):
     completed_order = order_factory(status="completed")
-    plain_group = OptionGroup.objects.create(product=product, name="plain", is_custom_response=False)
+    plain_group = OptionGroup.objects.create(product=ticket_product, name="plain", is_custom_response=False)
     rel = OrderProductOptionRelation.objects.create(
         order_product_relation=completed_order.products.first(),
         product_option_group=plain_group,

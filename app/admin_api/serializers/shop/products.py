@@ -12,6 +12,7 @@ from core.serializer.nested_model_serializer import (
 from core.util.timespan import TimeSpan
 from file.models import PublicFile
 from rest_framework import serializers
+from shop.order.models import OrderProductRelation
 from shop.product.models import Category, CategoryGroup, Option, OptionGroup, Product, Tag
 
 
@@ -28,6 +29,26 @@ class CategoryGroupAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer,
             extra_kwargs = {"group": {"required": False}}
             validators: list = []
             list_serializer_class = InstanceListSerializer
+
+        def validate(self, attrs: dict) -> dict:
+            if self.instance is not None:
+                new_is_ticket = attrs.get("is_ticket", self.instance.is_ticket)
+                if new_is_ticket != self.instance.is_ticket:
+                    self._validate_is_ticket_change(new_is_ticket=new_is_ticket)
+            return attrs
+
+        def _validate_is_ticket_change(self, *, new_is_ticket: bool) -> None:
+            purchased = OrderProductRelation.objects.filter_active().filter(
+                product__category=self.instance,
+                status__in=OrderProductRelation.PURCHASED_STOCK_STATUS,
+            )
+            if new_is_ticket:
+                if purchased.filter(ticket_info__isnull=True).exists():
+                    msg = "참가자 정보가 없는 구매 건이 있어 티켓으로 전환할 수 없습니다."
+                    raise serializers.ValidationError({"is_ticket": msg})
+            elif purchased.filter(ticket_info__isnull=False).exists():
+                msg = "참가자 정보가 수집된 티켓 구매 건이 있어 티켓 설정을 해제할 수 없습니다."
+                raise serializers.ValidationError({"is_ticket": msg})
 
     categories = CategoryAdminSerializer(many=True, required=False, source="category_set")
     category_count = serializers.IntegerField(read_only=True)

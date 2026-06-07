@@ -7,15 +7,15 @@ from shop.product.models import OptionGroup
 
 
 @pytest.mark.django_db
-def test_template_csv_includes_serializer_fields_and_option_group_names(product, option_group):
-    csv = OrderProductImportSerializer.get_template_csv(product=product)
+def test_template_csv_includes_serializer_fields_and_option_group_names(ticket_product, option_group):
+    csv = OrderProductImportSerializer.get_template_csv(product=ticket_product)
     header_line = csv.splitlines()[0]
     columns = [c.strip() for c in header_line.split(",")]
     assert columns == ["name", "phone", "email", "organization", "product_id", "donation_price", "사이즈"]
 
 
 @pytest.mark.django_db
-def test_import_create_persists_order_chain_with_paid_payment_history(customer_user, product, option_group):
+def test_import_create_persists_order_chain_with_paid_payment_history(customer_user, ticket_product, option_group):
     option_group.options.create(name="M", additional_price=0)
     serializer = OrderProductImportSerializer(
         data={
@@ -23,7 +23,7 @@ def test_import_create_persists_order_chain_with_paid_payment_history(customer_u
             "phone": "010-1234-5678",
             "email": customer_user.email,
             "organization": "",
-            "product_id": str(product.id),
+            "product_id": str(ticket_product.id),
             "donation_price": 0,
             "사이즈": "M",
         }
@@ -32,7 +32,7 @@ def test_import_create_persists_order_chain_with_paid_payment_history(customer_u
     opr = serializer.save()
 
     assert opr.status == OrderProductRelation.OrderProductStatus.paid
-    assert opr.price == product.price
+    assert opr.price == ticket_product.price
     assert opr.order.user == customer_user
     assert CustomerInfo.objects.filter(order=opr.order, name="홍길동", email=customer_user.email).exists()
     assert OrderProductOptionRelation.objects.filter(
@@ -45,7 +45,7 @@ def test_import_create_persists_order_chain_with_paid_payment_history(customer_u
 
 
 @pytest.mark.django_db
-def test_import_includes_option_additional_price_in_opr_price(customer_user, product, option_group):
+def test_import_includes_option_additional_price_in_opr_price(customer_user, ticket_product, option_group):
     option_group.options.create(name="L", additional_price=1000)
     serializer = OrderProductImportSerializer(
         data={
@@ -53,14 +53,14 @@ def test_import_includes_option_additional_price_in_opr_price(customer_user, pro
             "phone": "010-1234-5678",
             "email": customer_user.email,
             "organization": "",
-            "product_id": str(product.id),
+            "product_id": str(ticket_product.id),
             "donation_price": 0,
             "사이즈": "L",
         }
     )
     assert serializer.is_valid()
     opr = serializer.save()
-    assert opr.price == product.price + 1000
+    assert opr.price == ticket_product.price + 1000
 
 
 @pytest.mark.parametrize(
@@ -74,7 +74,7 @@ def test_import_includes_option_additional_price_in_opr_price(customer_user, pro
 )
 @pytest.mark.django_db
 def test_import_rejects_invalid_row_and_persists_nothing(
-    customer_user, product, option_group, override_email, size_value, expected_error
+    customer_user, ticket_product, option_group, override_email, size_value, expected_error
 ):
     option_group.options.create(name="M", additional_price=0)
     serializer = OrderProductImportSerializer(
@@ -84,7 +84,7 @@ def test_import_rejects_invalid_row_and_persists_nothing(
             # None 일 때 fixture user 매칭 — 옵션 검증 단계까지 도달.
             "email": override_email or customer_user.email,
             "organization": "",
-            "product_id": str(product.id),
+            "product_id": str(ticket_product.id),
             "donation_price": 0,
             "사이즈": size_value,
         }
@@ -98,7 +98,7 @@ def test_import_rejects_invalid_row_and_persists_nothing(
 
 
 @pytest.mark.django_db
-def test_import_skips_option_group_column_when_csv_missing_it(customer_user, product, option_group):
+def test_import_skips_option_group_column_when_csv_missing_it(customer_user, ticket_product, option_group):
     # option_group(name="사이즈") 존재 + CSV row 에 "사이즈" 컬럼 부재 → 해당 group 건너뜀 (OPR 옵션 0개).
     option_group.options.create(name="M", additional_price=0)
     serializer = OrderProductImportSerializer(
@@ -107,7 +107,7 @@ def test_import_skips_option_group_column_when_csv_missing_it(customer_user, pro
             "phone": "010-1234-5678",
             "email": customer_user.email,
             "organization": "",
-            "product_id": str(product.id),
+            "product_id": str(ticket_product.id),
             "donation_price": 0,
         }
     )
@@ -124,9 +124,9 @@ def test_import_option_input_data_returns_empty_when_product_id_invalid():
 
 
 @pytest.mark.django_db
-def test_import_supports_custom_response_option_group(customer_user, product):
+def test_import_supports_custom_response_option_group(customer_user, ticket_product):
     custom_group = OptionGroup.objects.create(
-        product=product, name="요청사항", is_custom_response=True, custom_response_pattern=r"^.*$"
+        product=ticket_product, name="요청사항", is_custom_response=True, custom_response_pattern=r"^.*$"
     )
     serializer = OrderProductImportSerializer(
         data={
@@ -134,7 +134,7 @@ def test_import_supports_custom_response_option_group(customer_user, product):
             "phone": "010-1234-5678",
             "email": customer_user.email,
             "organization": "",
-            "product_id": str(product.id),
+            "product_id": str(ticket_product.id),
             "donation_price": 0,
             "요청사항": "배송 빠르게",
         }

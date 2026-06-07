@@ -26,6 +26,9 @@ class ProductNotOrderableErrorMessages:
     PRICE_TOO_HIGH = "결제 금액이 너무 높습니다, 후원 금액 등을 줄여 100만원 미만으로 구매해주세요."
     DONATION_NOT_ALLOWED = "{} 상품은 후원이 불가능한 상품입니다."
     DONATION_PRICE_OUT_OF_RANGE = "{} 상품의 후원 금액이 범위를 벗어났습니다. {}원 이상 {}원 이하로 입력해주세요."
+    TICKET_INFO_REQUIRED = "{} 상품(티켓)은 참가자 정보 입력이 필요합니다."
+    TICKET_INFO_NOT_ALLOWED = "{} 상품은 티켓이 아니므로 참가자 정보를 입력할 수 없습니다."
+    CONTRIBUTION_MESSAGE_NOT_ALLOWED = "{} 상품은 후원 가능 상품이 아니므로 후원자 한마디를 입력할 수 없습니다."
 
 
 class TagNotOrderableErrorMessages:
@@ -56,6 +59,7 @@ class CartNotOrderableErrorMessages:
     EMPTY = "장바구니가 비어있습니다, 먼저 상품을 담아주세요."
     CART_PRICE_TOO_LOW = "장바구니의 금액이 너무 낮습니다. 최소한 1원 이상으로 구매해주세요."
     CART_PRICE_TOO_HIGH = "장바구니의 금액이 너무 높습니다. 일부 상품을 제거하여 100만원 미만으로 구매해주세요."
+    TICKET_INFO_REQUIRED = "참가자 정보가 입력되지 않은 티켓이 있습니다. 모든 티켓의 참가자 정보를 입력해주세요."
 
 
 class NotRefundableErrorMessages:

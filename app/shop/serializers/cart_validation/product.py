@@ -13,24 +13,35 @@ from core.serializer.nested_model_serializer import InstanceListSerializer
 from core.util.dateutil import now_aware
 from django.db import transaction
 from rest_framework import request, serializers
-from shop.order.models import Order, OrderProductOptionRelation, OrderProductRelation, SingleProductCart
+from shop.order.models import Order, OrderProductOptionRelation, OrderProductRelation, SingleProductCart, TicketInfo
+from shop.order.serializers.validator import TicketInfoSerializer, validate_ticket_info_against_product
 from shop.product.models import Option, Product
 from shop.serializers.cart_validation._base import OrderableCheckSerializerMode
 from shop.serializers.cart_validation.option import OptionOrderableCheckSerializer, OptionOrderableCheckTypedDict
 from shop.serializers.cart_validation.tag import TagOrderableCheckSerializer
 from user.models import UserExt
 
+# 티켓 참가자 정보를 인라인으로 받는 mode — 결제 직전(cart 재검증)에는 OPR 에 이미 존재하므로 받지 않음.
+_TICKET_INFO_INLINE_MODES = frozenset(
+    {
+        OrderableCheckSerializerMode.ADD_SINGLE_PRODUCT_TO_CART,
+        OrderableCheckSerializerMode.CHECKOUT_SINGLE_PRODUCT,
+    }
+)
+
 
 class ProductOrderableCheckBeforeValidationDataType(typing.TypedDict):
     product: Product
     options: list[OptionOrderableCheckTypedDict]
     donation_price: typing.NotRequired[int]
+    ticket_info: typing.NotRequired[dict]
 
 
 class ProductOrderableCheckAfterValidationDataType(typing.TypedDict):
     product: Product
     options: list[OptionOrderableCheckTypedDict]
     donation_price: int
+    ticket_info: typing.NotRequired[dict]
 
 
 class ProductOrderableCheckSerializer(serializers.ModelSerializer):
@@ -63,11 +74,13 @@ class ProductOrderableCheckSerializer(serializers.ModelSerializer):
     )
     options = OptionOrderableCheckSerializer(many=True, required=True, allow_empty=True, allow_null=False)
     donation_price = serializers.IntegerField(min_value=0, required=False)
+    # write_only — 응답(.data)은 OrderProductRelation 을 직렬화하므로 reverse OneToOne 접근(빈 티켓 시 예외)을 피한다.
+    ticket_info = TicketInfoSerializer(required=False, write_only=True)
 
     class Meta:
         model = OrderProductRelation
         list_serializer_class = InstanceListSerializer
-        fields = ("product", "options", "donation_price")
+        fields = ("product", "options", "donation_price", "ticket_info")
 
     @functools.cached_property
     def validation_mode(self) -> OrderableCheckSerializerMode:
@@ -172,6 +185,14 @@ class ProductOrderableCheckSerializer(serializers.ModelSerializer):
         product: Product = data["product"]
         options: list[OptionOrderableCheckTypedDict] = data["options"]
         donation_price: int = data.get("donation_price", 0)
+
+        # 인라인 모드(담기 / 단건 결제)에서 티켓이면 ticket_info 가 반드시 있어야 하고, 나머지 규칙은 공용 헬퍼가 검증.
+        if self.validation_mode in _TICKET_INFO_INLINE_MODES:
+            ticket_info = data.get("ticket_info")
+            if product.category.is_ticket and not ticket_info:
+                msg = ProductNotOrderableErrorMessages.TICKET_INFO_REQUIRED.format(product.name)
+                raise serializers.ValidationError({"ticket_info": msg})
+            validate_ticket_info_against_product(product, ticket_info)
 
         if any(o["product_option_group"].product != product for o in options):
             raise serializers.ValidationError(
@@ -324,5 +345,9 @@ class ProductOrderableCheckSerializer(serializers.ModelSerializer):
                 product_option=option_group_data["product_option"],
                 custom_response=option_group_data["custom_response"],
             )
+
+        # 티켓 상품이면 인라인으로 받은 참가자 정보를 함께 저장 (validate 에서 존재 보장).
+        if product.category.is_ticket and (ticket_info_data := validated_data.get("ticket_info")):
+            TicketInfo.objects.create(**ticket_info_data, order_product_relation=order_product_rel)
 
         return order_product_rel

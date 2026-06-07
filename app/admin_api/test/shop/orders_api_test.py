@@ -56,9 +56,9 @@ def test_admin_list_filters_by_status_csv(api_client, order_factory):
 
 
 @pytest.mark.django_db
-def test_admin_list_filters_by_product_id_distinct(api_client, product, order_factory):
+def test_admin_list_filters_by_product_id_distinct(api_client, ticket_product, order_factory):
     completed_order = order_factory(status="completed")
-    response = OrdersAdminApi(http_client=api_client).list({"product_id": str(product.id)})
+    response = OrdersAdminApi(http_client=api_client).list({"product_id": str(ticket_product.id)})
     assert response.status_code == HTTP_200_OK
     assert response.json() == {
         "count": 1,
@@ -69,19 +69,19 @@ def test_admin_list_filters_by_product_id_distinct(api_client, product, order_fa
 
 
 @pytest.mark.django_db
-def test_admin_list_filters_by_active_opr_category(api_client, product, order_factory):
+def test_admin_list_filters_by_active_opr_category(api_client, ticket_product, order_factory):
     """`?category_id=` 가 active OPR 가 있는 주문만 매칭한다."""
     completed_order = order_factory(status="completed")
-    response = OrdersAdminApi(http_client=api_client).list({"category_id": str(product.category_id)})
+    response = OrdersAdminApi(http_client=api_client).list({"category_id": str(ticket_product.category_id)})
     assert response.status_code == HTTP_200_OK
     assert {row["id"] for row in response.json()["results"]} == {str(completed_order.id)}
 
 
 @pytest.mark.django_db
-def test_admin_list_filters_by_active_opr_category_group(api_client, product, order_factory):
+def test_admin_list_filters_by_active_opr_category_group(api_client, ticket_product, order_factory):
     """`?category_group_id=` 가 active OPR 가 있는 주문만 매칭한다."""
     completed_order = order_factory(status="completed")
-    response = OrdersAdminApi(http_client=api_client).list({"category_group_id": str(product.category.group_id)})
+    response = OrdersAdminApi(http_client=api_client).list({"category_group_id": str(ticket_product.category.group_id)})
     assert response.status_code == HTTP_200_OK
     assert {row["id"] for row in response.json()["results"]} == {str(completed_order.id)}
 
@@ -123,12 +123,15 @@ def test_admin_refund_action_rejects_missing_totp(api_client, mock_portone_req_c
 
 @pytest.mark.django_db
 def test_admin_refund_product_action_does_partial_refund(
-    api_client, product, mock_portone_req_cancel_payment, order_factory
+    api_client, ticket_product, mock_portone_req_cancel_payment, order_factory
 ):
     completed_order = order_factory(status="completed")
     target_opr = completed_order.products.first()
     OrderProductRelation.objects.create(
-        order=completed_order, product=product, price=product.price, status=OrderProductRelation.OrderProductStatus.paid
+        order=completed_order,
+        product=ticket_product,
+        price=ticket_product.price,
+        status=OrderProductRelation.OrderProductStatus.paid,
     )
     response = OrdersAdminApi(http_client=api_client).refund_product(
         completed_order.id, target_opr.id, totp=valid_refund_totp()
@@ -152,17 +155,17 @@ def test_admin_refund_product_action_returns_404_for_unknown_rel(api_client, ord
 @pytest.mark.django_db
 def test_admin_refund_allows_expired_window(api_client, mock_portone_req_cancel_payment, order_factory):
     completed_order = order_factory(status="completed")
-    product = completed_order.products.first().product
-    product.refundable_ends_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
-    product.save()
+    ticket_product = completed_order.products.first().product
+    ticket_product.refundable_ends_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    ticket_product.save()
 
     response = OrdersAdminApi(http_client=api_client).refund(completed_order.id, totp=valid_refund_totp())
     assert response.status_code == HTTP_204_NO_CONTENT
 
 
 @pytest.mark.django_db
-def test_admin_import_template_returns_csv(api_client, product):
-    response = OrdersAdminApi(http_client=api_client).import_template(product_id=str(product.id))
+def test_admin_import_template_returns_csv(api_client, ticket_product):
+    response = OrdersAdminApi(http_client=api_client).import_template(product_id=str(ticket_product.id))
     assert response.status_code == HTTP_200_OK
     assert "text/csv" in response.headers["Content-Type"]
 
@@ -186,15 +189,15 @@ def _csv_file(rows: str) -> BytesIO:
 
 
 @pytest.mark.django_db
-def test_admin_import_csv_persists_paid_order_from_uploaded_row(api_client, customer_user, product):
+def test_admin_import_csv_persists_paid_order_from_uploaded_row(api_client, customer_user, ticket_product):
     response = OrdersAdminApi(http_client=api_client).import_csv(
         csv_file=_csv_file(
             "name,phone,email,organization,product_id,donation_price\n"
-            f"홍길동,010-1234-5678,{customer_user.email},,{product.id},0\n"
+            f"홍길동,010-1234-5678,{customer_user.email},,{ticket_product.id},0\n"
         )
     )
     assert response.status_code == HTTP_201_CREATED
-    opr = OrderProductRelation.objects.get(product=product)
+    opr = OrderProductRelation.objects.get(product=ticket_product)
     assert opr.status == OrderProductRelation.OrderProductStatus.paid
     assert opr.order.user == customer_user
 
@@ -206,12 +209,12 @@ def test_admin_import_csv_rejects_missing_file(api_client):
 
 
 @pytest.mark.django_db
-def test_admin_import_csv_returns_400_for_invalid_rows_without_persisting(api_client, product):
+def test_admin_import_csv_returns_400_for_invalid_rows_without_persisting(api_client, ticket_product):
     # email 매칭되는 user 부재 → 모든 row validate 실패 → atomic rollback.
     response = OrdersAdminApi(http_client=api_client).import_csv(
         csv_file=_csv_file(
             "name,phone,email,organization,product_id,donation_price\n"
-            f"홍길동,010-1234-5678,nobody@example.com,,{product.id},0\n"
+            f"홍길동,010-1234-5678,nobody@example.com,,{ticket_product.id},0\n"
         )
     )
     assert response.status_code == HTTP_400_BAD_REQUEST
@@ -222,11 +225,11 @@ def test_admin_import_csv_returns_400_for_invalid_rows_without_persisting(api_cl
 @freeze_time(datetime(2026, 5, 23, 15, 30, 45, tzinfo=timezone.utc))
 @pytest.mark.django_db
 def test_admin_export_returns_xlsx_filtering_refunded_per_include_flag(
-    api_client, customer_user, product, include_refunded, order_factory
+    api_client, customer_user, ticket_product, include_refunded, order_factory
 ):
     refunded_order = order_factory(status="refunded")
     response = OrdersAdminApi(http_client=api_client).export(
-        {"product_ids": [str(product.id)], "include_refunded": include_refunded}
+        {"product_ids": [str(ticket_product.id)], "include_refunded": include_refunded}
     )
     assert response.status_code == HTTP_200_OK
     assert response.headers["Content-Type"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -272,8 +275,8 @@ def test_admin_export_returns_xlsx_filtering_refunded_per_include_flag(
     assert df_dict["주문상품"].to_dict(orient="records") == [
         {
             "주문 번호": str(refunded_order.id),
-            "상품 ID": str(product.id),
-            "상품명": product.name,
+            "상품 ID": str(ticket_product.id),
+            "상품명": ticket_product.name,
             "상태": "refunded",
             "결제 금액": opr.price,
             "추가 기부액": opr.donation_price,
@@ -314,14 +317,17 @@ def test_admin_partial_update_creates_customer_info_when_missing(api_client, ord
 
 
 @pytest.mark.django_db
-def test_admin_list_filters_by_user_id(api_client, customer_user, other_user, product, order_factory):
+def test_admin_list_filters_by_user_id(api_client, customer_user, other_user, ticket_product, order_factory):
     completed_order = order_factory(status="completed")
     other_order = Order.objects.create(user=other_user, name="other")
     OrderProductRelation.objects.create(
-        order=other_order, product=product, price=product.price, status=OrderProductRelation.OrderProductStatus.paid
+        order=other_order,
+        product=ticket_product,
+        price=ticket_product.price,
+        status=OrderProductRelation.OrderProductStatus.paid,
     )
     PaymentHistory.objects.create(
-        order=other_order, imp_id="imp_o", status=PaymentHistoryStatus.completed, price=product.price
+        order=other_order, imp_id="imp_o", status=PaymentHistoryStatus.completed, price=ticket_product.price
     )
 
     response = OrdersAdminApi(http_client=api_client).list({"user_id": str(customer_user.id)})

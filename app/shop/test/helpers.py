@@ -27,6 +27,13 @@ class OrderProductsApi(ModelApiFixture):
             format="json",
         )
 
+    def update(self, order_id, opr_id, data=None):
+        return self.http_client.patch(
+            reverse(f"{self.name}-detail", kwargs={"order_id": order_id, "order_product_rel_id": opr_id}),
+            data,
+            format="json",
+        )
+
     def delete_partial(self, order_id, opr_id):
         return self.http_client.delete(
             reverse(f"{self.name}-detail", kwargs={"order_id": order_id, "order_product_rel_id": opr_id})

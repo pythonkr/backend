@@ -68,10 +68,10 @@ def test_option_rejects_when_user_not_signed_in(option_group):
 
 
 @pytest.mark.django_db
-def test_custom_response_rejects_when_pattern_mismatch(customer_user, product):
+def test_custom_response_rejects_when_pattern_mismatch(customer_user, ticket_product):
     # is_custom_response=True 그룹에 pattern 위배 응답.
     group = OptionGroup.objects.create(
-        product=product,
+        product=ticket_product,
         name="custom",
         is_custom_response=True,
         custom_response_pattern=r"^\d{6}$",

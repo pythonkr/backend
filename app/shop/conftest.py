@@ -48,6 +48,14 @@ _COMPLETED_ORDER_IMP_ID = "imp_test_completed"
 # webhook IP allowlist 통과용 — webhook 테스트는 이 IP 를 REMOTE_ADDR 로 사용.
 WEBHOOK_WHITELISTED_IP = "1.2.3.4"
 
+# 티켓 참가자 정보 입력 공용 페이로드.
+VALID_TICKET_INFO = {
+    "name": "김참가",
+    "phone": "010-9999-8888",
+    "email": "attendee@example.com",
+    "organization": "PSK",
+}
+
 
 @pytest.fixture(autouse=True)
 def _portone_settings():
@@ -111,8 +119,7 @@ def staff_client(staff_user) -> APIClient:
 
 
 @pytest.fixture
-def product(db) -> Product:
-    # category_group / category 는 Product 의 FK 체인을 만들기 위한 중간 단계 — 직접 참조하는 테스트가 생기는 시점에 별도 fixture 로 분리.
+def ticket_product(db) -> Product:
     category_group = CategoryGroup.objects.create(name="기본")
     category = Category.objects.create(group=category_group, name="티켓", is_ticket=True)
     return Product.objects.create(
@@ -131,22 +138,41 @@ def product(db) -> Product:
 
 
 @pytest.fixture
-def donation_product(product) -> Product:
-    """`product` fixture 를 donation_allowed=True 로 토글 — patron / 후원 테스트용."""
-    product.donation_allowed = True
-    product.donation_max_price = 999_999
-    product.save()
-    return product
+def donation_product(ticket_product) -> Product:
+    """`ticket_product` fixture 를 donation_allowed=True 로 토글 — patron / 후원 테스트용."""
+    ticket_product.donation_allowed = True
+    ticket_product.donation_max_price = 999_999
+    ticket_product.save()
+    return ticket_product
 
 
 @pytest.fixture
-def products_by_status(product) -> dict[Product.CurrentStatus, Product]:
+def non_ticket_product(db) -> Product:
+    category_group = CategoryGroup.objects.create(name="굿즈군")
+    category = Category.objects.create(group=category_group, name="굿즈", is_ticket=False)
+    return Product.objects.create(
+        category=category,
+        name="파이콘 한국 2026 머그컵",
+        name_ko="파이콘 한국 2026 머그컵",
+        name_en="PyCon Korea 2026 Mug",
+        price=10000,
+        stock=100,
+        visible_starts_at=FAR_PAST,
+        visible_ends_at=FAR_FUTURE,
+        orderable_starts_at=FAR_PAST,
+        orderable_ends_at=FAR_FUTURE,
+        refundable_ends_at=FAR_FUTURE,
+    )
+
+
+@pytest.fixture
+def products_by_status(ticket_product) -> dict[Product.CurrentStatus, Product]:
     """`Product.CurrentStatus` 4가지 상태별 Product 묶음 — status filter / queryset 테스트용.
 
-    `ACTIVE` 는 fixture `product` 재사용 (visible/orderable 모두 NOW 포함).
+    `ACTIVE` 는 fixture `ticket_product` 재사용 (visible/orderable 모두 NOW 포함).
     """
     common = {
-        "category": product.category,
+        "category": ticket_product.category,
         "price": 100,
         "visible_starts_at": FAR_PAST,
         "visible_ends_at": FAR_FUTURE,
@@ -155,7 +181,7 @@ def products_by_status(product) -> dict[Product.CurrentStatus, Product]:
         "refundable_ends_at": FAR_FUTURE,
     }
     return {
-        Product.CurrentStatus.ACTIVE: product,
+        Product.CurrentStatus.ACTIVE: ticket_product,
         Product.CurrentStatus.OUT_OF_VISIBLE_PERIOD: Product.objects.create(
             **{**common, "visible_starts_at": FAR_FUTURE}, name="oov"
         ),
@@ -166,9 +192,9 @@ def products_by_status(product) -> dict[Product.CurrentStatus, Product]:
 
 
 @pytest.fixture
-def option_group(product) -> OptionGroup:
+def option_group(ticket_product) -> OptionGroup:
     """기본 옵션 그룹 — `is_custom_response=False`, 선택형. `min_quantity_per_product=0` 이라 stock 검사 우회."""
-    return OptionGroup.objects.create(product=product, name="사이즈")
+    return OptionGroup.objects.create(product=ticket_product, name="사이즈")
 
 
 @pytest.fixture
@@ -178,17 +204,17 @@ def option(option_group) -> Option:
 
 
 @pytest.fixture
-def tag(product) -> Tag:
-    """기본 태그 — `product` 와 ProductTagRelation 으로 연결. 무한 재고 (stock=0)."""
+def tag(ticket_product) -> Tag:
+    """기본 태그 — `ticket_product` 와 ProductTagRelation 으로 연결. 무한 재고 (stock=0)."""
     t = Tag.objects.create(name="굿즈")
-    ProductTagRelation.objects.create(product=product, tag=t)
+    ProductTagRelation.objects.create(product=ticket_product, tag=t)
     return t
 
 
 @pytest.fixture
-def single_product_cart(customer_user, product) -> SingleProductCart:
+def single_product_cart(customer_user, ticket_product) -> SingleProductCart:
     """단일 상품 결제용 임시 cart — `to_order()` 로 같은 PK Order 로 승격됨."""
-    opr = OrderProductRelation.objects.create(product=product, price=product.price)
+    opr = OrderProductRelation.objects.create(product=ticket_product, price=ticket_product.price)
     cart = SingleProductCart.objects.create(user=customer_user, order_product_relation=opr)
     CustomerInfo.objects.create(
         single_product_cart=cart, name="홍길동", phone="01012345678", email="customer@example.com"
@@ -200,7 +226,7 @@ OrderStatus = Literal["empty", "cart", "prepared", "completed", "refunded", "par
 
 
 @pytest.fixture
-def order_factory(customer_user, product, donation_product):
+def order_factory(request, customer_user):
     """Order 팩토리 — 상태 / 후원 매트릭스를 한 함수로 표현.
 
     Args:
@@ -212,13 +238,16 @@ def order_factory(customer_user, product, donation_product):
             - ``"refunded"``: 전액 환불 — PH refunded(price=0) 추가 + OPR refunded
             - ``"partial_refunded"``: 부분 환불 — PH partial_refunded 추가
         donation: OPR 의 ``donation_price`` 금액. ``>0`` 이면 ``donation_product`` (donation_allowed=True) 사용.
+        is_ticket: 상품 종류. ``True``(기본)=티켓(``ticket_product``), ``False``=일반(``non_ticket_product``).
+            ``donation>0`` 이면 종류와 무관하게 ``donation_product`` 사용.
     """
 
-    def make(*, status: OrderStatus = "cart", donation: int = 0) -> Order:
+    def make(*, status: OrderStatus = "cart", donation: int = 0, is_ticket: bool = True) -> Order:
         if status == "empty":
             return Order.objects.create(user=customer_user, name="cart")
 
-        used_product = donation_product if donation > 0 else product
+        product_fixture = "donation" if donation > 0 else ("ticket" if is_ticket else "non_ticket")
+        used_product = request.getfixturevalue(product_fixture + "_product")
         order = Order.objects.create(
             user=customer_user,
             name=used_product.name,
@@ -276,11 +305,21 @@ def order_factory(customer_user, product, donation_product):
 
 
 @pytest.fixture
-def modifiable_option_relation(order_factory, product) -> OrderProductOptionRelation:
+def ticket_opr(order_factory) -> OrderProductRelation:
+    return order_factory(status="completed").products.get()
+
+
+@pytest.fixture
+def non_ticket_opr(order_factory) -> OrderProductRelation:
+    return order_factory(status="completed", is_ticket=False).products.get()
+
+
+@pytest.fixture
+def modifiable_option_relation(order_factory, ticket_product) -> OrderProductOptionRelation:
     """custom_response 수정 가능 옵션 — `response_modifiable_ends_at` 미래, paid OPR 에 attached."""
     completed_order = order_factory(status="completed")
     group = OptionGroup.objects.create(
-        product=product,
+        product=ticket_product,
         name="요청사항",
         is_custom_response=True,
         custom_response_pattern=r"^.{1,100}$",

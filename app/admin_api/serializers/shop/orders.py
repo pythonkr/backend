@@ -8,7 +8,7 @@ from core.serializer.skip_none_list_serializer import SkipNoneListSerializer
 from notification.channels import NotificationChannel
 from notification.models.base import Recipient
 from rest_framework import serializers
-from shop.order.models import CustomerInfo, Order, OrderProductOptionRelation, OrderProductRelation
+from shop.order.models import CustomerInfo, Order, OrderProductOptionRelation, OrderProductRelation, TicketInfo
 from shop.payment_history.models import PaymentHistory
 from shop.product.models import Product
 from user.models import UserExt
@@ -63,13 +63,19 @@ class OrderAdminSerializer(
                     "custom_response",
                 )
 
+        class SimpleTicketInfoSerializer(serializers.ModelSerializer):
+            class Meta:
+                model = TicketInfo
+                fields = ("name", "phone", "email", "organization", "contribution_message")
+
         product = SimpleProductSerializer(read_only=True)
         options = SimpleOrderProductOptionRelationSerializer(many=True, read_only=True)
+        ticket_info = SimpleTicketInfoSerializer(read_only=True, allow_null=True)
 
         class Meta:
             model = OrderProductRelation
-            fields = ("id", "product", "status", "price", "donation_price", "options")
-            read_only_fields = ("id", "product", "price", "donation_price", "options")
+            fields = ("id", "product", "status", "price", "donation_price", "options", "ticket_info")
+            read_only_fields = ("id", "product", "price", "donation_price", "options", "ticket_info")
 
     user = SimpleUserSerializer(read_only=True)
     customer_info = SimpleCustomerInfoSerializer(required=False, allow_null=True)

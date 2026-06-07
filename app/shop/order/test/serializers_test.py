@@ -11,18 +11,24 @@ _TEST_BACKEND_DOMAIN = "https://test.pycon.kr"
 
 @override_settings(BACKEND_DOMAIN=_TEST_BACKEND_DOMAIN)
 @pytest.mark.django_db
-def test_order_product_relation_dto_scancode_url_for_ticket_category(product, order_factory):
+def test_order_product_relation_dto_scancode_url_for_ticket_category(ticket_product, order_factory):
     pending_order = order_factory()
     opr = pending_order.products.first()
     assert OrderProductRelationDto(instance=opr).data == {
         "id": str(opr.id),
-        "product": {"id": str(product.id), "name": product.name, "price": product.price, "image": None},
+        "product": {
+            "id": str(ticket_product.id),
+            "name": ticket_product.name,
+            "price": ticket_product.price,
+            "image": None,
+        },
         "options": [],
         "status": opr.status,
         "price": opr.price,
         "donation_price": opr.donation_price,
         "not_refundable_reason": opr.not_refundable_reason,
         "scancode_url": f"{_TEST_BACKEND_DOMAIN}{opr.scancode_path}",
+        "ticket_info": None,
     }
 
 
@@ -42,6 +48,7 @@ def test_order_product_relation_dto_scancode_url_none_for_non_ticket_category(cu
         "donation_price": opr.donation_price,
         "not_refundable_reason": opr.not_refundable_reason,
         "scancode_url": None,
+        "ticket_info": None,
     }
 
 
@@ -68,7 +75,7 @@ def test_order_product_relation_dto_scancode_url_follows_is_ticket_not_name(cust
 
 @override_settings(BACKEND_DOMAIN=_TEST_BACKEND_DOMAIN)
 @pytest.mark.django_db
-def test_order_dto_includes_scancode_url_and_nested_payload(product, order_factory):
+def test_order_dto_includes_scancode_url_and_nested_payload(ticket_product, order_factory):
     pending_order = order_factory()
     opr = pending_order.products.first()
     customer_info = pending_order.customer_info
@@ -79,13 +86,19 @@ def test_order_dto_includes_scancode_url_and_nested_payload(product, order_facto
         "products": [
             {
                 "id": str(opr.id),
-                "product": {"id": str(product.id), "name": product.name, "price": product.price, "image": None},
+                "product": {
+                    "id": str(ticket_product.id),
+                    "name": ticket_product.name,
+                    "price": ticket_product.price,
+                    "image": None,
+                },
                 "options": [],
                 "status": opr.status,
                 "price": opr.price,
                 "donation_price": opr.donation_price,
                 "not_refundable_reason": opr.not_refundable_reason,
                 "scancode_url": f"{_TEST_BACKEND_DOMAIN}{opr.scancode_path}",
+                "ticket_info": None,
             },
         ],
         "scancode_url": f"{_TEST_BACKEND_DOMAIN}{pending_order.scancode_path}",
@@ -106,10 +119,10 @@ def test_order_dto_includes_scancode_url_and_nested_payload(product, order_facto
 
 
 @pytest.mark.django_db
-def test_scancode_option_serializer_value_for_custom_response_group(product, order_factory):
+def test_scancode_option_serializer_value_for_custom_response_group(ticket_product, order_factory):
     completed_order = order_factory(status="completed")
     group = OptionGroup.objects.create(
-        product=product, name="요청사항", is_custom_response=True, custom_response_pattern=r"^.*$"
+        product=ticket_product, name="요청사항", is_custom_response=True, custom_response_pattern=r"^.*$"
     )
     rel = OrderProductOptionRelation.objects.create(
         order_product_relation=completed_order.products.first(),
@@ -120,10 +133,10 @@ def test_scancode_option_serializer_value_for_custom_response_group(product, ord
 
 
 @pytest.mark.django_db
-def test_scancode_option_serializer_value_for_custom_response_when_blank(product, order_factory):
+def test_scancode_option_serializer_value_for_custom_response_when_blank(ticket_product, order_factory):
     completed_order = order_factory(status="completed")
     group = OptionGroup.objects.create(
-        product=product, name="요청사항", is_custom_response=True, custom_response_pattern=r"^.*$"
+        product=ticket_product, name="요청사항", is_custom_response=True, custom_response_pattern=r"^.*$"
     )
     rel = OrderProductOptionRelation.objects.create(
         order_product_relation=completed_order.products.first(),

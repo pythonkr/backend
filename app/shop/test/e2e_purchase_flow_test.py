@@ -258,7 +258,7 @@ _TEST_BACKEND_DOMAIN = "https://test.pycon.kr"
 @override_settings(BACKEND_DOMAIN=_TEST_BACKEND_DOMAIN)
 @pytest.mark.django_db
 def test_cart_get_reflects_added_products_for_e2e_setup(customer_client, customer_user, created_product):
-    # cart 조회가 admin 이 만든 product / option group nested 데이터를 OrderDto 의 모든 필드로 노출.
+    # cart 조회가 admin 이 만든 ticket_product / option group nested 데이터를 OrderDto 의 모든 필드로 노출.
     CartProductsApi(http_client=customer_client).create(
         {
             "product": created_product["product_id"],
@@ -333,6 +333,7 @@ def test_cart_get_reflects_added_products_for_e2e_setup(customer_client, custome
                 # 카테고리 "티셔츠" — is_ticket=False → scancode_url None.
                 "not_refundable_reason": NotRefundableErrorMessages.ORDER_NOT_REFUNDABLE,
                 "scancode_url": None,
+                "ticket_info": None,
             },
         ],
         "scancode_url": f"{_TEST_BACKEND_DOMAIN}{cart.scancode_path}",

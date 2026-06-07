@@ -12,7 +12,8 @@ from rest_framework.status import (
     HTTP_404_NOT_FOUND,
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
-from shop.order.models import CustomerInfo, Order, OrderProductRelation, SingleProductCart
+from shop.conftest import VALID_TICKET_INFO
+from shop.order.models import CustomerInfo, Order, OrderProductRelation, SingleProductCart, TicketInfo
 from shop.order.serializers.dto import OrderDto, SingleProductCartDto
 from shop.payment_history.models import PaymentHistoryStatus
 from shop.test.helpers import OrdersApi
@@ -59,11 +60,11 @@ def test_order_retrieve_returns_404_for_other_users_order(other_client, order_fa
 
 @pytest.mark.django_db
 def test_create_single_product_order_creates_cart_and_calls_portone(
-    customer_client, customer_user, product, mock_portone_register
+    customer_client, customer_user, ticket_product, mock_portone_register
 ):
     response = OrdersApi(http_client=customer_client).create_single(
         {
-            "product": str(product.id),
+            "product": str(ticket_product.id),
             "options": [],
             "customer_info": {
                 "name": "홍길동",
@@ -71,6 +72,7 @@ def test_create_single_product_order_creates_cart_and_calls_portone(
                 "email": "customer@example.com",
                 "organization": "",
             },
+            "ticket_info": VALID_TICKET_INFO,
         }
     )
     assert response.status_code == HTTP_201_CREATED
@@ -78,8 +80,8 @@ def test_create_single_product_order_creates_cart_and_calls_portone(
     assert response.json() == SingleProductCartDto(instance=cart).data
     assert cart.prepared_cart_snapshot is not None
     assert cart.prepared_cart_hash is not None
-    assert cart.prepared_price == product.price
-    mock_portone_register.assert_called_once_with(merchant_id=cart.merchant_uid, price=product.price)
+    assert cart.prepared_price == ticket_product.price
+    mock_portone_register.assert_called_once_with(merchant_id=cart.merchant_uid, price=ticket_product.price)
     # SingleProductCart + OPR 양쪽 history 생성 확인.
     assert list(cart.history.order_by("history_date").values_list("history_type", flat=True)) == ["+", "~"]
     assert list(cart.order_product_relation.history.values_list("history_type", flat=True)) == ["+"]
@@ -116,10 +118,13 @@ def test_create_order_rejects_when_cart_is_empty(customer_client, mock_portone_r
 
 @pytest.mark.django_db
 def test_create_order_persists_customer_info_and_schedules_portone_call(
-    customer_client, customer_user, product, mock_portone_register
+    customer_client, customer_user, ticket_product, mock_portone_register
 ):
     cart = Order.objects.create(user=customer_user, name="cart")
-    OrderProductRelation.objects.create(order=cart, product=product, price=product.price)
+    opr = OrderProductRelation.objects.create(order=cart, product=ticket_product, price=ticket_product.price)
+    TicketInfo.objects.create(
+        order_product_relation=opr, name="김참가", phone="010-9999-8888", email="attendee@example.com"
+    )
 
     # on_commit 은 test transaction rollback 으로 실제 발화 안 되지만 등록은 검증 가능.
     with patch("shop.order.views.orders.transaction.on_commit") as mocked_on_commit:

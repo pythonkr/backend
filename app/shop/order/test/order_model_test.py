@@ -8,10 +8,10 @@ from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
 
 
 @pytest.mark.django_db
-def test_pending_cart_first_paid_price_sums_products_and_donation(customer_user, product):
-    order = Order.objects.create(user=customer_user, name=product.name)
-    OrderProductRelation.objects.create(order=order, product=product, price=1000, donation_price=200)
-    OrderProductRelation.objects.create(order=order, product=product, price=3000, donation_price=500)
+def test_pending_cart_first_paid_price_sums_products_and_donation(customer_user, ticket_product):
+    order = Order.objects.create(user=customer_user, name=ticket_product.name)
+    OrderProductRelation.objects.create(order=order, product=ticket_product, price=1000, donation_price=200)
+    OrderProductRelation.objects.create(order=order, product=ticket_product, price=3000, donation_price=500)
     assert order.first_paid_price == 1000 + 200 + 3000 + 500
 
 
@@ -88,9 +88,9 @@ def test_not_fully_refundable_reason_when_order_status_not_refundable(order_fact
 
 
 @pytest.mark.django_db
-def test_not_fully_refundable_reason_when_any_opr_is_pending(product, order_factory):
+def test_not_fully_refundable_reason_when_any_opr_is_pending(ticket_product, order_factory):
     completed_order = order_factory(status="completed")
-    OrderProductRelation.objects.create(order=completed_order, product=product, price=product.price)
+    OrderProductRelation.objects.create(order=completed_order, product=ticket_product, price=ticket_product.price)
     refreshed = Order.objects.get(id=completed_order.id)
     assert (
         refreshed.not_fully_refundable_reason
@@ -118,10 +118,14 @@ def test_not_fully_refundable_reason_when_no_paid_product(order_factory):
 
 
 @pytest.mark.django_db
-def test_not_fully_refundable_reason_when_price_zero(customer_user, product):
+def test_not_fully_refundable_reason_when_price_zero(customer_user, ticket_product):
     order = Order.objects.create(user=customer_user, name="zero")
     OrderProductRelation.objects.create(
-        order=order, product=product, price=0, donation_price=0, status=OrderProductRelation.OrderProductStatus.paid
+        order=order,
+        product=ticket_product,
+        price=0,
+        donation_price=0,
+        status=OrderProductRelation.OrderProductStatus.paid,
     )
     PaymentHistory.objects.create(order=order, imp_id="imp_zero", status=PaymentHistoryStatus.completed, price=0)
     refreshed = Order.objects.get(id=order.id)
@@ -129,10 +133,10 @@ def test_not_fully_refundable_reason_when_price_zero(customer_user, product):
 
 
 @pytest.mark.django_db
-def test_not_fully_refundable_reason_when_expected_price_mismatch(product, order_factory):
+def test_not_fully_refundable_reason_when_expected_price_mismatch(ticket_product, order_factory):
     completed_order = order_factory(status="completed")
     OrderProductRelation.objects.create(
-        order=completed_order, product=product, price=5000, status=OrderProductRelation.OrderProductStatus.paid
+        order=completed_order, product=ticket_product, price=5000, status=OrderProductRelation.OrderProductStatus.paid
     )
     refreshed = Order.objects.get(id=completed_order.id)
     assert refreshed.not_fully_refundable_reason == NotRefundableErrorMessages.ORDER_REFUND_TARGET_PRICE_IS_MISMATCH
@@ -173,15 +177,18 @@ def test_filter_has_no_payment_histories_includes_only_carts(customer_user, orde
 
 @pytest.mark.django_db
 def test_filter_purchased_by_returns_only_target_users_purchased_orders(
-    customer_user, other_user, product, order_factory
+    customer_user, other_user, ticket_product, order_factory
 ):
     completed_order = order_factory(status="completed")
     other_order = Order.objects.create(user=other_user, name="other")
     OrderProductRelation.objects.create(
-        order=other_order, product=product, price=product.price, status=OrderProductRelation.OrderProductStatus.paid
+        order=other_order,
+        product=ticket_product,
+        price=ticket_product.price,
+        status=OrderProductRelation.OrderProductStatus.paid,
     )
     PaymentHistory.objects.create(
-        order=other_order, imp_id="imp_other", status=PaymentHistoryStatus.completed, price=product.price
+        order=other_order, imp_id="imp_other", status=PaymentHistoryStatus.completed, price=ticket_product.price
     )
 
     qs = Order.objects.filter_purchased_by(customer_user)

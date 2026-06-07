@@ -35,32 +35,32 @@ def test_tag_name_unique_constraint_rejects_duplicate():
 
 
 @pytest.mark.django_db
-def test_product_tag_relation_unique_per_product_tag_combination(product):
+def test_product_tag_relation_unique_per_product_tag_combination(ticket_product):
     t = Tag.objects.create(name="t")
-    ProductTagRelation.objects.create(product=product, tag=t)
+    ProductTagRelation.objects.create(product=ticket_product, tag=t)
     with pytest.raises(IntegrityError):
-        ProductTagRelation.objects.create(product=product, tag=t)
+        ProductTagRelation.objects.create(product=ticket_product, tag=t)
 
 
 @pytest.mark.django_db
-def test_option_group_unique_per_product_name_combination(product):
-    OptionGroup.objects.create(product=product, name="옵션")
+def test_option_group_unique_per_product_name_combination(ticket_product):
+    OptionGroup.objects.create(product=ticket_product, name="옵션")
     with pytest.raises(IntegrityError):
-        OptionGroup.objects.create(product=product, name="옵션")
+        OptionGroup.objects.create(product=ticket_product, name="옵션")
 
 
 @pytest.mark.django_db
-def test_option_group_same_name_allowed_across_different_products(product):
+def test_option_group_same_name_allowed_across_different_products(ticket_product):
     other = Product.objects.create(
-        category=product.category,
+        category=ticket_product.category,
         name="other",
         price=100,
-        visible_starts_at=product.visible_starts_at,
-        visible_ends_at=product.visible_ends_at,
-        orderable_starts_at=product.orderable_starts_at,
-        orderable_ends_at=product.orderable_ends_at,
-        refundable_ends_at=product.refundable_ends_at,
+        visible_starts_at=ticket_product.visible_starts_at,
+        visible_ends_at=ticket_product.visible_ends_at,
+        orderable_starts_at=ticket_product.orderable_starts_at,
+        orderable_ends_at=ticket_product.orderable_ends_at,
+        refundable_ends_at=ticket_product.refundable_ends_at,
     )
-    OptionGroup.objects.create(product=product, name="옵션")
-    # 다른 product 의 같은 name 은 허용.
+    OptionGroup.objects.create(product=ticket_product, name="옵션")
+    # 다른 ticket_product 의 같은 name 은 허용.
     OptionGroup.objects.create(product=other, name="옵션")

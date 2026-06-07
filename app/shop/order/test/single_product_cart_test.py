@@ -37,8 +37,8 @@ def test_to_order_promotes_opr_fk_to_new_order(single_product_cart):
 
 
 @pytest.mark.django_db
-def test_cart_first_paid_price_is_opr_price_plus_donation(customer_user, product):
-    opr = OrderProductRelation.objects.create(product=product, price=10000, donation_price=2000)
+def test_cart_first_paid_price_is_opr_price_plus_donation(customer_user, ticket_product):
+    opr = OrderProductRelation.objects.create(product=ticket_product, price=10000, donation_price=2000)
     cart = SingleProductCart.objects.create(user=customer_user, order_product_relation=opr)
     assert cart.first_paid_price == 12000
 
@@ -59,5 +59,5 @@ def test_cart_products_property_exposes_single_opr_as_queryset(single_product_ca
 
 
 @pytest.mark.django_db
-def test_cart_name_returns_product_name(single_product_cart, product):
-    assert single_product_cart.name == product.name
+def test_cart_name_returns_product_name(single_product_cart, ticket_product):
+    assert single_product_cart.name == ticket_product.name

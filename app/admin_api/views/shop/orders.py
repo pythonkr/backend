@@ -31,7 +31,7 @@ ADMIN_METHODS = ["list", "retrieve", "partial_update"]
 # OrderProductRelation + nested Options prefetch — `Order.products` 용.
 _OPR_PREFETCH_QS = (
     OrderProductRelation.objects.filter_active()
-    .select_related("product")
+    .select_related("product", "ticket_info")
     .prefetch_related(
         models.Prefetch(
             "options",
