@@ -22,7 +22,7 @@ class PaymentHistoryDto(serializers.ModelSerializer):
 
 class SimpleProductDto(serializers.ModelSerializer):
     class Meta:
-        fields = ("id", "name", "price", "image")
+        fields = ("id", "name", "price", "image", "donation_allowed")
         model = Product
 
 

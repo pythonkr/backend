@@ -294,6 +294,7 @@ def test_cart_get_reflects_added_products_for_e2e_setup(customer_client, custome
                     "name": "파이콘 티셔츠",
                     "price": 25000,
                     "image": None,
+                    "donation_allowed": False,
                 },
                 "is_ticket": False,
                 "options": [
