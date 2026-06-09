@@ -39,6 +39,16 @@ def test_opr_not_refundable_reason_when_refund_window_expired(order_factory):
 
 
 @pytest.mark.django_db
+def test_opr_not_refundable_reason_when_product_not_refundable(ticket_product, order_factory):
+    # refundable_ends_at=null → 기간 만료와 무관하게 환불 불가 사유.
+    ticket_product.refundable_ends_at = None
+    ticket_product.save()
+    completed_order = order_factory(status="completed")
+    opr = completed_order.products.first()
+    assert opr.not_refundable_reason == NotRefundableErrorMessages.PRODUCT_IS_NOT_REFUNDABLE
+
+
+@pytest.mark.django_db
 def test_opr_not_refundable_reason_when_price_is_zero(customer_user, ticket_product):
     # paid OPR + price=0 + donation=0 → PRODUCT_PRICE_IS_ZERO.
     order = Order.objects.create(user=customer_user, name="zero")

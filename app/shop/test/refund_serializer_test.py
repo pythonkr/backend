@@ -126,6 +126,46 @@ def test_total_refund_allows_expired_window_when_check_disabled(mock_portone_req
 
 
 @pytest.mark.django_db
+def test_total_refund_rejects_when_product_not_refundable(
+    mock_portone_req_cancel_payment, ticket_product, order_factory
+):
+    ticket_product.refundable_ends_at = None
+    ticket_product.save()
+    completed_order = order_factory(status="completed")
+    serializer = OrderTotalRefundSerializer(
+        instance=completed_order, data={"id": str(completed_order.id)}, context={"check_totp": False}
+    )
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {
+        "non_field_errors": [
+            {"detail": NotRefundableErrorMessages.ONE_OF_PRODUCT_IS_NOT_REFUNDABLE, "code": "invalid"},
+        ],
+    }
+    mock_portone_req_cancel_payment.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_total_refund_allows_not_refundable_product_when_check_disabled(
+    mock_portone_req_cancel_payment, ticket_product, order_factory
+):
+    ticket_product.refundable_ends_at = None
+    ticket_product.save()
+    completed_order = order_factory(status="completed")
+    serializer = OrderTotalRefundSerializer(
+        instance=completed_order,
+        data={"id": str(completed_order.id)},
+        context={"check_totp": False, "check_refundable_date": False},
+    )
+    assert serializer.is_valid()
+    serializer.refund()
+    mock_portone_req_cancel_payment.assert_called_once_with(
+        imp_id=completed_order.latest_imp_id,
+        refund_request_price=completed_order.first_paid_price,
+        current_leftover_price=completed_order.first_paid_price,
+    )
+
+
+@pytest.mark.django_db
 def test_total_refund_rolls_back_when_portone_cancel_fails(mock_portone_req_cancel_payment, order_factory):
     completed_order = order_factory(status="completed")
     mock_portone_req_cancel_payment.side_effect = PortOneException("PortOne 취소 실패")
