@@ -1,3 +1,4 @@
+from admin_api.filtersets.modification_audit import ModificationAuditAdminFilterSet
 from admin_api.serializers.modification_audit import (
     ModificationAuditApprovalAdminSerializer,
     ModificationAuditRejectionAdminSerializer,
@@ -7,6 +8,7 @@ from admin_api.serializers.modification_audit import (
 )
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
+from core.pagination import AdminPagination
 from django.db import models
 from drf_spectacular import utils
 from drf_standardized_errors.openapi_serializers import (
@@ -29,6 +31,8 @@ MODEL_SERIALIZER_MAP: dict[models.Model, type[serializers.Serializer]] = {
 class ModificationAuditAdminViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = ModificationAuditResponseAdminSerializer
     permission_classes = [IsSuperUser]
+    filterset_class = ModificationAuditAdminFilterSet
+    pagination_class = AdminPagination
     queryset = (
         ModificationAudit.objects.filter_active()
         .prefetch_related(

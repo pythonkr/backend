@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from admin_api.filtersets.event.sponsor import (
+    SponsorAdminFilterSet,
+    SponsorTagAdminFilterSet,
+    SponsorTierAdminFilterSet,
+)
 from admin_api.serializers.event.sponsor import (
     SponsorAdminSerializer,
     SponsorTagAdminSerializer,
@@ -7,6 +12,7 @@ from admin_api.serializers.event.sponsor import (
 )
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
+from core.pagination import AdminPagination
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from django.db import models
 from drf_spectacular.utils import extend_schema, extend_schema_view
@@ -21,6 +27,8 @@ class SponsorTierAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = SponsorTierAdminSerializer
     permission_classes = [IsSuperUser]
+    filterset_class = SponsorTierAdminFilterSet
+    pagination_class = AdminPagination
     queryset = (
         SponsorTier.objects.filter_active()
         .prefetch_related(
@@ -39,6 +47,8 @@ class SponsorTagAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = SponsorTagAdminSerializer
     permission_classes = [IsSuperUser]
+    filterset_class = SponsorTagAdminFilterSet
+    pagination_class = AdminPagination
     queryset = SponsorTag.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")
 
 
@@ -47,4 +57,6 @@ class SponsorAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = SponsorAdminSerializer
     permission_classes = [IsSuperUser]
+    filterset_class = SponsorAdminFilterSet
+    pagination_class = AdminPagination
     queryset = Sponsor.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")

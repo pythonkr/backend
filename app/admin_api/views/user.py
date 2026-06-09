@@ -1,3 +1,4 @@
+from admin_api.filtersets.user import UserAdminFilterSet
 from admin_api.serializers.user import (
     OrganizationAdminSerializer,
     UserAdminPasswordChangeSerializer,
@@ -8,6 +9,7 @@ from admin_api.serializers.user import (
 from core.authz import IsSuperUser
 from core.const.account import generate_random_password
 from core.const.tag import OpenAPITag
+from core.pagination import AdminPagination
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from django.contrib.auth import login, logout
 from drf_spectacular.utils import extend_schema, extend_schema_view
@@ -31,6 +33,8 @@ class UserAdminViewSet(
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = UserAdminSerializer
     permission_classes = [IsSuperUser]
+    filterset_class = UserAdminFilterSet
+    pagination_class = AdminPagination
     queryset = UserExt.objects.filter(is_active=True).prefetch_related("emailaddress_set", "socialaccount_set")
 
     def create(self, request: request.Request, *args: tuple, **kwargs: dict) -> response.Response:

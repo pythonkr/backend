@@ -3,6 +3,7 @@ from __future__ import annotations
 from admin_api.serializers.event.event import EventAdminSerializer
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
+from core.pagination import AdminPagination
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from event.models import Event
@@ -16,4 +17,5 @@ class EventAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = EventAdminSerializer
     permission_classes = [IsSuperUser]
+    pagination_class = AdminPagination
     queryset = Event.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")

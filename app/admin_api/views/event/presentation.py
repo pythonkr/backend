@@ -4,6 +4,8 @@ from admin_api.filtersets.event.presentation import (
     PresentationAdminFilterSet,
     PresentationCategoryAdminFilterSet,
     PresentationSpeakerAdminFilterSet,
+    PresentationTypeAdminFilterSet,
+    RoomAdminFilterSet,
     RoomScheduleAdminFilterSet,
 )
 from admin_api.serializers.event.presentation import (
@@ -16,6 +18,7 @@ from admin_api.serializers.event.presentation import (
 )
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
+from core.pagination import AdminPagination
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from event.presentation.models import (
@@ -36,6 +39,7 @@ class PresentationTypeAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = PresentationTypeAdminSerializer
     permission_classes = [IsSuperUser]
+    filterset_class = PresentationTypeAdminFilterSet
     queryset = PresentationType.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")
 
 
@@ -71,6 +75,8 @@ class RoomAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = RoomAdminSerializer
     permission_classes = [IsSuperUser]
+    filterset_class = RoomAdminFilterSet
+    pagination_class = AdminPagination
     queryset = Room.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")
 
 

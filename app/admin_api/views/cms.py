@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import typing
 
+from admin_api.filtersets.cms import PageAdminFilterSet
 from admin_api.serializers.cms import (
     DomainGroupAdminSerializer,
     PageAdminSerializer,
@@ -11,6 +12,7 @@ from admin_api.serializers.cms import (
 from cms.models import DomainGroup, Page, Section, Sitemap
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
+from core.pagination import AdminPagination
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from django.db import transaction
 from drf_spectacular.utils import extend_schema, extend_schema_view
@@ -71,6 +73,8 @@ class SitemapAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
 class PageAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     serializer_class = PageAdminSerializer
     permission_classes = [IsSuperUser]
+    filterset_class = PageAdminFilterSet
+    pagination_class = AdminPagination
     queryset = Page.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")
 
     @staticmethod

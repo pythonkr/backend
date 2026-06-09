@@ -1,6 +1,8 @@
+from admin_api.filtersets.file import PublicFileAdminFilterSet
 from admin_api.serializers.file import PublicFileAdmimUploadSerializer, PublicFileAdminSerializer
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
+from core.pagination import AdminPagination
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from drf_spectacular import utils
 from file.models import PublicFile
@@ -19,6 +21,8 @@ class PublicFileAdminViewSet(
 ):
     serializer_class = PublicFileAdminSerializer
     permission_classes = [IsSuperUser]
+    filterset_class = PublicFileAdminFilterSet
+    pagination_class = AdminPagination
     queryset = PublicFile.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")
 
     @utils.extend_schema(

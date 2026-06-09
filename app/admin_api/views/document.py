@@ -1,3 +1,4 @@
+from admin_api.filtersets.document import IssuedDocumentAdminFilterSet
 from admin_api.serializers.document import DocumentTemplateAdminSerializer, IssuedDocumentAdminSerializer
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
@@ -26,6 +27,7 @@ class DocumentTemplateAdminViewSet(JsonSchemaViewSet, ModelViewSet):
 class IssuedDocumentAdminViewSet(JsonSchemaViewSet, ReadOnlyModelViewSet):
     permission_classes = [IsSuperUser]
     pagination_class = AdminPagination
+    filterset_class = IssuedDocumentAdminFilterSet
     serializer_class = IssuedDocumentAdminSerializer
     queryset = (
         IssuedDocument.objects.filter_active()
