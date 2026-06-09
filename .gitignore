@@ -253,6 +253,9 @@ static/*
 media
 media/*
 
+# Git worktrees (scripts/dev-worktree.sh creates .worktrees/<slug> in-repo)
+.worktrees/
+
 # Jupyter Notebook
 .ipynb_checkpoints
 .ipynb_checkpoints/*

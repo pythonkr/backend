@@ -91,9 +91,10 @@ local-test-cov-shop:
 		--cov-fail-under=100
 
 # Git worktree helpers — per-branch worktree with its own Postgres DB.
+# Worktrees default to .worktrees/<slug> inside the repo (gitignored).
 # See scripts/dev-worktree.sh.
-#   make local-worktree-add branch=feat/foo [dir=../backend-foo]
-#   make local-worktree-remove dir=../backend-foo
+#   make local-worktree-add branch=feat/foo [dir=.worktrees/foo]
+#   make local-worktree-remove dir=.worktrees/feat_foo
 local-worktree-add:
 	@$(if $(branch),,$(error branch=<name> is required))
 	@./scripts/dev-worktree.sh add "$(branch)" "$(dir)"

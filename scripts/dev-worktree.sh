@@ -52,7 +52,7 @@ sanitize() {
 cmd_add() {
   local branch="${1:-}"; [ -n "$branch" ] || usage 1
   local slug; slug=$(sanitize "$branch")
-  local wt_dir="${2:-$REPO_ROOT/../backend-$slug}"
+  local wt_dir="${2:-$REPO_ROOT/.worktrees/$slug}"
 
   load_db_env "$SRC_ENV"
   # PG identifier limit is 63 chars; pytest-django auto-creates test_<dbname>,
