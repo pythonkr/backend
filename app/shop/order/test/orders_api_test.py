@@ -1,9 +1,11 @@
+from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
 from core.const.shop_error_messages import CartNotOrderableErrorMessages
 from core.external_apis.portone.client import PortOneException
 from core.util.testutil import to_json
+from django.utils import timezone
 from rest_framework.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -15,7 +17,7 @@ from rest_framework.status import (
 from shop.conftest import VALID_TICKET_INFO
 from shop.order.models import CustomerInfo, Order, OrderProductRelation, SingleProductCart, TicketInfo
 from shop.order.serializers.dto import OrderDto, SingleProductCartDto
-from shop.payment_history.models import PaymentHistoryStatus
+from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
 from shop.test.helpers import OrdersApi
 
 
@@ -41,6 +43,22 @@ def test_order_list_excludes_other_users_orders(other_client, order_factory):
     response = OrdersApi(http_client=other_client).list()
     assert response.status_code == HTTP_200_OK
     assert response.json() == []
+
+
+@pytest.mark.django_db
+def test_order_list_orders_by_first_paid_at_desc(customer_client, order_factory):
+    # 먼저 생성된 주문(= Order.created_at 이 더 과거)이 더 최근에 결제되도록 구성.
+    # 이렇게 해야 created_at 기본 정렬과 first_paid_at 정렬의 결과가 달라져 검증이 유효하다.
+    older_order = order_factory(status="completed")
+    newer_order = order_factory(status="completed")
+    now = timezone.now()
+    PaymentHistory.objects.filter(order=older_order).update(created_at=now)
+    PaymentHistory.objects.filter(order=newer_order).update(created_at=now - timedelta(days=1))
+
+    response = OrdersApi(http_client=customer_client).list()
+
+    assert response.status_code == HTTP_200_OK
+    assert [order["id"] for order in response.json()] == [str(older_order.id), str(newer_order.id)]
 
 
 @pytest.mark.django_db

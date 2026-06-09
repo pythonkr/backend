@@ -83,7 +83,10 @@ class OrderViewSet(
         if self.action == "retrieve_receipt":
             user_filter = {} if self.request.user.is_staff else {"user": self.request.user}
             return base_qs.filter_has_payment_histories().filter(**user_filter).distinct()
-        return base_qs.with_dto_prefetches().filter_has_payment_histories().filter(user=self.request.user).distinct()
+        qs = base_qs.with_dto_prefetches().filter_has_payment_histories().filter(user=self.request.user).distinct()
+        if self.action == "list":
+            qs = qs.order_by_first_paid_at()
+        return qs
 
     @extend_schema(
         summary="단건 주문 프로세스 시작",

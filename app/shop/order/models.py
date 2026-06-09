@@ -130,6 +130,15 @@ class OrderQuerySet(BaseCartQuerySet):
             ~models.Exists(PaymentHistory.objects.filter_active().filter(order=models.OuterRef("id")))
         )
 
+    def order_by_first_paid_at(self) -> models.QuerySet[Order]:
+        """첫 결제(최초 active payment_history) 시각이 최근인 주문이 먼저 오도록 정렬."""
+        return self.annotate(
+            _first_paid_at=PaymentHistory.objects.filter_active()
+            .filter(order_id=models.OuterRef("id"))
+            .order_by("created_at")
+            .values("created_at")[:1]
+        ).order_by(models.F("_first_paid_at").desc(nulls_last=True), "-created_at")
+
     def for_dto_response(self) -> models.QuerySet[Order]:
         return self.select_related("customer_info").with_dto_prefetches()
 
