@@ -44,8 +44,14 @@ def get_request_log_data(request: HttpRequest | Request) -> dict[str, str | dict
 
 def get_response_log_data(response: HttpResponseBase) -> dict[str, int | str | dict]:
     response_body = getattr(response, "content", getattr(response, "streaming_content", "Couldn't get response body"))
-    with contextlib.suppress(json.JSONDecodeError, TypeError):
-        response_body = response_body and json.loads(response_body)
+    if isinstance(response_body, bytes) and response_body:
+        try:
+            response_body = json.loads(response_body)
+        except json.JSONDecodeError:
+            response_body = response_body.decode("utf-8", "ignore")
+        except UnicodeDecodeError:
+            # 파일 다운로드 등 바이너리 응답은 디코딩이 불가능하므로 본문 대신 크기만 남김
+            response_body = f"Binary response body ({len(response_body)} bytes) is not logged."
 
     with contextlib.suppress(json.JSONDecodeError, TypeError):
         if json.dumps(response_body).encode("utf-8").__sizeof__() > 102400:
