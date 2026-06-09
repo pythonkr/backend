@@ -61,6 +61,7 @@ class TicketInfoDto(serializers.ModelSerializer):
 
 class OrderProductRelationDto(serializers.ModelSerializer):
     product = SimpleProductDto()
+    is_ticket = serializers.BooleanField(source="product.category.is_ticket", read_only=True)
     options = OrderProductOptionRelationDto(many=True)
     scancode_url = serializers.SerializerMethodField()
     ticket_info = TicketInfoDto(allow_null=True)
@@ -74,6 +75,7 @@ class OrderProductRelationDto(serializers.ModelSerializer):
         fields = (
             "id",
             "product",
+            "is_ticket",
             "options",
             "status",
             "price",

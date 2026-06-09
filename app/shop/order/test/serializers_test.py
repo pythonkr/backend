@@ -22,6 +22,7 @@ def test_order_product_relation_dto_scancode_url_for_ticket_category(ticket_prod
             "price": ticket_product.price,
             "image": None,
         },
+        "is_ticket": True,
         "options": [],
         "status": opr.status,
         "price": opr.price,
@@ -43,6 +44,7 @@ def test_order_product_relation_dto_scancode_url_none_for_non_ticket_category(cu
     assert OrderProductRelationDto(instance=opr).data == {
         "id": str(opr.id),
         "product": {"id": str(product.id), "name": product.name, "price": product.price, "image": None},
+        "is_ticket": False,
         "options": [],
         "status": opr.status,
         "price": opr.price,
@@ -94,6 +96,7 @@ def test_order_dto_includes_scancode_url_and_nested_payload(ticket_product, orde
                     "price": ticket_product.price,
                     "image": None,
                 },
+                "is_ticket": True,
                 "options": [],
                 "status": opr.status,
                 "price": opr.price,

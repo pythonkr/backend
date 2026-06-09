@@ -153,6 +153,7 @@ class OptionGroupDto(serializers.ModelSerializer):
 class ProductDto(serializers.ModelSerializer):
     category_group = serializers.CharField(source="category.group.name")
     category = serializers.CharField(source="category.name")
+    is_ticket = serializers.BooleanField(source="category.is_ticket", read_only=True)
     image = serializers.FileField(source="image.file", read_only=True, allow_null=True)
     option_groups = OptionGroupDto(many=True)
     tag_names: serializers.StringRelatedField = serializers.StringRelatedField(source="tags", many=True)
@@ -173,6 +174,7 @@ class ProductDto(serializers.ModelSerializer):
             "refundable_ends_at",
             "category_group",
             "category",
+            "is_ticket",
             "option_groups",
             "leftover_stock",
             "tag_names",
