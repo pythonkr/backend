@@ -60,6 +60,13 @@ LOGGING = {
         "django.db.backends": ({"level": LOG_LEVEL, "handlers": ["console"]} if IS_LOCAL else {}),
         "request_logger": {"level": LOG_LEVEL, "handlers": ["console"], "propagate": True},
         "slack_logger": ({"level": LOG_LEVEL, "handlers": ["slack"]} if SLACK.token and SLACK.channel else {}),
+        # drf-standardized-errors 는 예외를 응답으로 변환 → process_exception 미들웨어 미발화.
+        # 핸들러가 5xx 를 traceback 과 함께 django.request(ERROR) 로 남기므로 console+slack 으로 라우팅.
+        "django.request": {
+            "level": "ERROR",
+            "handlers": ["console", "slack"] if SLACK.token and SLACK.channel else ["console"],
+            "propagate": False,
+        },
     },
 }
 
