@@ -2,7 +2,7 @@
 from logging import getLogger
 from typing import Any
 
-from core.external_apis.__interface__ import NotificationServiceInterface, SendParameters
+from core.external_apis.__interface__ import NotificationSendError, NotificationServiceInterface, SendParameters
 from django.conf import settings
 from httpx import Client
 
@@ -32,6 +32,13 @@ class NHNCloudKakaoAlimTalkClient(NotificationServiceInterface):
             "recipientList": [{"recipientNo": data["send_to"], "templateParameter": data["payload"]}],
         }
         result = self.session.post("/messages", json=body).raise_for_status().json()
+
+        # NHN은 발송 거부 시에도 HTTP 200을 주므로 수신자별 결과와 header를 직접 검증.
+        if failed := [r for r in (result.get("message") or {}).get("sendResults", []) if r.get("resultCode") != 0]:
+            detail = "; ".join(f"{r.get('recipientNo')}={r.get('resultCode')} {r.get('resultMessage')}" for r in failed)
+            raise NotificationSendError(f"Alimtalk send failed: {detail}")
+        if not result.get("header", {}).get("isSuccessful"):
+            raise NotificationSendError(f"Alimtalk request failed: {result.get('header')}")
         logger.info(
             "Alimtalk send results: result_code=%s, result_message=%s",
             result["header"]["resultCode"],

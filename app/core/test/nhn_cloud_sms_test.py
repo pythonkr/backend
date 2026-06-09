@@ -2,8 +2,8 @@ import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
-from core.external_apis.__interface__ import SendParameters
-from core.external_apis.nhn_cloud_sms import nhn_cloud_sms_client
+from core.external_apis.__interface__ import NotificationSendError, SendParameters
+from core.external_apis.nhn_cloud.sms import nhn_cloud_sms_client
 
 
 @pytest.fixture
@@ -97,7 +97,38 @@ def test_send_message_template_id_omitted_when_template_code_empty(mock_session)
 
 
 def test_send_message_logs_result_code_and_message_on_success(mock_session, caplog):
-    with caplog.at_level(logging.INFO, logger="core.external_apis.nhn_cloud_sms"):
+    with caplog.at_level(logging.INFO, logger="core.external_apis.nhn_cloud.sms"):
         nhn_cloud_sms_client.send_message(data=_params())
 
     assert any("result_code=0" in r.getMessage() and "SUCCESS" in r.getMessage() for r in caplog.records)
+
+
+def test_send_message_raises_when_nhn_rejects_with_http_200(mock_session):
+    # NHN은 발송을 거부해도 HTTP 200을 주므로 header.isSuccessful을 검증해야 한다.
+    mock_session.post.return_value.json.return_value = {
+        "header": {"isSuccessful": False, "resultCode": -1, "resultMessage": "fail"},
+    }
+    with pytest.raises(NotificationSendError, match="SMS"):
+        nhn_cloud_sms_client.send_message(data=_params())
+
+
+def test_send_message_raises_when_recipient_failed_but_header_successful(mock_session):
+    # SMS는 개별 수신자가 실패해도 header.isSuccessful=true 라 sendResultList까지 봐야 한다.
+    mock_session.post.return_value.json.return_value = {
+        "header": {"isSuccessful": True, "resultCode": 0, "resultMessage": "SUCCESS"},
+        "body": {
+            "data": {"sendResultList": [{"recipientNo": "01012345678", "resultCode": 5, "resultMessage": "fail"}]}
+        },
+    }
+    with pytest.raises(NotificationSendError, match="01012345678"):
+        nhn_cloud_sms_client.send_message(data=_params())
+
+
+def test_send_message_raises_cleanly_when_body_is_null(mock_session):
+    # 요청 단위 실패 시 NHN이 body/data를 null로 줄 수 있다. AttributeError가 아니라 명확한 예외여야 한다.
+    mock_session.post.return_value.json.return_value = {
+        "header": {"isSuccessful": False, "resultCode": -1, "resultMessage": "fail"},
+        "body": {"data": None},
+    }
+    with pytest.raises(NotificationSendError, match="SMS"):
+        nhn_cloud_sms_client.send_message(data=_params())

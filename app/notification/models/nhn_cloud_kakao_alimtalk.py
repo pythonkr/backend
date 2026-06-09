@@ -1,7 +1,7 @@
 from re import compile as re_compile
 from typing import Any, ClassVar, Self
 
-from core.external_apis.nhn_cloud_kakao_alimtalk import NHNCloudKakaoAlimTalkClient, nhn_cloud_kakao_alimtalk_client
+from core.external_apis.nhn_cloud.kakao_alimtalk import NHNCloudKakaoAlimTalkClient, nhn_cloud_kakao_alimtalk_client
 from core.logger.util.django_helper import default_json_dumps
 from core.models import BaseAbstractModelQuerySet
 from django.db import models, transaction

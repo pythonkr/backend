@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from core.external_apis.nhn_cloud_sms import NHNCloudSMSClient, nhn_cloud_sms_client
+from core.external_apis.nhn_cloud.sms import NHNCloudSMSClient, nhn_cloud_sms_client
 from django.db import models
 from notification.models.base import (
     NotificationHistoryBase,

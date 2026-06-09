@@ -2,7 +2,7 @@
 from logging import getLogger
 from typing import Any, TypedDict, cast
 
-from core.external_apis.__interface__ import NotificationServiceInterface, SendParameters
+from core.external_apis.__interface__ import NotificationSendError, NotificationServiceInterface, SendParameters
 from django.conf import settings
 from httpx import Client
 
@@ -50,6 +50,15 @@ class NHNCloudSMSClient(NotificationServiceInterface):
             url = "/sender/sms"
 
         result = self.session.post(url, json=body).raise_for_status().json()
+
+        # SMS는 개별 수신자 실패 시에도 header는 성공이므로 sendResultList까지 검증해야 한다.
+        send_results = ((result.get("body") or {}).get("data") or {}).get("sendResultList", [])
+        if failed := [r for r in send_results if r.get("resultCode") != 0]:
+            detail = "; ".join(f"{r.get('recipientNo')}={r.get('resultCode')} {r.get('resultMessage')}" for r in failed)
+            raise NotificationSendError(f"SMS send failed: {detail}")
+        if not result.get("header", {}).get("isSuccessful"):
+            raise NotificationSendError(f"SMS request failed: {result.get('header')}")
+
         logger.info(
             "SMS send results: result_code=%s, result_message=%s",
             result["header"]["resultCode"],
