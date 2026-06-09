@@ -84,7 +84,7 @@ class OrderAdminViewSet(
             first_paid_at=_payment_history_created_at_subquery(latest=False),
             status_changed_at=_payment_history_created_at_subquery(latest=True),
         )
-        .order_by("-created_at")
+        .order_by(models.F("first_paid_at").desc(nulls_last=True), "-created_at")
     )
 
     @extend_schema(

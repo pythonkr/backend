@@ -43,6 +43,21 @@ def test_admin_list_returns_only_orders_with_payment_history_and_products(api_cl
 
 
 @pytest.mark.django_db
+def test_admin_list_orders_by_first_paid_at_desc(api_client, order_factory):
+    # 먼저 생성된 주문(= created_at 이 더 과거)이 더 최근에 결제되도록 구성.
+    # 이렇게 해야 created_at 기본 정렬과 first_paid_at 정렬의 결과가 달라져 검증이 유효하다.
+    older_order = order_factory(status="completed")
+    newer_order = order_factory(status="completed")
+    PaymentHistory.objects.filter(order=older_order).update(created_at=datetime(2026, 5, 2, tzinfo=timezone.utc))
+    PaymentHistory.objects.filter(order=newer_order).update(created_at=datetime(2026, 5, 1, tzinfo=timezone.utc))
+
+    response = OrdersAdminApi(http_client=api_client).list()
+
+    assert response.status_code == HTTP_200_OK
+    assert [row["id"] for row in response.json()["results"]] == [str(older_order.id), str(newer_order.id)]
+
+
+@pytest.mark.django_db
 def test_admin_list_filters_by_status_csv(api_client, order_factory):
     order_factory(status="completed")
     refunded_order = order_factory(status="refunded")
