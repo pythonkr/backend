@@ -13,6 +13,16 @@ from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
 from shop.product.models import Product
 from simple_history.utils import bulk_update_with_history
 
+# check_refundable_date=False(운영자 강제 환불)로 우회 가능한 환불 일자/가능 여부 사유.
+_REFUND_DATE_OVERRIDABLE_REASONS = frozenset(
+    {
+        NotRefundableErrorMessages.ONE_OF_PRODUCT_REFUND_TIME_EXPIRED,
+        NotRefundableErrorMessages.ONE_OF_PRODUCT_IS_NOT_REFUNDABLE,
+        NotRefundableErrorMessages.PRODUCT_REFUND_TIME_EXPIRED,
+        NotRefundableErrorMessages.PRODUCT_IS_NOT_REFUNDABLE,
+    }
+)
+
 
 def _check_totp(context: dict, totp_value: str | None) -> None:
     if not context.get("check_totp", True):
@@ -39,10 +49,10 @@ class OrderTotalRefundSerializer(serializers.ModelSerializer):
     - 환불할 금액이 없는 경우
     - 환불할 금액이 음수인 경우
     - 환불할 금액이 남은 결제 금액과 일치하지 않는 경우
-    - 환불 가능한 일자를 지난 상품이 있는 경우
+    - 환불 가능한 일자를 지났거나 환불 불가(refundable_ends_at=null)인 상품이 있는 경우
 
     Context:
-    - check_refundable_date (default True): 환불 가능 일자를 지난 상품이 있어도 환불 허용 시 False.
+    - check_refundable_date (default True): 환불 가능 일자를 지났거나 환불 불가인 상품이 있어도 환불 허용 시 False.
     - check_totp (default True): TOTP 검증 강제 여부. False 시 totp 입력 무시.
     """
 
@@ -72,9 +82,7 @@ class OrderTotalRefundSerializer(serializers.ModelSerializer):
         check_refundable_date = self.context.get("check_refundable_date", True)
         order: Order = typing.cast(Order, self.instance)
         if reason := order.not_fully_refundable_reason:
-            if not (
-                reason == NotRefundableErrorMessages.ONE_OF_PRODUCT_REFUND_TIME_EXPIRED and not check_refundable_date
-            ):
+            if not (reason in _REFUND_DATE_OVERRIDABLE_REASONS and not check_refundable_date):
                 raise serializers.ValidationError(reason)
 
         return attrs
@@ -90,9 +98,7 @@ class OrderTotalRefundSerializer(serializers.ModelSerializer):
         order = typing.cast(Order, self.instance)
         if reason := order.not_fully_refundable_reason:
             check_refundable_date = self.context.get("check_refundable_date", True)
-            if not (
-                reason == NotRefundableErrorMessages.ONE_OF_PRODUCT_REFUND_TIME_EXPIRED and not check_refundable_date
-            ):
+            if not (reason in _REFUND_DATE_OVERRIDABLE_REASONS and not check_refundable_date):
                 raise serializers.ValidationError(reason)
 
         portone_client.req_cancel_payment(
@@ -124,11 +130,11 @@ class OrderProductRefundSerializer(serializers.ModelSerializer):
     아래의 경우에는 ValidationError를 발생시킵니다.
     - 주문에 PortOne ID가 없는 경우 (보통 결제가 완료되지 않았거나 주문 불러오기로 생성한 주문인 경우입니다.)
     - 이미 사용했거나 결제 전, 환불된 상품인 경우
-    - 환불 가능한 일자를 지난 상품이 있는 경우
+    - 환불 가능한 일자를 지났거나 환불 불가(refundable_ends_at=null)인 상품인 경우
     - 환불 금액이 없는 경우
 
     Context:
-    - check_refundable_date (default True): 환불 가능 일자를 지난 상품이어도 환불 허용 시 False.
+    - check_refundable_date (default True): 환불 가능 일자를 지났거나 환불 불가인 상품이어도 환불 허용 시 False.
     - check_totp (default True): TOTP 검증 강제 여부. False 시 totp 입력 무시.
     """
 
@@ -149,7 +155,7 @@ class OrderProductRefundSerializer(serializers.ModelSerializer):
         order_product_rel = typing.cast(OrderProductRelation, self.instance)
 
         if reason := order_product_rel.not_refundable_reason:
-            if not (reason == NotRefundableErrorMessages.PRODUCT_REFUND_TIME_EXPIRED and not check_refundable_date):
+            if not (reason in _REFUND_DATE_OVERRIDABLE_REASONS and not check_refundable_date):
                 raise serializers.ValidationError(reason)
 
         return attrs
@@ -164,7 +170,7 @@ class OrderProductRefundSerializer(serializers.ModelSerializer):
         # validate() 가 lock 전 stale 상태를 봤을 수 있어 lock 후 invariant 재검사.
         if reason := order_product_rel.not_refundable_reason:
             check_refundable_date = self.context.get("check_refundable_date", True)
-            if not (reason == NotRefundableErrorMessages.PRODUCT_REFUND_TIME_EXPIRED and not check_refundable_date):
+            if not (reason in _REFUND_DATE_OVERRIDABLE_REASONS and not check_refundable_date):
                 raise serializers.ValidationError(reason)
 
         refund_request_price = order_product_rel.price + order_product_rel.donation_price

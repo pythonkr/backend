@@ -69,6 +69,8 @@ class NotRefundableErrorMessages:
     )
     ONE_OF_PRODUCT_REFUND_TIME_EXPIRED = "주문 중 환불 가능 기간이 지난 상품이 존재합니다. 개별 환불을 진행해주세요."
     PRODUCT_REFUND_TIME_EXPIRED = "상품의 환불 가능 기간이 지났습니다. PyCon 한국 준비 위원회에 문의해주세요."
+    ONE_OF_PRODUCT_IS_NOT_REFUNDABLE = "주문 중 환불할 수 없는 상품이 존재합니다. 개별 환불을 진행해주세요."
+    PRODUCT_IS_NOT_REFUNDABLE = "해당 상품은 환불할 수 없습니다. PyCon 한국 준비 위원회에 문의해주세요."
     PRODUCT_PRICE_IS_ZERO = "환불 가능한 상품이 아닙니다. (환불할 금액이 없습니다.)"
     PRODUCT_STATUS_IS_NOT_PAID = (
         "결제하지 않았거나, 이미 사용했거나 환불한 상품입니다. PyCon 한국 준비 위원회에 문의해주세요."

@@ -138,7 +138,12 @@ class Product(BaseAbstractModel):
     visible_ends_at = models.DateTimeField(default=datetime.datetime.max)
     orderable_starts_at = models.DateTimeField(default=datetime.datetime.min)
     orderable_ends_at = models.DateTimeField(default=datetime.datetime.max)
-    refundable_ends_at = models.DateTimeField(default=datetime.datetime.max)
+    refundable_ends_at = models.DateTimeField(
+        default=datetime.datetime.max,
+        null=True,
+        blank=True,
+        help_text="환불 가능 마감 시간. null인 경우 환불 불가. 항상 환불 가능한 상품을 만들려면 9999-12-31같은 먼 미래 날짜로 설정해주세요.",
+    )
 
     category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="products")
     priority = models.IntegerField(default=0)

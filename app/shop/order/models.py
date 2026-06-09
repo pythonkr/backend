@@ -292,7 +292,7 @@ class Order(PaymentPreparationMixin, ScanCodeMixin, BaseAbstractModel):
         - 환불할 금액이 없는 경우
         - 환불할 금액이 음수인 경우
         - 환불할 금액이 남은 결제 금액과 일치하지 않는 경우
-        - 환불 가능한 일자를 지난 상품이 있는 경우
+        - 환불 가능한 일자를 지났거나 환불 불가(refundable_ends_at=null)인 상품이 있는 경우
         """
         from shop.payment_history.models import REFUNDABLE_STATUSES
         from shop.product.models import Product
@@ -324,8 +324,12 @@ class Order(PaymentPreparationMixin, ScanCodeMixin, BaseAbstractModel):
             return NotRefundableErrorMessages.ORDER_REFUND_TARGET_PRICE_IS_MISMATCH
 
         now = now_aware()
-        if any(typing.cast(Product, rel.product).refundable_ends_at < now for rel in refund_target_product_relations):
-            return NotRefundableErrorMessages.ONE_OF_PRODUCT_REFUND_TIME_EXPIRED
+        for rel in refund_target_product_relations:
+            refundable_ends_at = typing.cast(Product, rel.product).refundable_ends_at
+            if refundable_ends_at is None:
+                return NotRefundableErrorMessages.ONE_OF_PRODUCT_IS_NOT_REFUNDABLE
+            if refundable_ends_at < now:
+                return NotRefundableErrorMessages.ONE_OF_PRODUCT_REFUND_TIME_EXPIRED
 
         return None
 
@@ -401,7 +405,7 @@ class OrderProductRelation(ScanCodeMixin, IssuableMixin, BaseAbstractModel):
         환불이 불가능한 경우는 다음과 같습니다.
         - 주문에 PortOne ID가 없는 경우 (보통 결제가 완료되지 않았거나 주문 불러오기로 생성한 주문인 경우입니다.)
         - 이미 사용했거나 결제 전, 또는 환불된 상품인 경우
-        - 환불 가능한 일자를 지난 상품이 있는 경우
+        - 환불 가능한 일자를 지났거나 환불 불가(refundable_ends_at=null)인 상품인 경우
         - 환불 금액이 없는 경우
         """
         from shop.payment_history.models import REFUNDABLE_STATUSES
@@ -415,7 +419,10 @@ class OrderProductRelation(ScanCodeMixin, IssuableMixin, BaseAbstractModel):
         if self.status != OrderProductRelation.OrderProductStatus.paid:
             return NotRefundableErrorMessages.PRODUCT_STATUS_IS_NOT_PAID
 
-        if typing.cast(Product, self.product).refundable_ends_at < now_aware():
+        refundable_ends_at = typing.cast(Product, self.product).refundable_ends_at
+        if refundable_ends_at is None:
+            return NotRefundableErrorMessages.PRODUCT_IS_NOT_REFUNDABLE
+        if refundable_ends_at < now_aware():
             return NotRefundableErrorMessages.PRODUCT_REFUND_TIME_EXPIRED
 
         if (self.price + self.donation_price) == 0:

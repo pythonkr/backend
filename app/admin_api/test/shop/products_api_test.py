@@ -135,6 +135,15 @@ def test_admin_product_create_returns_201(api_client, ticket_product):
 
 
 @pytest.mark.django_db
+def test_admin_product_partial_update_can_set_refundable_ends_at_null(api_client, ticket_product):
+    # null = 환불 불가 상품. 운영자가 어드민에서 직접 지정하는 경로.
+    response = ProductsAdminApi(http_client=api_client).update(ticket_product.id, {"refundable_ends_at": None})
+    assert response.status_code == HTTP_200_OK
+    ticket_product.refresh_from_db()
+    assert ticket_product.refundable_ends_at is None
+
+
+@pytest.mark.django_db
 def test_admin_product_partial_update_validates_orderable_after_visible_start(api_client, ticket_product):
     # orderable_starts_at(2010) < visible_starts_at(fixture default FAR_PAST=2020) → 400.
     response = ProductsAdminApi(http_client=api_client).update(
