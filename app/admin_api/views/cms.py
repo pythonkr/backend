@@ -56,6 +56,7 @@ class SectionData(typing.TypedDict):
     id: typing.NotRequired[str]
     page_id: typing.NotRequired[str]
     order: int
+    css: typing.NotRequired[str]
     body_ko: str
     body_en: str
 

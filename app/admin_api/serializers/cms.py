@@ -111,7 +111,13 @@ class SitemapAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, seria
 class PageAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
     class Meta:
         model = Page
-        fields = COMMON_ADMIN_FIELDS + ("title_ko", "title_en", "show_top_title_banner", "show_bottom_sponsor_banner")
+        fields = COMMON_ADMIN_FIELDS + (
+            "title_ko",
+            "title_en",
+            "css",
+            "show_top_title_banner",
+            "show_bottom_sponsor_banner",
+        )
 
 
 class SectionAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
@@ -119,4 +125,4 @@ class SectionAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, seria
 
     class Meta:
         model = Section
-        fields = COMMON_ADMIN_FIELDS + ("page", "order", "body_ko", "body_en")
+        fields = COMMON_ADMIN_FIELDS + ("page", "order", "css", "body_ko", "body_en")
