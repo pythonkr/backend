@@ -7,17 +7,11 @@ from django.urls import reverse
 class OrdersAdminApi(ModelApiFixture):
     name: ClassVar[str] = "v1:admin-shop-order"
 
-    def refund(self, pk, *, totp: str | None = None):
-        url = reverse(f"{self.name}-refund", kwargs={"pk": pk})
-        if totp is not None:
-            url += f"?totp={totp}"
-        return self.http_client.post(url)
+    def refund(self, pk):
+        return self.http_client.post(reverse(f"{self.name}-refund", kwargs={"pk": pk}))
 
-    def refund_product(self, pk, rel_id, *, totp: str | None = None):
-        url = reverse(f"{self.name}-refund-product", kwargs={"pk": pk, "rel_id": rel_id})
-        if totp is not None:
-            url += f"?totp={totp}"
-        return self.http_client.post(url)
+    def refund_product(self, pk, rel_id):
+        return self.http_client.post(reverse(f"{self.name}-refund-product", kwargs={"pk": pk, "rel_id": rel_id}))
 
     def import_template(self, *, product_id: str | None = None):
         params = {"product_id": product_id} if product_id is not None else None

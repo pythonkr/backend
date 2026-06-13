@@ -18,7 +18,6 @@ from rest_framework.status import (
 )
 from shop.order.models import CustomerInfo, Order, OrderProductRelation
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
-from shop.test.helpers import valid_refund_totp
 
 
 @pytest.mark.parametrize("client_fixture", ["anon_client", "customer_client"])
@@ -111,30 +110,14 @@ def test_admin_retrieve_returns_nested_payload(api_client, order_factory):
 
 
 @pytest.mark.django_db
-def test_admin_refund_action_refunds_order_with_valid_totp(api_client, mock_portone_req_cancel_payment, order_factory):
+def test_admin_refund_action_refunds_order(api_client, mock_portone_req_cancel_payment, order_factory):
     completed_order = order_factory(status="completed")
-    response = OrdersAdminApi(http_client=api_client).refund(completed_order.id, totp=valid_refund_totp())
+    response = OrdersAdminApi(http_client=api_client).refund(completed_order.id)
     assert response.status_code == HTTP_204_NO_CONTENT
     completed_order.refresh_from_db()
     statuses = list(completed_order.products.values_list("status", flat=True))
     assert statuses == [OrderProductRelation.OrderProductStatus.refunded]
     assert completed_order.payment_histories.filter(status=PaymentHistoryStatus.refunded).exists()
-
-
-@pytest.mark.django_db
-def test_admin_refund_action_rejects_invalid_totp(api_client, mock_portone_req_cancel_payment, order_factory):
-    completed_order = order_factory(status="completed")
-    response = OrdersAdminApi(http_client=api_client).refund(completed_order.id, totp="000000")
-    assert response.status_code == HTTP_400_BAD_REQUEST
-    mock_portone_req_cancel_payment.assert_not_called()
-
-
-@pytest.mark.django_db
-def test_admin_refund_action_rejects_missing_totp(api_client, mock_portone_req_cancel_payment, order_factory):
-    completed_order = order_factory(status="completed")
-    response = OrdersAdminApi(http_client=api_client).refund(completed_order.id)
-    assert response.status_code == HTTP_400_BAD_REQUEST
-    mock_portone_req_cancel_payment.assert_not_called()
 
 
 @pytest.mark.django_db
@@ -149,9 +132,7 @@ def test_admin_refund_product_action_does_partial_refund(
         price=ticket_product.price,
         status=OrderProductRelation.OrderProductStatus.paid,
     )
-    response = OrdersAdminApi(http_client=api_client).refund_product(
-        completed_order.id, target_opr.id, totp=valid_refund_totp()
-    )
+    response = OrdersAdminApi(http_client=api_client).refund_product(completed_order.id, target_opr.id)
     assert response.status_code == HTTP_204_NO_CONTENT
     target_opr.refresh_from_db()
     assert target_opr.status == OrderProductRelation.OrderProductStatus.refunded
@@ -163,7 +144,7 @@ def test_admin_refund_product_action_does_partial_refund(
 def test_admin_refund_product_action_returns_404_for_unknown_rel(api_client, order_factory):
     completed_order = order_factory(status="completed")
     response = OrdersAdminApi(http_client=api_client).refund_product(
-        completed_order.id, "00000000-0000-0000-0000-000000000000", totp=valid_refund_totp()
+        completed_order.id, "00000000-0000-0000-0000-000000000000"
     )
     assert response.status_code == HTTP_404_NOT_FOUND
 
@@ -175,7 +156,7 @@ def test_admin_refund_allows_expired_window(api_client, mock_portone_req_cancel_
     ticket_product.refundable_ends_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
     ticket_product.save()
 
-    response = OrdersAdminApi(http_client=api_client).refund(completed_order.id, totp=valid_refund_totp())
+    response = OrdersAdminApi(http_client=api_client).refund(completed_order.id)
     assert response.status_code == HTTP_204_NO_CONTENT
 
 

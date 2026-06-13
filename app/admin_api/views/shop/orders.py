@@ -88,9 +88,8 @@ class OrderAdminViewSet(
     )
 
     @extend_schema(
-        summary="주문 전체 환불 (환불 승인자 TOTP 필수)",
+        summary="주문 전체 환불",
         tags=[OpenAPITag.ADMIN_SHOP_ORDER_REFUND],
-        parameters=[OpenApiParameter(name="totp", location=OpenApiParameter.QUERY, required=True)],
         responses={status.HTTP_204_NO_CONTENT: None},
     )
     @action(detail=True, methods=["post"], url_path="refund")
@@ -98,17 +97,16 @@ class OrderAdminViewSet(
     def refund(self, request: request.Request, pk: typing.Any = None) -> response.Response:
         serializer = OrderTotalRefundSerializer(
             instance=self.get_object(),
-            data={"totp": request.query_params.get("totp")},
-            context={"check_refundable_date": False},
+            data={},
+            context={"check_refundable_date": False, "check_totp": False},
         )
         serializer.is_valid(raise_exception=True)
         serializer.refund()
         return response.Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
-        summary="주문 부분 환불 (환불 승인자 TOTP 필수)",
+        summary="주문 부분 환불",
         tags=[OpenAPITag.ADMIN_SHOP_ORDER_REFUND],
-        parameters=[OpenApiParameter(name="totp", location=OpenApiParameter.QUERY, required=True)],
         responses={status.HTTP_204_NO_CONTENT: None},
     )
     @action(detail=True, methods=["post"], url_path=r"products/(?P<rel_id>[^/.]+)/refund")
@@ -125,8 +123,8 @@ class OrderAdminViewSet(
 
         serializer = OrderProductRefundSerializer(
             instance=order_product_rel,
-            data={"totp": request.query_params.get("totp")},
-            context={"check_refundable_date": False},
+            data={},
+            context={"check_refundable_date": False, "check_totp": False},
         )
         serializer.is_valid(raise_exception=True)
         serializer.refund()

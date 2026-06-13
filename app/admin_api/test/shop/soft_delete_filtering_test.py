@@ -11,7 +11,6 @@ from rest_framework.status import HTTP_200_OK, HTTP_404_NOT_FOUND
 from shop.order.models import Order, OrderProductRelation
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
 from shop.product.models import Product
-from shop.test.helpers import valid_refund_totp
 
 
 @pytest.mark.django_db
@@ -26,9 +25,7 @@ def test_admin_refund_product_404_for_soft_deleted_opr(api_client, order_factory
     )
     stale_opr.delete()
 
-    response = OrdersAdminApi(http_client=api_client).refund_product(
-        completed.id, stale_opr.id, totp=valid_refund_totp()
-    )
+    response = OrdersAdminApi(http_client=api_client).refund_product(completed.id, stale_opr.id)
     assert response.status_code == HTTP_404_NOT_FOUND
 
 
