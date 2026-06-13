@@ -49,4 +49,4 @@ EXPOSE 8000
 
 # The reason for using nobody user is to avoid running the app as root, which can be a security risk.
 USER nobody
-CMD ["gunicorn", "core.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4", "--timeout", "30"]
+CMD ["gunicorn", "core.wsgi:application", "-c", "core/gunicorn_conf.py"]

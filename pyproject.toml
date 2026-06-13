@@ -40,6 +40,14 @@ dependencies = [
     "shortuuid>=1.0.13",
     "qrcode[pil]>=8.0",
     "weasyprint>=63.0",
+    "opentelemetry-sdk>=1.42.1",
+    "opentelemetry-exporter-otlp-proto-http>=1.42.1",
+    "opentelemetry-instrumentation-django>=0.63b1",
+    "opentelemetry-instrumentation-psycopg>=0.63b1",
+    "opentelemetry-instrumentation-celery>=0.63b1",
+    "opentelemetry-instrumentation-redis>=0.63b1",
+    "opentelemetry-instrumentation-httpx>=0.63b1",
+    "opentelemetry-instrumentation-requests>=0.63b1",
 ]
 
 [dependency-groups]

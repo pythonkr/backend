@@ -41,14 +41,19 @@ LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "basic": {"format": "%(asctime)s:%(module)s:%(levelname)s:%(message)s", "datefmt": "%Y-%m-%d %H:%M:%S"},
+        "basic": {
+            "format": "%(asctime)s:%(module)s:%(levelname)s:%(message)s trace_id=%(otelTraceID)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        },
         "slack": {"()": "core.logger.formatter.slack.SlackJsonFormatter"},
     },
+    "filters": {"otel_trace": {"()": "core.logger.filter.otel.OtelTraceContextFilter"}},
     "handlers": {
         "console": {
             "level": LOG_LEVEL,
             "class": "logging.StreamHandler",
             "formatter": "basic",
+            "filters": ["otel_trace"],
         },
         "slack": {
             "level": LOG_LEVEL,
