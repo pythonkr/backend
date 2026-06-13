@@ -7,7 +7,6 @@ import corsheaders.defaults
 import environ
 import sentry_sdk
 import sentry_sdk.integrations.django
-from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = pathlib.Path(__file__).resolve().parent.parent
@@ -304,64 +303,28 @@ MEDIA_ROOT = pathlib.Path(env("DJANGO_MEDIA_ROOT", default=BASE_DIR / "media"))
 DATA_UPLOAD_MAX_MEMORY_SIZE = 30 * 1024 * 1024  # 30 MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 30 * 1024 * 1024  # 30 MB
 
-S3_STORAGE_BACKEND = "storages.backends.s3.S3Storage"
+# 스토리지는 자체 호스팅(FileSystemStorage)만 지원한다. static·미디어 모두 nginx 가 서빙한다.
+#  - static: collectstatic -> STATIC_ROOT, nginx 가 STATIC_URL 로 서빙.
+#  - 미디어(public 업로드): PublicFile 은 upload_to="public/" 이므로 디스크 경로는 MEDIA_ROOT/public/<name>,
+#    URL 은 MEDIA_URL + "public/<name>" 로 떨어진다. (location/base_url 기본값 = MEDIA_ROOT/MEDIA_URL)
+DEFAULT_STORAGE_BACKEND = env("DJANGO_DEFAULT_STORAGE_BACKEND", default="django.core.files.storage.FileSystemStorage")
+STATIC_STORAGE_BACKEND = env(
+    "DJANGO_STATIC_STORAGE_BACKEND", default="django.contrib.staticfiles.storage.StaticFilesStorage"
+)
 
-DEFAULT_STORAGE_BACKEND = env("DJANGO_DEFAULT_STORAGE_BACKEND", default=S3_STORAGE_BACKEND)
-STATIC_STORAGE_BACKEND = env("DJANGO_STATIC_STORAGE_BACKEND", default=S3_STORAGE_BACKEND)
+STATIC_URL = env("DJANGO_STATIC_URL", default="static/")
+MEDIA_URL = env("DJANGO_MEDIA_URL", default="media/")
 
-# AWS S3 모드일 때만 S3 전용 설정을 적용한다. (env 가 S3 백엔드를 가리키면 기존 동작을 그대로 유지)
-# 그 외(FileSystemStorage = 자체 호스팅) 모드에서는 로컬 파일시스템에 맞는 설정만 넣는다.
-USING_S3 = DEFAULT_STORAGE_BACKEND == S3_STORAGE_BACKEND
+# URL 뒤에 파일 경로가 그대로 이어붙으므로 끝 슬래시를 보장한다. (예: MEDIA_URL + "public/<name>")
+if not STATIC_URL.endswith("/"):
+    STATIC_URL += "/"
+if not MEDIA_URL.endswith("/"):
+    MEDIA_URL += "/"
 
-# default(media/public)와 static 백엔드는 함께 S3 이거나 함께 자체 호스팅이어야 한다.
-# 한쪽만 S3 로 두면 STORAGES["staticfiles"] 가 버킷 없이 구성되어 조용히 깨지므로 시작 시 막는다.
-if USING_S3 != (STATIC_STORAGE_BACKEND == S3_STORAGE_BACKEND):
-    raise ImproperlyConfigured(
-        "DJANGO_DEFAULT_STORAGE_BACKEND 와 DJANGO_STATIC_STORAGE_BACKEND 는 "
-        "둘 다 S3 이거나 둘 다 비-S3(자체 호스팅) 여야 합니다. "
-        f"(default={DEFAULT_STORAGE_BACKEND!r}, static={STATIC_STORAGE_BACKEND!r})"
-    )
-
-PRIVATE_STORAGE_BUCKET_NAME = f"pyconkr-backend-{API_STAGE}"
-PUBLIC_STORAGE_BUCKET_NAME = f"pyconkr-backend-{API_STAGE}-public"
-
-if USING_S3:
-    STATIC_URL = f"https://s3.ap-northeast-2.amazonaws.com/{PRIVATE_STORAGE_BUCKET_NAME}/"
-    MEDIA_URL = f"https://s3.ap-northeast-2.amazonaws.com/{PUBLIC_STORAGE_BUCKET_NAME}/"
-
-    STATIC_STORAGE_OPTIONS = {
-        "bucket_name": PRIVATE_STORAGE_BUCKET_NAME,
-        "file_overwrite": False,
-        "addressing_style": "path",
-    }
-    PUBLIC_STORAGE_OPTIONS = {
-        "bucket_name": PUBLIC_STORAGE_BUCKET_NAME,
-        "file_overwrite": False,
-        "addressing_style": "path",
-    }
-else:
-    # 자체 호스팅(FileSystemStorage): static·미디어 모두 nginx 가 서빙한다.
-    #  - static: collectstatic -> STATIC_ROOT, nginx 가 STATIC_URL 로 서빙.
-    #  - 미디어(public 업로드): PublicFile 은 upload_to="public/" 이므로 디스크 경로는 MEDIA_ROOT/public/<name>,
-    #    URL 은 MEDIA_URL + "public/<name>" 로 떨어진다. (location/base_url 기본값 = MEDIA_ROOT/MEDIA_URL)
-    STATIC_URL = env("DJANGO_STATIC_URL", default="static/")
-    MEDIA_URL = env("DJANGO_MEDIA_URL", default="media/")
-
-    # URL 뒤에 파일 경로가 그대로 이어붙으므로 끝 슬래시를 보장한다. (예: MEDIA_URL + "public/<name>")
-    if not STATIC_URL.endswith("/"):
-        STATIC_URL += "/"
-    if not MEDIA_URL.endswith("/"):
-        MEDIA_URL += "/"
-
-    # FileSystemStorage 등 로컬 백엔드에는 S3 전용 kwargs(bucket_name 등)를 넘기지 않는다.
-    STATIC_STORAGE_OPTIONS = {}
-    PUBLIC_STORAGE_OPTIONS = {}
-
-# STORAGES 구조는 두 모드 공통이며, OPTIONS 만 위 분기에서 모드별로 채워진다.
 STORAGES = {
-    "default": {"BACKEND": DEFAULT_STORAGE_BACKEND, "OPTIONS": STATIC_STORAGE_OPTIONS},
-    "staticfiles": {"BACKEND": STATIC_STORAGE_BACKEND, "OPTIONS": STATIC_STORAGE_OPTIONS},
-    "public": {"BACKEND": DEFAULT_STORAGE_BACKEND, "OPTIONS": PUBLIC_STORAGE_OPTIONS},
+    "default": {"BACKEND": DEFAULT_STORAGE_BACKEND},
+    "staticfiles": {"BACKEND": STATIC_STORAGE_BACKEND},
+    "public": {"BACKEND": DEFAULT_STORAGE_BACKEND},
 }
 
 # Default primary key field type
