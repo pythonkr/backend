@@ -83,6 +83,11 @@ class SitemapGraph:
         return self.route_code
 
 
+# route(=parent 체인 재귀)를 이 깊이까지 select_related로 미리 로드 (더 깊은 트리는 lazy fallback).
+SITEMAP_ROUTE_PREFETCH_DEPTH = 6
+SITEMAP_ROUTE_SELECT_RELATED = "__".join(["parent_sitemap"] * SITEMAP_ROUTE_PREFETCH_DEPTH)
+
+
 class SitemapQuerySet(BaseAbstractModelQuerySet):
     def filter_by_today(self) -> typing.Self:
         now = datetime.datetime.now()
@@ -118,6 +123,8 @@ class SitemapQuerySet(BaseAbstractModelQuerySet):
 
 
 class Sitemap(BaseAbstractModel):
+    choices_select_related = (SITEMAP_ROUTE_SELECT_RELATED,)
+
     parent_sitemap = models.ForeignKey(
         "self", null=True, blank=True, default=None, on_delete=models.SET_NULL, related_name="children"
     )

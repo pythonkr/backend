@@ -66,7 +66,7 @@ class SitemapAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = SitemapAdminSerializer
     permission_classes = [IsSuperUser]
-    queryset = Sitemap.objects.filter_active().select_related_with_user("domain_group")
+    queryset = Sitemap.objects.filter_active().select_related_with_user("domain_group", *Sitemap.choices_select_related)
     filterset_fields = ["domain_group"]
 
 
