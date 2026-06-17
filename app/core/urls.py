@@ -21,6 +21,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path, re_path, resolvers
+from django.views.decorators.cache import cache_page
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 # type: ignore[assignment]
@@ -39,6 +40,8 @@ v1_apis: list[resolvers.URLPattern | resolvers.URLResolver] = [
     path("document/", include("document.urls")),
 ]
 
+SCHEMA_CACHE_TIMEOUT = 60 * 60
+
 urlpatterns = [
     # Health Check
     path("readyz/", readyz),
@@ -51,7 +54,11 @@ urlpatterns = [
     # V1 API
     re_path("^v1/", include((v1_apis, "v1"), namespace="v1")),
     # API Docs
-    path("api/schema/v1/", SpectacularAPIView.as_view(api_version="v1"), name="v1-schema"),
+    path(
+        "api/schema/v1/",
+        cache_page(SCHEMA_CACHE_TIMEOUT)(SpectacularAPIView.as_view(api_version="v1")),
+        name="v1-schema",
+    ),
     # Static files
     *static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT),
     *static(settings.STATIC_URL, document_root=settings.STATIC_ROOT),
