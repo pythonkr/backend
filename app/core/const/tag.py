@@ -33,6 +33,7 @@ class OpenAPITag:
     ADMIN_SHOP_TAG = "Admin > Shop > 태그"
     ADMIN_SHOP_REFUND_AUTHORIZER = "Admin > Shop > 환불 승인자"
     ADMIN_DOCUMENT = "Admin > Document"
+    ADMIN_DASHBOARD = "Admin > Dashboard"
 
     PARTICIPANT_PORTAL_USER = "Participant Portal > Sign-In & Sign-Out & My Profile"
     PARTICIPANT_PORTAL_PUBLIC_FILE = "Participant Portal > Public File"

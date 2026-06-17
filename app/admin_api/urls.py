@@ -1,4 +1,5 @@
 from admin_api.views.cms import DomainGroupAdminViewSet, PageAdminViewSet, SitemapAdminViewSet
+from admin_api.views.dashboard import DashboardChartAdminViewSet
 from admin_api.views.document import DocumentTemplateAdminViewSet, IssuedDocumentAdminViewSet
 from admin_api.views.event.event import EventAdminViewSet
 from admin_api.views.event.presentation import (
@@ -114,6 +115,9 @@ admin_document_router = routers.SimpleRouter()
 admin_document_router.register("templates", DocumentTemplateAdminViewSet, basename="admin-document-template")
 admin_document_router.register("issued", IssuedDocumentAdminViewSet, basename="admin-document-issued")
 
+admin_dashboard_router = routers.SimpleRouter()
+admin_dashboard_router.register("charts", DashboardChartAdminViewSet, basename="admin-dashboard-chart")
+
 admin_allauth_router = routers.SimpleRouter()
 admin_allauth_router.register("social-app", SocialAppAdminViewSet, basename="admin-social-app")
 admin_allauth_router.register("social-account", SocialAccountAdminViewSet, basename="admin-social-account")
@@ -131,5 +135,6 @@ urlpatterns = [
     path("external-api/google/", include(admin_external_api_google_router.urls)),
     path("shop/", include(admin_shop_router.urls)),
     path("document/", include(admin_document_router.urls)),
+    path("dashboard/", include(admin_dashboard_router.urls)),
     path("allauth/", include(admin_allauth_router.urls)),
 ]

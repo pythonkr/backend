@@ -354,6 +354,7 @@ class OrderProductRelation(ScanCodeMixin, IssuableMixin, BaseAbstractModel):
         refunded = "refunded", "환불함"
 
     PURCHASED_STOCK_STATUS = {OrderProductStatus.paid, OrderProductStatus.used}
+    PURCHASED_OR_REFUNDED_STATUS = PURCHASED_STOCK_STATUS | {OrderProductStatus.refunded}
 
     order = models.ForeignKey(Order, on_delete=models.PROTECT, related_name="products", null=True, blank=True)
     product = models.ForeignKey("product.Product", on_delete=models.PROTECT)
