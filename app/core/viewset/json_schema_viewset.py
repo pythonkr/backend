@@ -25,15 +25,13 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
     def _get_choices_from_queryset(qs: QuerySet, is_nullable: bool) -> list[dict[str, str]]:
         choices: list[dict[str, str]] = [{"const": None, "title": "빈 값"}] if is_nullable else []
 
-        related_model = qs.model
-        if hasattr(related_model, "get_choices_queryset"):
-            qs = related_model.get_choices_queryset()
-        else:
-            qs = qs.all()
-            if hasattr(qs, "filter_active"):
-                qs = qs.filter_active()
-            elif hasattr(related_model, "is_active"):
-                qs = qs.filter(is_active=True)
+        if hasattr(qs, "get_choices_queryset"):
+            qs = qs.get_choices_queryset()
+
+        if hasattr(qs, "filter_active"):
+            qs = qs.filter_active()
+        elif hasattr(qs.model, "is_active"):
+            qs = qs.filter(is_active=True)
 
         for row in qs:
             choices.append({"const": str(row.pk), "title": str(row)})

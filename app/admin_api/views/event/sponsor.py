@@ -59,4 +59,4 @@ class SponsorAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     permission_classes = [IsSuperUser]
     filterset_class = SponsorAdminFilterSet
     pagination_class = AdminPagination
-    queryset = Sponsor.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")
+    queryset = Sponsor.objects.filter_active().select_related_with_user("event").prefetch_related("tiers", "tags")

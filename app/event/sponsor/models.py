@@ -34,6 +34,8 @@ class Sponsor(BaseAbstractModel):
 
 
 class SponsorTier(BaseAbstractModel):
+    choices_select_related = ("event",)
+
     event = models.ForeignKey(Event, on_delete=models.PROTECT)
     name = models.CharField(max_length=256)
     order = models.IntegerField(default=0)

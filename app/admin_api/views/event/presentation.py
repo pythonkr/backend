@@ -58,7 +58,7 @@ class PresentationAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     serializer_class = PresentationAdminSerializer
     permission_classes = [IsSuperUser]
     filterset_class = PresentationAdminFilterSet
-    queryset = Presentation.objects.get_all_nested_data().select_related("created_by", "updated_by", "deleted_by")
+    queryset = Presentation.objects.filter_active().select_related_with_user("type").prefetch_related("categories")
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION]) for m in ADMIN_METHODS})

@@ -36,8 +36,14 @@ class BaseAbstractModelQuerySet(models.QuerySet):
         _fields = set(fields) | {"created_by", "updated_by", "deleted_by"}
         return self.select_related(*_fields)
 
+    def get_choices_queryset(self) -> typing.Self:
+        fields = self.model.choices_select_related
+        return self.select_related(*fields) if fields else self.all()
+
 
 class BaseAbstractModel(models.Model):
+    choices_select_related: typing.ClassVar[tuple[str, ...]] = ()
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
     created_at = models.DateTimeField(auto_now_add=True)

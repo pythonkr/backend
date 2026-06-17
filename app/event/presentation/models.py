@@ -45,6 +45,8 @@ class PresentationQuerySet(BaseAbstractModelQuerySet):
 
 
 class PresentationType(BaseAbstractModel):
+    choices_select_related = ("event",)
+
     event = models.ForeignKey(Event, on_delete=models.PROTECT)
     name = models.CharField(max_length=256)
 
@@ -79,6 +81,8 @@ class PresentationCategory(BaseAbstractModel):
 
 
 class Presentation(BaseAbstractModel):
+    choices_select_related = ("type",)
+
     type = models.ForeignKey(PresentationType, on_delete=models.PROTECT)
     title = models.CharField(max_length=256)
     summary = models.TextField(blank=True, default="")
@@ -139,6 +143,8 @@ class CallForPresentationSchedule(BaseAbstractModel):
 
 
 class Room(BaseAbstractModel):
+    choices_select_related = ("event",)
+
     event = models.ForeignKey(Event, on_delete=models.PROTECT)
     name = models.CharField(max_length=256)
 
