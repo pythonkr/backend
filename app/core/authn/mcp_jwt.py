@@ -32,7 +32,12 @@ class McpJwtTokenSerializer(JwtTokenSerializer):
         token = (
             McpToken.objects.filter_active()
             .select_related("user")
-            .filter(id=attrs["jti"], user__unique_id=attrs["aud"], user__is_active=True)
+            .filter(
+                id=attrs["jti"],
+                user__unique_id=attrs["aud"],
+                user__is_active=True,
+                user__is_superuser=True,
+            )
             .first()
         )
         if token is None:

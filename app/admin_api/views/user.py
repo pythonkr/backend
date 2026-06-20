@@ -15,6 +15,7 @@ from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from django.contrib.auth import login, logout
 from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import decorators, mixins, request, response, status, viewsets
+from rest_framework.exceptions import ValidationError
 from user.models import UserExt
 from user.models.mcp_token import McpToken
 from user.models.organization import Organization
@@ -103,7 +104,11 @@ class UserAdminViewSet(
     )
     @decorators.action(detail=True, methods=["POST"], url_path="mcp-token")
     def issue_mcp_token(self, *args: tuple, **kwargs: dict) -> response.Response:
-        token = McpToken.objects.create(user=self.get_object())
+        user = self.get_object()
+        if not user.is_superuser:
+            raise ValidationError("MCP 토큰은 슈퍼유저에게만 발급할 수 있습니다.")
+
+        token = McpToken.objects.create(user=user)
         return response.Response(
             data={"token": McpJwtTokenSerializer.issue_for(token)},
             status=status.HTTP_201_CREATED,
