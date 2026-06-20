@@ -103,6 +103,10 @@ local-worktree-remove:
 	@$(if $(dir),,$(error dir=<worktree-path> is required))
 	@./scripts/dev-worktree.sh remove "$(dir)"
 
+# Regenerate pyconkr.code-workspace (main repo + every .worktrees/<slug> as roots)
+local-worktree-sync:
+	@./scripts/dev-worktree.sh workspace
+
 
 # Devtools
 hooks-install: local-setup

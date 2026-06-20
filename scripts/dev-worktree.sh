@@ -4,6 +4,7 @@
 #
 #   scripts/dev-worktree.sh add <branch> [worktree-dir]
 #   scripts/dev-worktree.sh remove <worktree-dir>
+#   scripts/dev-worktree.sh workspace            # regen pyconkr.code-workspace
 #
 # Reads envfile/.env.local for Postgres credentials; the new worktree
 # gets a copy with only DATABASE_NAME rewritten.
@@ -12,6 +13,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_REL="envfile/.env.local"
 SRC_ENV="$REPO_ROOT/$ENV_REL"
+WORKSPACE_FILE="$REPO_ROOT/pyconkr.code-workspace"
 
 usage() {
   awk 'NR>1 && /^[^#]/ {exit} NR>1 {sub(/^# ?/, ""); print}' "$0"
@@ -47,6 +49,37 @@ pg() {
 sanitize() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]' \
     | sed -E 's/[^a-z0-9]+/_/g; s/^_+|_+$//g'
+}
+
+# Regenerate the multi-root workspace so each .worktrees/<slug> is its own root
+# (with its own Source Control) next to the main repo. .worktrees is hidden in
+# the main root to avoid showing every worktree twice.
+regen_workspace() {
+  local folders='    { "name": "backend (main)", "path": "." }'
+  local d slug
+  for d in "$REPO_ROOT"/.worktrees/*/; do
+    [ -d "$d" ] || continue
+    slug=$(basename "$d")
+    folders+=$',\n'"    { \"name\": \"wt: $slug\", \"path\": \".worktrees/$slug\" }"
+  done
+  cat > "$WORKSPACE_FILE" <<EOF
+{
+  "folders": [
+$folders
+  ],
+  "settings": {
+    "files.exclude": { "**/.worktrees": true }
+  }
+}
+EOF
+  echo "  synced ${WORKSPACE_FILE##*/} (VSCode: File → Open Workspace from File…)"
+}
+
+# Auto-refresh only for devs who opted in by creating the file once
+# (`make local-worktree-sync`). Non-VSCode users never get the file.
+sync_workspace_if_present() {
+  [ -f "$WORKSPACE_FILE" ] || return 0
+  regen_workspace
 }
 
 cmd_add() {
@@ -102,6 +135,8 @@ cmd_add() {
     exit 1
   fi
 
+  sync_workspace_if_present
+
   cat <<EOF
 
 next:
@@ -135,6 +170,8 @@ cmd_remove() {
   # DATABASE_NAME on add, and the tree may contain .venv/__pycache__/coverage
   # artifacts. The y/N prompt above is the safety gate.
   git -C "$REPO_ROOT" worktree remove --force "$wt_dir"
+
+  sync_workspace_if_present
 }
 
 main() {
@@ -142,6 +179,7 @@ main() {
   case "$sub" in
     add)         cmd_add "$@" ;;
     remove|rm)   cmd_remove "$@" ;;
+    workspace|ws|sync) regen_workspace ;;
     -h|--help|"") usage 0 ;;
     *) usage 1 ;;
   esac
