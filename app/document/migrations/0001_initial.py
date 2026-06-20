@@ -121,7 +121,7 @@ CONFIRMATION_OF_PARTICIPATION_V1 = r"""<!DOCTYPE html>
     }
 
     .footer {
-      position: absolute;
+      position: fixed;
       left: 0;
       right: 0;
       bottom: 24mm;
@@ -159,7 +159,6 @@ CONFIRMATION_OF_PARTICIPATION_V1 = r"""<!DOCTYPE html>
       bottom: 0;
       height: 24mm;
       margin-left: -13mm;
-      mix-blend-mode: multiply;
     }
   </style>
 </head>
