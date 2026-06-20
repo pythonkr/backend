@@ -10,9 +10,6 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, ClassVar
 
 from core.authn.jwt_authn import JwtBearerAuthentication, JwtTokenSerializer
-from core.util.dateutil import now_aware
-from django.conf import settings
-from jwt import encode
 from rest_framework.serializers import UUIDField, ValidationError
 
 if TYPE_CHECKING:
@@ -54,19 +51,7 @@ class McpJwtTokenSerializer(JwtTokenSerializer):
 
     @classmethod
     def issue_for(cls, token: "McpToken") -> str:
-        now = now_aware()
-        return encode(
-            {
-                "iss": cls.ISS,
-                "sub": cls.SUB,
-                "aud": str(token.user.unique_id),
-                "jti": str(token.id),
-                "iat": now,
-                "exp": now + cls.TTL,
-            },
-            key=settings.JWT_SECRET_KEY,
-            algorithm="HS256",
-        )
+        return cls.issue(token.user, extra_claims={"jti": str(token.id)})
 
 
 class McpJwtAuthentication(JwtBearerAuthentication):

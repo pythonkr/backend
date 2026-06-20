@@ -40,8 +40,8 @@ class JwtTokenSerializer(Serializer):
         return self.get_queryset().get(unique_id=self.validated_data["aud"])
 
     @classmethod
-    def issue(cls, user: "UserExt") -> str:
-        """user 에 대한 JWT 발급(HS256). 토큰 엔드포인트/MCP 토큰 교환 등에서 사용."""
+    def issue(cls, user: "UserExt", *, extra_claims: dict | None = None) -> str:
+        """user 에 대한 JWT 발급(HS256). `extra_claims` 로 jti 등 추가 클레임 주입(서브클래스가 재사용)."""
         now = now_aware()
         return encode(
             {
@@ -50,6 +50,7 @@ class JwtTokenSerializer(Serializer):
                 "aud": str(user.unique_id),
                 "iat": now,
                 "exp": now + cls.TTL,
+                **(extra_claims or {}),
             },
             key=settings.JWT_SECRET_KEY,
             algorithm="HS256",
