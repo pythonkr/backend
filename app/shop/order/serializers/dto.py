@@ -40,6 +40,7 @@ class SimpleOptionGroupDto(serializers.ModelSerializer):
             "is_custom_response",
             "custom_response_pattern",
             "response_modifiable_ends_at",
+            "placeholder_mode",
         )
         model = OptionGroup
 

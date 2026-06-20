@@ -32,7 +32,7 @@ class SimpleProductDeskSupportDto(serializers.ModelSerializer):
 
 class SimpleOptionGroupDeskSupportDto(serializers.ModelSerializer):
     class Meta:
-        fields = ("id", "name", "is_custom_response", "custom_response_pattern")
+        fields = ("id", "name", "is_custom_response", "custom_response_pattern", "placeholder_mode")
         model = OptionGroup
 
 
