@@ -46,6 +46,10 @@ dependencies = [
     "opentelemetry-instrumentation-redis>=0.63b1",
     "opentelemetry-instrumentation-httpx>=0.63b1",
     "opentelemetry-instrumentation-requests>=0.63b1",
+    "mcp>=1.28.0",
+    "uvicorn[standard]>=0.49.0",
+    "pyjwt>=2.12.1",
+    "fastmcp>=3.4.2",
 ]
 
 [dependency-groups]

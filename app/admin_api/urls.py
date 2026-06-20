@@ -13,6 +13,7 @@ from admin_api.views.event.presentation import (
 from admin_api.views.event.sponsor import SponsorAdminViewSet, SponsorTagAdminViewSet, SponsorTierAdminViewSet
 from admin_api.views.external_api.google_oauth2 import GoogleOAuth2AdminViewSet
 from admin_api.views.file import PublicFileAdminViewSet
+from admin_api.views.mcp_token import McpTokenAdminViewSet
 from admin_api.views.modification_audit import ModificationAuditAdminViewSet
 from admin_api.views.notification import (
     EmailNotificationHistoryAdminViewSet,
@@ -43,6 +44,7 @@ from rest_framework import routers
 admin_user_router = routers.SimpleRouter()
 admin_user_router.register("userext", UserAdminViewSet, basename="admin-user")
 admin_user_router.register("organization", OrganizationAdminViewSet, basename="admin-organization")
+admin_user_router.register("mcp-token", McpTokenAdminViewSet, basename="admin-mcp-token")
 
 admin_cms_router = routers.SimpleRouter()
 admin_cms_router.register("domain-group", DomainGroupAdminViewSet, basename="admin-domain-group")
