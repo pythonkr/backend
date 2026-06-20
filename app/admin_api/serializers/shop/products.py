@@ -135,6 +135,7 @@ class OptionGroupAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, N
             "is_custom_response",
             "custom_response_pattern",
             "response_modifiable_ends_at",
+            "placeholder_mode",
             "options",
         )
         nested_fields = {

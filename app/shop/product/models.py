@@ -256,6 +256,11 @@ class OptionGroupQuerySet(BaseAbstractModelQuerySet):
 
 
 class OptionGroup(BaseAbstractModel):
+    class PlaceholderMode(models.TextChoices):
+        HIDDEN = "hidden", "선택해주세요 미노출"
+        OPTIONAL = "optional", "노출, 선택해도 통과"
+        REQUIRED = "required", "노출, 선택 시 검증 실패"
+
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="option_groups")
     priority = models.IntegerField(default=0)
 
@@ -276,6 +281,11 @@ class OptionGroup(BaseAbstractModel):
         default=None,
         null=True,
         help_text="답변 수정 마감 시간. None인 경우 수정 불가.",
+    )
+    placeholder_mode = models.CharField(
+        max_length=10,
+        choices=PlaceholderMode.choices,
+        default=PlaceholderMode.HIDDEN,
     )
 
     objects: OptionGroupQuerySet = OptionGroupQuerySet.as_manager()  # type: ignore[misc, assignment]

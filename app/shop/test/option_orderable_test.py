@@ -44,7 +44,7 @@ def test_option_group_rejects_when_stock_insufficient_for_min_quantity(customer_
 
 @pytest.mark.django_db
 def test_option_rejects_when_option_is_none_for_non_custom_response_group(customer_user, option_group):
-    # option=None + group.is_custom_response=False → OPTION_NOT_SELECTED.
+    # option=None + group.is_custom_response=False + placeholder_mode=HIDDEN(기본) → OPTION_NOT_SELECTED.
     serializer = OptionOrderableCheckSerializer(
         data={"product_option_group": str(option_group.id), "product_option": None, "custom_response": None},
         context=make_serializer_context(customer_user),
@@ -53,6 +53,34 @@ def test_option_rejects_when_option_is_none_for_non_custom_response_group(custom
     assert errors_payload(serializer.errors) == {
         "product_option": [{"detail": OptionGroupNotOrderableErrorMessages.OPTION_NOT_SELECTED, "code": "invalid"}],
     }
+
+
+@pytest.mark.django_db
+def test_option_rejects_when_option_is_none_for_required_placeholder_group(customer_user, option_group):
+    # placeholder_mode=REQUIRED → "선택해주세요" 선택(미선택)은 검증 실패.
+    option_group.placeholder_mode = OptionGroup.PlaceholderMode.REQUIRED
+    option_group.save()
+    serializer = OptionOrderableCheckSerializer(
+        data={"product_option_group": str(option_group.id), "product_option": None, "custom_response": None},
+        context=make_serializer_context(customer_user),
+    )
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {
+        "product_option": [{"detail": OptionGroupNotOrderableErrorMessages.OPTION_NOT_SELECTED, "code": "invalid"}],
+    }
+
+
+@pytest.mark.django_db
+def test_option_passes_when_option_is_none_for_optional_placeholder_group(customer_user, option_group):
+    # placeholder_mode=OPTIONAL → "선택해주세요" 미선택을 허용. product_option 은 None 으로 통과.
+    option_group.placeholder_mode = OptionGroup.PlaceholderMode.OPTIONAL
+    option_group.save()
+    serializer = OptionOrderableCheckSerializer(
+        data={"product_option_group": str(option_group.id), "product_option": None, "custom_response": None},
+        context=make_serializer_context(customer_user),
+    )
+    assert serializer.is_valid()
+    assert serializer.validated_data["product_option"] is None
 
 
 @pytest.mark.django_db

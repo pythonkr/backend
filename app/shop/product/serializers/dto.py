@@ -136,6 +136,7 @@ class OptionGroupDto(serializers.ModelSerializer):
             "orderable_ends_at",
             "is_custom_response",
             "custom_response_pattern",
+            "placeholder_mode",
             "leftover_stock_per_user",
             "leftover_stock_info",
             "options",

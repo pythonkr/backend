@@ -72,8 +72,11 @@ class OptionOrderableCheckSerializer(serializers.Serializer):
         if not self.group or self.group.is_custom_response:
             return None
 
-        # 옵션 그룹이 custom_response를 받지 않는 경우, option이 선택되지 않았거나 옵션 그룹에 속하지 않은 경우 주문 불가능
+        # option 이 선택되지 않았거나 옵션 그룹에 속하지 않은 경우("선택해주세요" 상태).
+        # placeholder_mode 가 OPTIONAL 일 때만 미선택을 허용하고, 그 외에는 주문 불가능.
         if not (option and option.group_id == self.group.id):
+            if self.group.placeholder_mode == OptionGroup.PlaceholderMode.OPTIONAL:
+                return None
             raise serializers.ValidationError(OptionGroupNotOrderableErrorMessages.OPTION_NOT_SELECTED)
 
         # 옵션의 재고가 없는 경우 주문 불가능 — 단건 SOLDOUT. 합산 stock / max_per_user 는 product-level 이 본다.
