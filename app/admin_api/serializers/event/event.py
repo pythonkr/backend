@@ -8,4 +8,10 @@ from rest_framework import serializers
 class EventAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
     class Meta:
         model = Event
-        fields = COMMON_ADMIN_FIELDS + ("organization", "name_ko", "name_en")
+        fields = COMMON_ADMIN_FIELDS + (
+            "organization",
+            "name_ko",
+            "name_en",
+            "event_start_at",
+            "event_end_at",
+        )
