@@ -87,6 +87,15 @@ class CategoryGroupAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer,
         }
 
 
+class CategoryAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
+    group = serializers.PrimaryKeyRelatedField(queryset=CategoryGroup.objects.filter_active())
+    event = serializers.PrimaryKeyRelatedField(queryset=Event.objects.filter_active(), allow_null=True, required=False)
+
+    class Meta:
+        model = Category
+        fields = COMMON_ADMIN_FIELDS + ("group", "name", "priority", "is_ticket", "event")
+
+
 class TagAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
     leftover_stock = serializers.IntegerField(read_only=True, allow_null=True)
 

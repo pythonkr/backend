@@ -1,5 +1,6 @@
 class OpenAPITag:
     CMS = "CMS"
+    EVENT = "Event"
     EVENT_PRESENTATION = "Event > Presentation"
     EVENT_SPONSOR = "Event > Sponsor"
 
