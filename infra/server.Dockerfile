@@ -25,7 +25,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     apt-get update \
     && apt-get install -y --no-install-recommends gcc curl libpq-dev libpango-1.0-0 libpangoft2-1.0-0 fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/* \
-    && uv sync --no-default-groups --frozen
+    && uv sync --no-default-groups --group mcp --frozen
 
 # The nobody user has no writable fontconfig cache dir, which triggers "Fontconfig error: No writable cache directories" on every WeasyPrint render.
 # Give it a writable cache path.
@@ -43,9 +43,14 @@ ENV DEPLOYMENT_IMAGE_BUILD_DATETIME=$IMAGE_BUILD_DATETIME
 # Copy main app
 COPY --chown=nobody:nobody app/ ./
 
+# Copy the standalone MCP server package (Django-free; same image runs it via
+# `python -m mcp_app`). WORKDIR is /app, so the package resolves at /app/mcp_app.
+COPY --chown=nobody:nobody mcp_app/ ./mcp_app/
+
 ENV DJANGO_SETTINGS_MODULE="core.settings"
 
-EXPOSE 8000
+# 8000=Django(gunicorn), 9000=MCP(python -m mcp_app)
+EXPOSE 8000 9000
 
 # The reason for using nobody user is to avoid running the app as root, which can be a security risk.
 USER nobody
