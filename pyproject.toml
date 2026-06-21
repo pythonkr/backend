@@ -46,9 +46,13 @@ dependencies = [
     "opentelemetry-instrumentation-redis>=0.63b1",
     "opentelemetry-instrumentation-httpx>=0.63b1",
     "opentelemetry-instrumentation-requests>=0.63b1",
+    "pyjwt>=2.12.1",
 ]
 
 [dependency-groups]
+mcp = [
+    "fastmcp>=3.4.2",
+]
 dev = [
     "django-stubs[compatible-mypy]>=6.0.4",
     "djangorestframework-stubs[compatible-mypy]>=3.17.0",

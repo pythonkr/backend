@@ -15,7 +15,7 @@ from core.const.tag import OpenAPITag
 from core.pagination import AdminPagination
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from django.db import transaction
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import extend_schema, extend_schema_view, inline_serializer
 from drf_standardized_errors.openapi_serializers import (
     ValidationErrorEnum,
     ValidationErrorResponseSerializer,
@@ -119,7 +119,9 @@ class PageAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
 
     @extend_schema(
         tags=[OpenAPITag.ADMIN_CMS],
-        request=SectionAdminSerializer(many=True),
+        request=inline_serializer(
+            name="SectionBulkUpdateRequest", fields={"sections": SectionAdminSerializer(many=True)}
+        ),
         responses={
             status.HTTP_200_OK: SectionAdminSerializer(many=True),
             status.HTTP_400_BAD_REQUEST: ValidationErrorResponseSerializer,

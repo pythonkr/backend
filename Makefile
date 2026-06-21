@@ -4,6 +4,7 @@ PROJECT_DIR := $(dir $(MKFILE_PATH))
 # Set additional build args for docker image build using make arguments
 IMAGE_NAME := pycon_backend
 SERVER_CONTAINER_NAME = $(IMAGE_NAME)_server_container
+MCP_CONTAINER_NAME = $(IMAGE_NAME)_mcp_container
 
 ifeq ($(DOCKER_DEBUG),true)
 	DOCKER_MID_BUILD_OPTIONS = --progress=plain --no-cache
@@ -23,6 +24,10 @@ local-setup:
 # Run local development server
 local-api: local-collectstatic
 	@ENV_PATH=envfile/.env.local uv run python app/manage.py runserver 8000
+
+# Run the standalone MCP server (Django-free, calls the backend API; needs the API running).
+local-mcp:
+	@uv run --group mcp python -m mcp_app
 
 # Run local Celery worker (requires `make docker-compose-up` for redis)
 local-worker:
@@ -152,6 +157,29 @@ docker-server-stop:
 
 docker-server-rm: docker-server-stop
 	docker rm $(SERVER_CONTAINER_NAME) || true
+
+# Smoke-test the built image's MCP role without a running API: only checks deps
+# import (fastmcp installed + mcp_app importable). build() itself needs the API.
+docker-mcp-smoke:
+	@docker run --rm $(IMAGE_NAME):server \
+		python -c "import fastmcp, mcp_app.server; print('mcp ok:', fastmcp.__version__)"
+
+# Run the MCP server from the same server image (CMD override). Needs the API
+# container up (docker-server-run); reaches it via host.docker.internal:8000.
+docker-mcp-run: docker-server-run
+	@(docker stop $(MCP_CONTAINER_NAME) || true && docker rm $(MCP_CONTAINER_NAME) || true) > /dev/null 2>&1
+	@docker run -d --rm \
+		-p 9000:9000 \
+		-e MCP_HOST=0.0.0.0 \
+		-e MCP_API_BASE_URL=http://host.docker.internal:8000 \
+		--name $(MCP_CONTAINER_NAME) \
+		$(IMAGE_NAME):server python -m mcp_app
+
+docker-mcp-stop:
+	docker stop $(MCP_CONTAINER_NAME) || true
+
+docker-mcp-rm: docker-mcp-stop
+	docker rm $(MCP_CONTAINER_NAME) || true
 
 # Docker compose setup
 # Below commands are for local development only

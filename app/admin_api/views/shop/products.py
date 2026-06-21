@@ -1,6 +1,7 @@
 from admin_api.filtersets.shop.products import ProductAdminFilterSet
 from admin_api.serializers.shop.products import (
     CategoryGroupAdminSerializer,
+    CategoryReadAdminSerializer,
     OptionGroupAdminSerializer,
     ProductAdminSerializer,
     TagAdminSerializer,
@@ -30,6 +31,14 @@ class CategoryGroupAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
         )
         .annotate(category_count=Count("category", filter=Q(category__deleted_at__isnull=True)))
     )
+
+
+@extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_SHOP_CATEGORY]) for m in READONLY_METHODS})
+class CategoryAdminViewSet(JsonSchemaViewSet, viewsets.ReadOnlyModelViewSet):
+    serializer_class = CategoryReadAdminSerializer
+    permission_classes = [IsSuperUser]
+    filterset_fields = ["group", "event", "is_ticket"]
+    queryset = Category.objects.filter_active().select_related_with_user("group", "event")
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_SHOP_TAG]) for m in CRUD_METHODS})

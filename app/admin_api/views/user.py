@@ -6,15 +6,18 @@ from admin_api.serializers.user import (
     UserAdminSerializer,
     UserAdminSignInSerializer,
 )
+from core.authn.mcp_jwt import McpJwtTokenSerializer
 from core.authz import IsSuperUser
 from core.const.account import generate_random_password
 from core.const.tag import OpenAPITag
 from core.pagination import AdminPagination
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from django.contrib.auth import login, logout
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import decorators, mixins, request, response, status, viewsets
+from rest_framework.exceptions import ValidationError
 from user.models import UserExt
+from user.models.mcp_token import McpToken
 from user.models.organization import Organization
 
 USER_ADMIN_METHODS = ["list", "retrieve", "create", "partial_update"]
@@ -88,6 +91,27 @@ class UserAdminViewSet(
         return response.Response(
             data={"password": new_password},
             status=status.HTTP_200_OK,
+        )
+
+    @extend_schema(
+        tags=[OpenAPITag.ADMIN_MCP_TOKEN],
+        request=None,
+        responses={
+            status.HTTP_201_CREATED: OpenApiResponse(
+                response={"type": "object", "properties": {"token": {"type": "string"}}}
+            )
+        },
+    )
+    @decorators.action(detail=True, methods=["POST"], url_path="mcp-token")
+    def issue_mcp_token(self, *args: tuple, **kwargs: dict) -> response.Response:
+        user = self.get_object()
+        if not user.is_superuser:
+            raise ValidationError("MCP 토큰은 슈퍼유저에게만 발급할 수 있습니다.")
+
+        token = McpToken.objects.create(user=user)
+        return response.Response(
+            data={"token": McpJwtTokenSerializer.issue_for(token)},
+            status=status.HTTP_201_CREATED,
         )
 
     @extend_schema(

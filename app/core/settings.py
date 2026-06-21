@@ -22,6 +22,7 @@ env.read_env(env.str("ENV_PATH", default="envfile/.env.local"))
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="local_secret_key")
+JWT_SECRET_KEY = env.str("JWT_SECRET_KEY", default="local_jwt_secret_key")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env("DEBUG")
@@ -373,6 +374,10 @@ FRONTEND_DOMAIN = types.SimpleNamespace(
 
 # Django Rest Framework Settings
 REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework.authentication.SessionAuthentication",
+        "core.authn.mcp_jwt.McpJwtAuthentication",
+    ),
     "DEFAULT_VERSIONING_CLASS": "rest_framework.versioning.NamespaceVersioning",
     "DEFAULT_SCHEMA_CLASS": "core.openapi.schemas.BackendAutoSchema",
     "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",),

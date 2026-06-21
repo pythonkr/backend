@@ -18,3 +18,5 @@ class UserConfig(AppConfig):
         from user.models.organization import Organization
 
         register(Organization)
+
+        from user.models.mcp_token import McpToken  # noqa: F401

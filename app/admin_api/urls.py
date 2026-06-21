@@ -13,6 +13,7 @@ from admin_api.views.event.presentation import (
 from admin_api.views.event.sponsor import SponsorAdminViewSet, SponsorTagAdminViewSet, SponsorTierAdminViewSet
 from admin_api.views.external_api.google_oauth2 import GoogleOAuth2AdminViewSet
 from admin_api.views.file import PublicFileAdminViewSet
+from admin_api.views.mcp_token import McpTokenAdminViewSet
 from admin_api.views.modification_audit import ModificationAuditAdminViewSet
 from admin_api.views.notification import (
     EmailNotificationHistoryAdminViewSet,
@@ -25,6 +26,7 @@ from admin_api.views.notification import (
 from admin_api.views.shop.order_notifications import OrderNotificationAdminViewSet
 from admin_api.views.shop.orders import OrderAdminViewSet
 from admin_api.views.shop.products import (
+    CategoryAdminViewSet,
     CategoryGroupAdminViewSet,
     OptionGroupAdminViewSet,
     ProductAdminViewSet,
@@ -43,6 +45,7 @@ from rest_framework import routers
 admin_user_router = routers.SimpleRouter()
 admin_user_router.register("userext", UserAdminViewSet, basename="admin-user")
 admin_user_router.register("organization", OrganizationAdminViewSet, basename="admin-organization")
+admin_user_router.register("mcp-token", McpTokenAdminViewSet, basename="admin-mcp-token")
 
 admin_cms_router = routers.SimpleRouter()
 admin_cms_router.register("domain-group", DomainGroupAdminViewSet, basename="admin-domain-group")
@@ -106,6 +109,7 @@ admin_shop_router.register(
     "order-notifications", OrderNotificationAdminViewSet, basename="admin-shop-order-notification"
 )
 admin_shop_router.register("products", ProductAdminViewSet, basename="admin-shop-product")
+admin_shop_router.register("categories", CategoryAdminViewSet, basename="admin-shop-category")
 admin_shop_router.register("tags", TagAdminViewSet, basename="admin-shop-tag")
 admin_shop_router.register("category-groups", CategoryGroupAdminViewSet, basename="admin-shop-category-group")
 admin_shop_router.register("option-groups", OptionGroupAdminViewSet, basename="admin-shop-option-group")
