@@ -22,4 +22,5 @@ class McpTokenAdminViewSet(
     serializer_class = McpTokenAdminSerializer
     permission_classes = [IsSuperUser]
     pagination_class = AdminPagination
+    filterset_fields = ["user"]
     queryset = McpToken.objects.filter_active().select_related_with_user("user").order_by("-created_at")
