@@ -3,10 +3,9 @@ from __future__ import annotations
 import typing
 
 from core.const.tag import OpenAPITag
-from core.models import MarkdownField
+from core.openapi.ui_hints import ui_hints_for_model_field
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
-from django.db.models.fields import TextField, URLField
-from django.db.models.fields.files import FileField
+from django.db.models.fields import URLField
 from django.db.models.fields.related import ForeignKey, ManyToManyField
 from django.db.models.query import QuerySet
 from drf_spectacular import openapi, types, utils
@@ -88,7 +87,7 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
 
         return choices
 
-    def get_json_schema(self) -> dict:  # noqa: C901
+    def get_json_schema(self) -> dict:
         serializer_class = typing.cast(type[JsonSchemaSerializer], self.get_serializer_class())
 
         result = {
@@ -125,25 +124,13 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
                     if serializer_field.read_only:
                         continue
                     result["schema"]["properties"][field.name]["uniqueItems"] = True
-                    self.set_ui_schema(result["ui_schema"], field.name, {"ui:field": "m2m_select"})
-                elif isinstance(field, FileField):
-                    self.set_ui_schema(result["ui_schema"], field.name, {"ui:field": "file"})
                 elif isinstance(field, URLField):
                     result["schema"]["properties"][field.name].pop("format", None)
                 elif isinstance(field, TranslationField):
                     result["translation_fields"].add(field.translated_field.name)
-                    if isinstance(field.translated_field, MarkdownField):
-                        self.set_ui_schema(
-                            result["ui_schema"], field.name, {"ui:widget": "textarea", "ui:field": "markdown"}
-                        )
-                    elif isinstance(field.translated_field, TextField):
-                        self.set_ui_schema(result["ui_schema"], field.name, {"ui:widget": "textarea"})
-                elif isinstance(field, MarkdownField):
-                    self.set_ui_schema(
-                        result["ui_schema"], field.name, {"ui:widget": "textarea", "ui:field": "markdown"}
-                    )
-                elif isinstance(field, TextField):
-                    self.set_ui_schema(result["ui_schema"], field.name, {"ui:widget": "textarea"})
+
+                if hints := ui_hints_for_model_field(field):
+                    self.set_ui_schema(result["ui_schema"], field.name, hints)
 
         result["translation_fields"] = list(result["translation_fields"])
         return result
