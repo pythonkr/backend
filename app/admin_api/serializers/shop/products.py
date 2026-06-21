@@ -87,7 +87,8 @@ class CategoryGroupAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer,
         }
 
 
-class CategoryAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
+class CategoryReadAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
+    # 독립 카테고리 읽기/choices 용. CategoryGroupAdminSerializer 내부 nested CategoryAdminSerializer 와 이름 충돌 방지.
     group = serializers.PrimaryKeyRelatedField(queryset=CategoryGroup.objects.filter_active())
     event = serializers.PrimaryKeyRelatedField(queryset=Event.objects.filter_active(), allow_null=True, required=False)
 
