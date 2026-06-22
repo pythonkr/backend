@@ -29,6 +29,15 @@ class Route:
 
 
 ROUTES: list[Route] = [
+    # ── CMS 도메인 그룹(어드민 읽기) ──
+    Route(
+        method="GET",
+        path="/v1/admin-api/cms/domain-group/",
+        summary="도메인 그룹 목록",
+        description="프론트엔드 도메인 그룹(name + domains 호스트 목록)을 조회합니다. "
+        "CMS 페이지/사이트맵의 domain_group 이 어떤 실제 도메인(예: 2026.pycon.kr)에 대응하는지 확인하고, "
+        "그 도메인을 mdx_components 도구의 domain 인자로 넣어 사용 가능한 MDX 컴포넌트를 확인하세요.",
+    ),
     # ── CMS 사이트맵(어드민 쓰기) ──
     Route(
         method="GET",

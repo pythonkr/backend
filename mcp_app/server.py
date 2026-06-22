@@ -12,7 +12,8 @@ from fastmcp.server.providers.openapi import (
 from fastmcp.utilities.openapi import HTTPRoute
 
 from mcp_app import config
-from mcp_app.auth import AUTH_KEY, AuthMiddleware, AuthState, CurrentAuth
+from mcp_app import mdx_components as mdx
+from mcp_app.auth import ADMIN_TAG, AUTH_KEY, AuthMiddleware, AuthState, CurrentAuth
 from mcp_app.routes import ROUTE_MAPS, lookup
 
 LANG_KEY = "language"
@@ -21,7 +22,10 @@ _GUIDANCE_ADMIN = (
     "공개 도구 + 어드민 도구(CMS 페이지·사이트맵 쓰기, 대시보드 통계, 주문·상품·카테고리 조회)를 사용할 수 있습니다. "
     "쓰기 시 생성/수정 도구의 입력 스키마를 참고하세요 — 각 필드에 x-ui-schema(위젯; markdown 여부), "
     "x-translation({of,language}; *_ko/*_en 매핑), x-relation({model,many}; FK/M2M 대상)이 붙습니다. "
-    "관계 필드 값은 해당 리소스의 choices 도구로 유효 id 를 확인해 채우세요."
+    "관계 필드 값은 해당 리소스의 choices 도구로 유효 id 를 확인해 채우세요. "
+    "CMS 본문(섹션 body)은 Markdown 이 아니라 MDX 입니다 — 사용 가능한 컴포넌트와 props 는 `mdx_components` 도구로 확인하세요. "
+    "컴포넌트 목록은 프론트엔드 도메인(앱)마다 다르므로, 먼저 `도메인 그룹 목록`으로 해당 페이지의 "
+    "domain_group → 실제 도메인(예: 2026.pycon.kr)을 확인한 뒤 그 도메인으로 호출하세요."
 )
 _GUIDANCE_PUBLIC = (
     "공개 도구(후원사·발표·이벤트 조회)를 사용할 수 있습니다. 더 많은 기능이 필요하면 유효한 토큰으로 다시 연결하세요."
@@ -89,5 +93,21 @@ def build() -> FastMCP:
             raise ToolError(f"language 는 {' 또는 '.join(_SUPPORTED_LANGS)} 여야 합니다.")
         await ctx.set_state(LANG_KEY, lang)
         return {"language": lang}
+
+    @mcp.tool(
+        title="MDX 컴포넌트 조회",
+        description=(
+            "CMS 본문(MDX)에서 쓸 수 있는 컴포넌트와 props 를 조회한다. 컴포넌트 집합은 프론트엔드 도메인(앱)마다 다르므로 "
+            "`도메인 그룹 목록`으로 확인한 실제 호스트를 domain 에 넣는다(예: 2026.pycon.kr). "
+            "component 를 비우면 목록(이름·group·요약), 채우면 그 컴포넌트의 props 상세를 반환한다. "
+            "group(mui|common|shop)으로 목록을 좁힐 수 있다. "
+            "Mui__* 컴포넌트는 props 설명이 없으니 응답의 muiVersion 기준 MUI 공식 문서를 참고한다."
+        ),
+        tags={ADMIN_TAG},
+    )
+    async def mdx_components(domain: str, component: str | None = None, group: str | None = None) -> dict:
+        if component:
+            return await mdx.detail(domain, component)
+        return await mdx.compact(domain, group)
 
     return mcp
