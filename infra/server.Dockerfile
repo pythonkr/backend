@@ -13,7 +13,8 @@ ENV PATH="${PATH}:/root/.local/bin:" \
     UV_CONCURRENT_DOWNLOADS=32 \
     UV_LINK_MODE=copy \
     UV_PROJECT_ENVIRONMENT="/usr/local" \
-    UV_PYTHON_DOWNLOADS=0
+    UV_PYTHON_DOWNLOADS=0 \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 # Setup timezone and install system dependencies
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
@@ -26,6 +27,17 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     && apt-get install -y --no-install-recommends gcc curl libpq-dev libpango-1.0-0 libpangoft2-1.0-0 fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/* \
     && uv sync --no-default-groups --group mcp --frozen
+
+# Bundle Chromium for the MCP `mdx_preview` tool. The browser download is cached
+# across builds via a BuildKit cache mount, then copied into the image (cache mounts
+# aren't persisted into layers). Kept before `COPY app/` so app-code changes never
+# re-trigger it. PLAYWRIGHT_BROWSERS_PATH (set above) is where the runtime looks.
+RUN --mount=type=cache,target=/opt/pw-cache \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/pw-cache playwright install --with-deps chromium \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p "$PLAYWRIGHT_BROWSERS_PATH" \
+    && cp -a /opt/pw-cache/. "$PLAYWRIGHT_BROWSERS_PATH"/ \
+    && chmod -R a+rX "$PLAYWRIGHT_BROWSERS_PATH"
 
 # The nobody user has no writable fontconfig cache dir, which triggers "Fontconfig error: No writable cache directories" on every WeasyPrint render.
 # Give it a writable cache path.

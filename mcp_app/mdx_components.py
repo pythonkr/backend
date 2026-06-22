@@ -7,17 +7,14 @@ from fastmcp.exceptions import ToolError
 from httpx import AsyncClient, HTTPError
 
 from mcp_app import config
+from mcp_app.util import require_host
 
 _CACHE_TTL = 300.0
 _cache: dict[str, tuple[float, dict]] = {}
 
 
 async def _fetch(domain: str) -> dict:
-    if not (host := domain.strip().lower()):
-        raise ToolError(
-            "domain 에 프론트엔드 호스트가 필요합니다 (예: 2026.pycon.kr). 도메인 그룹 목록 도구로 유효한 도메인을 확인하세요."
-        )
-
+    host = require_host(domain)
     url = f"https://{host}/.well-known/mdx-components.json"
     now = monotonic()
     if (hit := _cache.get(url)) and hit[0] > now:

@@ -7,3 +7,4 @@ PORT = int(os.environ.get("MCP_PORT", "9000"))
 PATH = os.environ.get("MCP_PATH", "/mcp")
 
 HTTP_TIMEOUT = float(os.environ.get("MCP_HTTP_TIMEOUT", "15"))
+BROWSER_TIMEOUT = float(os.environ.get("MCP_BROWSER_TIMEOUT", "30"))

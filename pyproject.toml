@@ -52,6 +52,7 @@ dependencies = [
 [dependency-groups]
 mcp = [
     "fastmcp>=3.4.2",
+    "playwright>=1.49.0",
 ]
 dev = [
     "django-stubs[compatible-mypy]>=6.0.4",
