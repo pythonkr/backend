@@ -25,8 +25,12 @@ local-setup:
 local-api: local-collectstatic
 	@ENV_PATH=envfile/.env.local uv run python app/manage.py runserver 8000
 
+# One-time: install the Chromium binary the mdx_preview tool drives (python deps come via `uv sync --group mcp`).
+local-mcp-setup:
+	@uv run --group mcp playwright install chromium
+
 # Run the standalone MCP server (Django-free, calls the backend API; needs the API running).
-local-mcp:
+local-mcp: local-mcp-setup
 	@uv run --group mcp python -m mcp_app
 
 # Run local Celery worker (requires `make docker-compose-up` for redis)
@@ -158,11 +162,13 @@ docker-server-stop:
 docker-server-rm: docker-server-stop
 	docker rm $(SERVER_CONTAINER_NAME) || true
 
-# Smoke-test the built image's MCP role without a running API: only checks deps
-# import (fastmcp installed + mcp_app importable). build() itself needs the API.
-docker-mcp-smoke:
+# Smoke-test the server image's MCP role: deps import (fastmcp + mcp_app) and the
+# bundled Chromium actually launches (catches container sandbox issues). build()
+# itself needs the API, so it's not exercised here.
+docker-mcp-smoke: docker-server-build
 	@docker run --rm $(IMAGE_NAME):server \
-		python -c "import fastmcp, mcp_app.server; print('mcp ok:', fastmcp.__version__)"
+		python -c "import fastmcp, mcp_app.server; from playwright.sync_api import sync_playwright; \
+p=sync_playwright().start(); b=p.chromium.launch(); print('mcp ok:', fastmcp.__version__, b.version); b.close(); p.stop()"
 
 # Run the MCP server from the same server image (CMD override). Needs the API
 # container up (docker-server-run); reaches it via host.docker.internal:8000.
