@@ -314,6 +314,156 @@ def test_sitemap_admin_serializer_exposes_domain_group(api_client, superuser, do
     assert row["domain_group"] == str(domain_group.id)
 
 
+# ---- Sitemap (domain_group, parent, route_code) unique 사전 검증 ------------
+
+
+@pytest.fixture
+def page(superuser):
+    return Page.objects.create(title="t", subtitle="s", created_by=superuser, updated_by=superuser)
+
+
+@pytest.mark.django_db
+def test_sitemap_create_rejects_duplicate_route_code(api_client, superuser, domain_group, page):
+    Sitemap.objects.create(
+        name="about",
+        route_code="about",
+        page=page,
+        domain_group=domain_group,
+        created_by=superuser,
+        updated_by=superuser,
+    )
+
+    response = api_client.post(
+        reverse("v1:admin-sitemap-list"),
+        data={"domain_group": str(domain_group.id), "route_code": "about", "name_ko": "소개", "page": str(page.id)},
+        format="json",
+    )
+    assert response.status_code == http.HTTPStatus.BAD_REQUEST, response.json()
+    assert any(err["attr"] == "route_code" for err in response.json()["errors"])
+
+
+@pytest.mark.django_db
+def test_sitemap_create_allows_same_route_code_under_different_parent(api_client, superuser, domain_group, page):
+    parent = Sitemap.objects.create(
+        name="parent",
+        route_code="parent",
+        page=page,
+        domain_group=domain_group,
+        created_by=superuser,
+        updated_by=superuser,
+    )
+    # 루트에 동일 route_code가 있어도 다른 parent 하위라면 허용
+    Sitemap.objects.create(
+        name="dup-root",
+        route_code="dup",
+        page=page,
+        domain_group=domain_group,
+        created_by=superuser,
+        updated_by=superuser,
+    )
+
+    response = api_client.post(
+        reverse("v1:admin-sitemap-list"),
+        data={
+            "domain_group": str(domain_group.id),
+            "parent_sitemap": str(parent.id),
+            "route_code": "dup",
+            "name_ko": "중복아님",
+            "page": str(page.id),
+        },
+        format="json",
+    )
+    assert response.status_code == http.HTTPStatus.CREATED, response.json()
+
+
+@pytest.mark.django_db
+def test_sitemap_create_allows_same_route_code_in_other_domain_group(api_client, superuser, domain_group, page):
+    other = DomainGroup.objects.create(
+        name="다른 그룹", domains=["other.pycon.kr"], created_by=superuser, updated_by=superuser
+    )
+    Sitemap.objects.create(
+        name="about",
+        route_code="about",
+        page=page,
+        domain_group=domain_group,
+        created_by=superuser,
+        updated_by=superuser,
+    )
+
+    response = api_client.post(
+        reverse("v1:admin-sitemap-list"),
+        data={"domain_group": str(other.id), "route_code": "about", "name_ko": "소개", "page": str(page.id)},
+        format="json",
+    )
+    assert response.status_code == http.HTTPStatus.CREATED, response.json()
+
+
+@pytest.mark.django_db
+def test_sitemap_create_allows_route_code_of_soft_deleted(api_client, superuser, domain_group, page):
+    existing = Sitemap.objects.create(
+        name="about",
+        route_code="about",
+        page=page,
+        domain_group=domain_group,
+        created_by=superuser,
+        updated_by=superuser,
+    )
+    existing.delete()  # soft delete → unique 제약 대상에서 제외
+
+    response = api_client.post(
+        reverse("v1:admin-sitemap-list"),
+        data={"domain_group": str(domain_group.id), "route_code": "about", "name_ko": "소개", "page": str(page.id)},
+        format="json",
+    )
+    assert response.status_code == http.HTTPStatus.CREATED, response.json()
+
+
+@pytest.mark.django_db
+def test_sitemap_update_rejects_duplicate_route_code(api_client, superuser, domain_group, page):
+    Sitemap.objects.create(
+        name="about",
+        route_code="about",
+        page=page,
+        domain_group=domain_group,
+        created_by=superuser,
+        updated_by=superuser,
+    )
+    target = Sitemap.objects.create(
+        name="contact",
+        route_code="contact",
+        page=page,
+        domain_group=domain_group,
+        created_by=superuser,
+        updated_by=superuser,
+    )
+
+    response = api_client.patch(
+        reverse("v1:admin-sitemap-detail", kwargs={"pk": target.id}),
+        data={"route_code": "about"},
+        format="json",
+    )
+    assert response.status_code == http.HTTPStatus.BAD_REQUEST, response.json()
+
+
+@pytest.mark.django_db
+def test_sitemap_update_allows_keeping_own_route_code(api_client, superuser, domain_group, page):
+    target = Sitemap.objects.create(
+        name="about",
+        route_code="about",
+        page=page,
+        domain_group=domain_group,
+        created_by=superuser,
+        updated_by=superuser,
+    )
+
+    response = api_client.patch(
+        reverse("v1:admin-sitemap-detail", kwargs={"pk": target.id}),
+        data={"name_ko": "소개 수정"},
+        format="json",
+    )
+    assert response.status_code == http.HTTPStatus.OK, response.json()
+
+
 @pytest.mark.django_db
 def test_sitemap_admin_filter_by_domain_group(api_client, superuser):
     group_a = DomainGroup.objects.create(name="A", domains=["a.pycon.kr"], created_by=superuser, updated_by=superuser)

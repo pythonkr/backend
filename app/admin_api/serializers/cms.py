@@ -105,6 +105,22 @@ class SitemapAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, seria
         if page and external_link:
             raise serializers.ValidationError("Page, External Link 중 하나만 선택 또는 입력할 수 있습니다.")
 
+        merged = {**attrs}
+        if self.instance is not None:
+            for field in ("domain_group", "parent_sitemap", "route_code"):
+                merged.setdefault(field, getattr(self.instance, field, None))
+
+        duplicates = Sitemap.objects.filter_active().filter(
+            domain_group=merged.get("domain_group"),
+            parent_sitemap=merged.get("parent_sitemap"),
+            route_code=merged.get("route_code") or "",
+        )
+        if self.instance is not None:
+            duplicates = duplicates.exclude(pk=self.instance.pk)
+        if duplicates.exists():
+            msg = "동일한 도메인 그룹과 상위 항목 내에 같은 route_code가 이미 존재합니다."
+            raise serializers.ValidationError({"route_code": msg})
+
         return attrs
 
 
