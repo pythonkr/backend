@@ -14,6 +14,8 @@ class Event(BaseAbstractModel):
     event_end_at = models.DateTimeField(null=True, blank=True)
     banner_display_start_at = models.DateTimeField(null=True, blank=True)
     banner_display_end_at = models.DateTimeField(null=True, blank=True)
+    stats_start_date = models.DateField(null=True, blank=True)
+    stats_end_date = models.DateField(null=True, blank=True)
 
     class Meta:
         ordering = ["-event_start_at", "-event_end_at"]
@@ -34,3 +36,5 @@ class Event(BaseAbstractModel):
             and self.banner_display_start_at > self.banner_display_end_at
         ):
             raise ValidationError("banner 전시 종료 날짜는 시작 날짜보다 이전일 수 없습니다.")
+        if self.stats_start_date and self.stats_end_date and self.stats_start_date > self.stats_end_date:
+            raise ValidationError("통계 종료일은 시작일보다 이전일 수 없습니다.")

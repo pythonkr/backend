@@ -35,17 +35,31 @@ class DashboardChartAdminViewSet(ViewSet):
             .order_by("category__priority", "name")
             .values("id", "name", "category__event_id")  # event_id: 프론트의 이벤트→티켓 종속 필터용
         )
-        es = Event.objects.filter_active().filter(category__is_ticket=True).distinct().order_by("name")
+        es = (
+            Event.objects.filter_active()
+            .filter(category__is_ticket=True)
+            .values("id", "name", "stats_start_date", "stats_end_date")
+            .distinct()
+            .order_by("name")
+        )
         dynamic_options = {
             "tickets": [
                 {
                     "value": str(t["id"]),
                     "label": t["name"],
-                    "event_id": str(t["category__event_id"]) if t["category__event_id"] else None,
+                    "event_id": t["category__event_id"] and str(t["category__event_id"]),
                 }
                 for t in ts
             ],
-            "events": [{"value": str(e.id), "label": e.name} for e in es],
+            "events": [
+                {
+                    "value": str(e["id"]),
+                    "label": e["name"],
+                    "date_from": e["stats_start_date"] and e["stats_start_date"].isoformat(),
+                    "date_to": e["stats_end_date"] and e["stats_end_date"].isoformat(),
+                }
+                for e in es
+            ],
         }
         return Response([handler.to_dict(dynamic_options) for handler in CHART_REGISTRY.values()])
 

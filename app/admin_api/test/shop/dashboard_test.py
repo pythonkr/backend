@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 import pytest
 from core.const.datetime import KST
@@ -195,6 +195,51 @@ def test_sales_trend_missing_date_range_is_400(api_client):
     resp = _chart_data(api_client, "line-sales-trend", {"granularity": "day"})
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert "date_range" in {e["attr"] for e in resp.json()["errors"]}
+
+
+# --- 이벤트별 통계 기간 프리셋 ---
+def _attach_event(ticket_product, **stats):
+    event = baker.make("event.Event", name="파이콘 한국 2026", **stats)
+    ticket_product.category.event = event
+    ticket_product.category.save()
+    return event
+
+
+def test_time_series_defaults_to_event_stats_period(api_client, ticket_product):
+    """date_range 미전송 + 통계 기간이 설정된 이벤트 선택 → 그 기간(inclusive)을 기본값으로 사용."""
+    event = _attach_event(ticket_product, stats_start_date=date(2026, 8, 14), stats_end_date=date(2026, 8, 16))
+    body = _chart_data(api_client, "line-sales-trend", {"event_id": str(event.id), "granularity": "day"}).json()
+    assert [d["label"] for d in body["data"]] == ["2026-08-14", "2026-08-15", "2026-08-16"]
+
+
+def test_explicit_date_range_overrides_event_preset(api_client, ticket_product):
+    event = _attach_event(ticket_product, stats_start_date=date(2026, 8, 1), stats_end_date=date(2026, 8, 31))
+    body = _chart_data(
+        api_client,
+        "line-sales-trend",
+        {
+            "event_id": str(event.id),
+            "date_range": {"date_from": "2026-08-14", "date_to": "2026-08-15"},
+            "granularity": "day",
+        },
+    ).json()
+    assert [d["label"] for d in body["data"]] == ["2026-08-14", "2026-08-15"]
+
+
+def test_event_without_stats_period_still_requires_date_range(api_client, ticket_product):
+    event = _attach_event(ticket_product)  # 통계 기간 미설정
+    resp = _chart_data(api_client, "line-sales-trend", {"event_id": str(event.id), "granularity": "day"})
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert "date_range" in {e["attr"] for e in resp.json()["errors"]}
+
+
+def test_event_option_carries_stats_period(api_client, ticket_product):
+    """프론트 프리필용: event 옵션이 통계 기본 기간을 동봉."""
+    event = _attach_event(ticket_product, stats_start_date=date(2026, 8, 14), stats_end_date=date(2026, 8, 16))
+    params = next(c for c in api_client.get(CHARTS_URL).json() if c["id"] == "line-sales-trend")["params"]
+    opt = next(o for p in params if p["key"] == "event_id" for o in p["options"] if o["value"] == str(event.id))
+    assert opt["date_from"] == "2026-08-14"
+    assert opt["date_to"] == "2026-08-16"
 
 
 def test_sales_trend_invalid_granularity_is_400(api_client):

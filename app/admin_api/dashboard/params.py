@@ -5,8 +5,9 @@ from datetime import datetime
 from uuid import UUID
 
 from core.const.datetime import Granularity
-from core.serializer.date_range_serializer import DateRangeSerializer
+from core.serializer.date_range_serializer import DateRangeSerializer, day_start, next_day_start
 from django.db.models import QuerySet
+from event.models import Event
 from rest_framework import serializers
 from shop.order.models import OrderProductRelation
 
@@ -42,7 +43,23 @@ class CounterParamsSerializer(serializers.Serializer):
 
 
 class _TimeSeriesParamsSerializer(CounterParamsSerializer):
-    date_range = DateRangeSerializer(required=True, label="조회 기간")
+    date_range = DateRangeSerializer(required=False, label="조회 기간")
+
+    def validate(self, attrs: dict) -> dict:
+        if not attrs.get("date_range") and (event_id := attrs.get("event_id")):
+            period = (
+                Event.objects.filter_active()
+                .filter(id=event_id)
+                .values_list("stats_start_date", "stats_end_date")
+                .first()
+            )
+            if period and all(period):
+                start, end = period
+                attrs["date_range"] = {"date_from": day_start(start), "date_to": next_day_start(end)}
+        if not attrs.get("date_range"):
+            err_msg = "조회 기간을 지정하거나, 통계 기간이 설정된 이벤트를 선택하세요."
+            raise serializers.ValidationError({"date_range": err_msg})
+        return attrs
 
 
 class SalesTrendParamsSerializer(_TimeSeriesParamsSerializer):
