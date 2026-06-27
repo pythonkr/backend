@@ -1,6 +1,7 @@
-from datetime import date
+from datetime import date, datetime
 
 from admin_api.serializers.event.event import EventAdminSerializer
+from core.const.datetime import KST
 from model_bakery import baker
 
 
@@ -27,3 +28,26 @@ def test_admin_serializer_rejects_inverted_stats_period(db):
     )
     assert not serializer.is_valid()
     assert "stats_end_date" in serializer.errors
+
+
+def test_admin_serializer_rejects_inverted_event_dates(db):
+    event = baker.make("event.Event")
+    serializer = EventAdminSerializer(
+        instance=event,
+        data={"event_start_at": "2026-08-16T00:00:00+09:00", "event_end_at": "2026-08-14T00:00:00+09:00"},
+        partial=True,
+    )
+    assert not serializer.is_valid()
+    assert "event_end_at" in serializer.errors
+
+
+def test_admin_serializer_rejects_event_end_before_existing_start(db):
+    """partial update: 기존 instance 의 시작일과 비교해 역전 감지."""
+    event = baker.make("event.Event", event_start_at=datetime(2026, 8, 16, tzinfo=KST))
+    serializer = EventAdminSerializer(
+        instance=event,
+        data={"event_end_at": "2026-08-14T00:00:00+09:00"},
+        partial=True,
+    )
+    assert not serializer.is_valid()
+    assert "event_end_at" in serializer.errors

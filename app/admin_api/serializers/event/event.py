@@ -18,11 +18,16 @@ class EventAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, seriali
             "stats_end_date",
         )
 
+    DATE_ORDER_PAIRS = (
+        ("event_start_at", "event_end_at", "event의 종료 날짜는 시작 날짜보다 이전일 수 없습니다."),
+        ("stats_start_date", "stats_end_date", "통계 종료일은 시작일보다 이전일 수 없습니다."),
+    )
+
     def validate(self, attrs: dict) -> dict:
         merged = {**attrs}
-        for field in ("stats_start_date", "stats_end_date"):
-            merged.setdefault(field, getattr(self.instance, field, None))
-        start, end = merged["stats_start_date"], merged["stats_end_date"]
-        if start and end and start > end:
-            raise serializers.ValidationError({"stats_end_date": "통계 종료일은 시작일보다 이전일 수 없습니다."})
+        for start_field, end_field, msg in self.DATE_ORDER_PAIRS:
+            start = merged.setdefault(start_field, getattr(self.instance, start_field, None))
+            end = merged.setdefault(end_field, getattr(self.instance, end_field, None))
+            if start and end and start > end:
+                raise serializers.ValidationError({end_field: msg})
         return attrs
