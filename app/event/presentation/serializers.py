@@ -3,9 +3,19 @@ from event.presentation.models import (
     Presentation,
     PresentationCategory,
     PresentationSpeaker,
+    PresentationType,
     RoomSchedule,
 )
+from event.serializers import EventSerializer
 from rest_framework import serializers
+
+
+class PresentationTypeSerializer(serializers.ModelSerializer):
+    event = EventSerializer(read_only=True)
+
+    class Meta:
+        model = PresentationType
+        fields = ("id", "name", "event")
 
 
 class PresentationCategorySerializer(serializers.ModelSerializer):
@@ -40,6 +50,7 @@ class CallForPresentationScheduleSerializer(serializers.ModelSerializer):
 
 
 class PresentationSerializer(serializers.ModelSerializer):
+    presentation_type = PresentationTypeSerializer(source="type", read_only=True)
     image = serializers.FileField(source="image.file", read_only=True, allow_null=True)
     categories = PresentationCategorySerializer(many=True, read_only=True, source="active_categories")
     speakers = PresentationSpeakerSerializer(many=True, read_only=True, source="active_speakers")
@@ -51,6 +62,7 @@ class PresentationSerializer(serializers.ModelSerializer):
         model = Presentation
         fields = (
             "id",
+            "presentation_type",
             "title",
             "summary",
             "description",

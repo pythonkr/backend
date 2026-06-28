@@ -40,7 +40,7 @@ class PresentationQuerySet(BaseAbstractModelQuerySet):
                     to_attr="_prefetched_active_call_for_presentation_schedules",
                 ),
             )
-            .select_related("image")
+            .select_related("image", "type__event__logo")
         )
 
 
