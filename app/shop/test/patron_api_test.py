@@ -1,7 +1,7 @@
 import pytest
 from rest_framework.status import HTTP_200_OK
-from shop.order.models import Order, OrderProductOptionRelation
-from shop.product.models import OptionGroup
+from shop.conftest import VALID_TICKET_INFO
+from shop.order.models import Order, TicketInfo
 from shop.test.helpers import PatronApi
 
 
@@ -40,18 +40,12 @@ def test_patron_list_year_filter_matches_order_year(anon_client, order_factory):
 
 
 @pytest.mark.django_db
-def test_patron_list_returns_contribution_message_from_donation_option(anon_client, ticket_product, order_factory):
+def test_patron_list_returns_contribution_message_from_ticket_info(anon_client, order_factory):
     donation_completed_order = order_factory(status="completed", donation=5000)
-    group = OptionGroup.objects.create(
-        product=ticket_product,
-        name="후원자 한마디",
-        is_custom_response=True,
-        custom_response_pattern=r"^.*$",
-    )
-    OrderProductOptionRelation.objects.create(
+    TicketInfo.objects.create(
         order_product_relation=donation_completed_order.products.first(),
-        product_option_group=group,
-        custom_response="응원합니다!",
+        **VALID_TICKET_INFO,
+        contribution_message="응원합니다!",
     )
 
     response = PatronApi(http_client=anon_client).list()

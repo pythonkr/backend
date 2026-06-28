@@ -1,10 +1,10 @@
 from core.const.tag import OpenAPITag
-from django.db.models import CharField, DecimalField, Exists, F, OuterRef, Q, Subquery, Sum, Value
+from django.db.models import CharField, DecimalField, Exists, F, OuterRef, Subquery, Sum, TextField, Value
 from django.db.models.functions import Coalesce
 from django_filters import rest_framework as filters
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import mixins, routers, serializers, status, viewsets
-from shop.order.models import Order, OrderProductOptionRelation, OrderProductRelation
+from shop.order.models import Order, OrderProductRelation, TicketInfo
 from shop.payment_history.models import REFUNDABLE_STATUSES, PaymentHistory
 
 
@@ -18,26 +18,11 @@ class PatronFilterSet(filters.FilterSet):
 
 class PatronSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source="customer_info.name", allow_null=True)
+    contribution_message = serializers.CharField(read_only=True)
 
     class Meta:
-        fields: list[str] = ["name"]
+        fields: list[str] = ["name", "contribution_message"]
         model = Order
-
-    def to_representation(self, instance: Order) -> dict[str, str]:
-        result = super().to_representation(instance)
-
-        opor: OrderProductOptionRelation = (
-            OrderProductOptionRelation.objects.filter_active()
-            .filter(
-                Q(product_option_group__name__contains="후원자") | Q(product_option_group__name__contains="message"),
-                order_product_relation__order=instance,
-                order_product_relation__deleted_at__isnull=True,
-                product_option_group__name__contains="후원자",
-                product_option_group__is_custom_response=True,
-            )
-            .first()
-        )
-        return result | {"contribution_message": opor.custom_response if opor else ""}
 
 
 @extend_schema_view(
@@ -64,11 +49,23 @@ class PatronViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         .annotate(total=Sum(F("price") + F("donation_price")))
         .values("total")
     )
+    contribution_message_sq = (
+        TicketInfo.objects.filter_active()
+        .filter(order_product_relation__order_id=OuterRef("id"), order_product_relation__deleted_at__isnull=True)
+        .exclude(contribution_message__isnull=True)
+        .exclude(contribution_message="")
+        .values("contribution_message")[:1]
+    )
 
     queryset = (
         Order.objects.filter_active()
         .annotate(
             current_status=Subquery(latest_status_sq, output_field=CharField()),
+            contribution_message=Coalesce(
+                Subquery(contribution_message_sq, output_field=TextField()),
+                Value(""),
+                output_field=TextField(),
+            ),
             has_donation_product=Exists(
                 OrderProductRelation.objects.filter_active().filter(
                     order_id=OuterRef("id"),
