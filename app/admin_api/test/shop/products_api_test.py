@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 
 import pytest
 from admin_api.test.helpers import CategoryGroupsAdminApi, OptionGroupsAdminApi, ProductsAdminApi, TagsAdminApi
+from django.urls import reverse
+from event.models import Event
 from rest_framework.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -11,6 +13,10 @@ from rest_framework.status import (
 )
 from shop.conftest import FAR_FUTURE, FAR_PAST
 from shop.product.models import Category, CategoryGroup, OptionGroup, Product, Tag
+from user.models.organization import Organization
+
+PRODUCT_CHOICES_URL = reverse("v1:admin-shop-product-list") + "choices/"
+OPTION_GROUP_CHOICES_URL = reverse("v1:admin-shop-option-group-list") + "choices/"
 
 
 @pytest.mark.parametrize("api_cls", [CategoryGroupsAdminApi, TagsAdminApi, ProductsAdminApi])
@@ -433,3 +439,41 @@ def test_admin_product_list_filters_by_status(api_client, products_by_status, st
     response = ProductsAdminApi(http_client=api_client).list({"status": status.value})
     assert response.status_code == HTTP_200_OK
     assert [p["id"] for p in response.json()] == [str(products_by_status[status].id)]
+
+
+@pytest.mark.django_db
+def test_admin_product_choices_include_category_meta(api_client, ticket_product):
+    # Product choices 의 category FK 는 Category.get_choice_meta() 로 group/is_ticket/event 메타를 실어야 한다.
+    org = Organization.objects.create(name="PSK")
+    event = Event.objects.create(
+        organization=org, name="PyCon Korea 2026", event_start_at=datetime(2026, 8, 1, tzinfo=timezone.utc)
+    )
+    evented = Category.objects.create(
+        group=CategoryGroup.objects.create(name="2026"), name="Conference", is_ticket=True, event=event
+    )
+
+    response = api_client.get(PRODUCT_CHOICES_URL)
+    assert response.status_code == HTTP_200_OK
+    category_choices = {c["const"]: c for c in response.json()["category"]}
+
+    # event 가 있는 카테고리 — str(event) 분기.
+    evented_meta = category_choices[str(evented.id)]["meta"]
+    assert evented_meta == {"group": "2026", "is_ticket": True, "event": str(event)}
+
+    # event 가 없는 카테고리(fixture) — None 분기.
+    plain_meta = category_choices[str(ticket_product.category.id)]["meta"]
+    assert plain_meta == {"group": "기본", "is_ticket": True, "event": None}
+
+
+@pytest.mark.django_db
+def test_admin_option_group_choices_include_product_meta(api_client, ticket_product):
+    # OptionGroup choices 의 product FK 는 Product.get_choice_meta() 로 category/price/stock/status 메타를 실어야 한다.
+    response = api_client.get(OPTION_GROUP_CHOICES_URL)
+    assert response.status_code == HTTP_200_OK
+    product_choices = {c["const"]: c for c in response.json()["product"]}
+    assert product_choices[str(ticket_product.id)]["meta"] == {
+        "category": str(ticket_product.category),
+        "price": ticket_product.price,
+        "stock": ticket_product.stock,
+        "status": Product.CurrentStatus.ACTIVE.label,
+    }
