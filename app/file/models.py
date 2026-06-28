@@ -11,7 +11,15 @@ class PublicFile(BaseAbstractModel):
     choices_meta_schema: typing.ClassVar[dict] = {
         "preview": {"label": "미리보기", "type": "string", "display": "image"},
         "mimetype": {"label": "형식", "type": "string", "filter": "select"},
-        "size": {"label": "크기(bytes)", "type": "number"},
+        "size": {"label": "크기", "type": "number", "display": "filesize"},
+        "created_by": {"label": "추가한 사람", "type": "string", "filter": "select", "filterOnly": True},
+        "created_at": {
+            "label": "추가 연도",
+            "type": "string",
+            "filter": "select",
+            "display": "year",
+            "filterOnly": True,
+        },
     }
 
     file = models.FileField(unique=True, null=False, blank=False, upload_to="public/", storage=storages["public"])
