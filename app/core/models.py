@@ -6,11 +6,19 @@ from core.util.thread_local import get_current_user
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.db.models.functions import Now
+from django.utils import timezone
 
 if typing.TYPE_CHECKING:
     from user.models import UserExt  # noqa: F401
 
 User = get_user_model()
+
+AUDIT_CHOICE_META_SCHEMA: dict[str, dict[str, str]] = {
+    "created_by": {"label": "생성자", "type": "string", "filter": "select"},
+    "updated_by": {"label": "수정자", "type": "string", "filter": "select"},
+    "created_at": {"label": "생성일시", "type": "string", "filter": "search"},
+    "updated_at": {"label": "수정일시", "type": "string", "filter": "search"},
+}
 
 
 class BaseAbstractModelQuerySet(models.QuerySet):
@@ -37,7 +45,9 @@ class BaseAbstractModelQuerySet(models.QuerySet):
         return self.select_related(*_fields)
 
     def get_choices_queryset(self) -> typing.Self:
-        fields = self.model.choices_select_related
+        fields = set(self.model.choices_select_related)
+        if self.model.choices_meta_schema:
+            fields |= {"created_by", "updated_by"}  # audit 메타 출력을 위한 join
         return self.select_related(*fields) if fields else self.all()
 
 
@@ -65,6 +75,22 @@ class BaseAbstractModel(models.Model):
 
     class Meta:
         abstract = True
+
+    def get_choice_meta(self) -> dict:
+        if not self.choices_meta_schema:
+            return {}
+        return self._choice_meta_fields() | self.get_audit_choice_meta()
+
+    def _choice_meta_fields(self) -> dict:
+        return {}
+
+    def get_audit_choice_meta(self) -> dict:
+        return {
+            "created_by": self.created_by_id and str(self.created_by),
+            "updated_by": self.updated_by_id and str(self.updated_by),
+            "created_at": self.created_at and timezone.localtime(self.created_at).isoformat(),
+            "updated_at": self.updated_at and timezone.localtime(self.updated_at).isoformat(),
+        }
 
     def save(  # type: ignore[override]
         self,

@@ -458,11 +458,11 @@ def test_admin_product_choices_include_category_meta(api_client, ticket_product)
 
     # event 가 있는 카테고리 — str(event) 분기.
     evented_meta = category_choices[str(evented.id)]["meta"]
-    assert evented_meta == {"group": "2026", "is_ticket": True, "event": str(event)}
+    assert evented_meta.items() >= {"group": "2026", "is_ticket": True, "event": str(event)}.items()
 
     # event 가 없는 카테고리(fixture) — None 분기.
     plain_meta = category_choices[str(ticket_product.category.id)]["meta"]
-    assert plain_meta == {"group": "기본", "is_ticket": True, "event": None}
+    assert plain_meta.items() >= {"group": "기본", "is_ticket": True, "event": None}.items()
 
 
 @pytest.mark.django_db
@@ -471,9 +471,12 @@ def test_admin_option_group_choices_include_product_meta(api_client, ticket_prod
     response = api_client.get(OPTION_GROUP_CHOICES_URL)
     assert response.status_code == HTTP_200_OK
     product_choices = {c["const"]: c for c in response.json()["product"]}
-    assert product_choices[str(ticket_product.id)]["meta"] == {
-        "category": str(ticket_product.category),
-        "price": ticket_product.price,
-        "stock": ticket_product.stock,
-        "status": Product.CurrentStatus.ACTIVE.label,
-    }
+    assert (
+        product_choices[str(ticket_product.id)]["meta"].items()
+        >= {
+            "category": str(ticket_product.category),
+            "price": ticket_product.price,
+            "stock": ticket_product.stock,
+            "status": Product.CurrentStatus.ACTIVE.label,
+        }.items()
+    )

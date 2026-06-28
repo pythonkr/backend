@@ -26,7 +26,7 @@ class PublicFile(BaseAbstractModel):
     def __str__(self) -> str:
         return self.file.name
 
-    def get_choice_meta(self) -> dict:
+    def _choice_meta_fields(self) -> dict:
         return {
             "preview": self.file.url if self.file else None,
             "mimetype": self.mimetype,

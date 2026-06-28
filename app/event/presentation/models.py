@@ -108,7 +108,7 @@ class Presentation(BaseAbstractModel):
     def __str__(self) -> str:
         return f"[{self.type.name}] {self.title}"
 
-    def get_choice_meta(self) -> dict:
+    def _choice_meta_fields(self) -> dict:
         return {
             "type": self.type.name,
             "event": self.type.event.name,

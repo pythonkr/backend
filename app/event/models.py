@@ -37,7 +37,7 @@ class Event(BaseAbstractModel):
     def __str__(self):
         return f"{self.name} by {self.organization}"
 
-    def get_choice_meta(self) -> dict:
+    def _choice_meta_fields(self) -> dict:
         return {
             "organization": str(self.organization),
             "started_at": timezone.localtime(self.event_start_at).date().isoformat() if self.event_start_at else None,

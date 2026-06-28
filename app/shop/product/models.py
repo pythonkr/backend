@@ -56,7 +56,7 @@ class Category(BaseAbstractModel):
     def __str__(self) -> str:  # pragma: no cover
         return f"{self.group.name} > {self.name}"
 
-    def get_choice_meta(self) -> dict:
+    def _choice_meta_fields(self) -> dict:
         return {
             "group": self.group.name,
             "is_ticket": self.is_ticket,
@@ -191,7 +191,7 @@ class Product(BaseAbstractModel):
     def __str__(self) -> str:  # pragma: no cover
         return f"{self.category} > {self.name} ({self.price}원)"
 
-    def get_choice_meta(self) -> dict:
+    def _choice_meta_fields(self) -> dict:
         return {
             "category": str(self.category),
             "price": self.price,
