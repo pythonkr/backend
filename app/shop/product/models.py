@@ -19,6 +19,10 @@ if typing.TYPE_CHECKING:  # pragma: no cover
 
 
 class CategoryGroup(BaseAbstractModel):
+    choices_meta_schema: typing.ClassVar[dict] = {
+        "priority": {"label": "순서", "type": "number"},
+    }
+
     name = models.CharField(max_length=100)
     priority = models.IntegerField(default=0)
 
@@ -30,6 +34,9 @@ class CategoryGroup(BaseAbstractModel):
 
     def __str__(self) -> str:  # pragma: no cover
         return self.name
+
+    def _choice_meta_fields(self) -> dict:
+        return {"priority": self.priority}
 
 
 class Category(BaseAbstractModel):

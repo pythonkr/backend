@@ -53,6 +53,12 @@ class NotificationTemplateBase(BaseAbstractModel):
     variable_end: ClassVar[str] = "}}"
     html_template_name: ClassVar[str]
 
+    choices_meta_schema: ClassVar[dict] = {
+        "code": {"label": "코드", "type": "string", "filter": "search"},
+        "sent_from": {"label": "발신", "type": "string", "filter": "select"},
+        "description": {"label": "설명", "type": "string", "filter": "search"},
+    }
+
     code = models.CharField(max_length=128)
     title = models.CharField(max_length=256, db_index=True)
     description = models.TextField(null=True, blank=True)
@@ -82,6 +88,13 @@ class NotificationTemplateBase(BaseAbstractModel):
 
     def __str__(self) -> str:
         return f"[{self.code}] {self.title}"
+
+    def _choice_meta_fields(self) -> dict:
+        return {
+            "code": self.code,
+            "sent_from": self.sent_from,
+            "description": self.description,
+        }
 
     @classmethod
     def _to_dtl(cls, source: str) -> str:

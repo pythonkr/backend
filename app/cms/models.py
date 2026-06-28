@@ -18,6 +18,10 @@ from django.db import models
 
 
 class DomainGroup(BaseAbstractModel):
+    choices_meta_schema: typing.ClassVar[dict] = {
+        "domains": {"label": "도메인", "type": "string", "filter": "search"},
+    }
+
     name = models.CharField(max_length=128, help_text="예: '2025년 PyConKR 홈페이지'")
     domains = ArrayField(
         models.CharField(
@@ -46,8 +50,17 @@ class DomainGroup(BaseAbstractModel):
     def __str__(self):
         return f"{self.name} ({', '.join(self.domains) or '없음'})"
 
+    def _choice_meta_fields(self) -> dict:
+        return {"domains": ", ".join(self.domains)}
+
 
 class Page(BaseAbstractModel):
+    choices_meta_schema: typing.ClassVar[dict] = {
+        "subtitle": {"label": "부제목", "type": "string", "filter": "search"},
+        "show_top_title_banner": {"label": "상단 타이틀 배너", "type": "boolean"},
+        "show_bottom_sponsor_banner": {"label": "하단 스폰서 배너", "type": "boolean"},
+    }
+
     css = models.TextField(null=True, blank=True, default=None)
     title = models.CharField(max_length=256)
     subtitle = models.CharField(max_length=512)
@@ -59,6 +72,13 @@ class Page(BaseAbstractModel):
 
     def __str__(self):
         return str(self.title)
+
+    def _choice_meta_fields(self) -> dict:
+        return {
+            "subtitle": self.subtitle,
+            "show_top_title_banner": self.show_top_title_banner,
+            "show_bottom_sponsor_banner": self.show_bottom_sponsor_banner,
+        }
 
     def active_sections(self) -> list[Section]:
         with contextlib.suppress(AttributeError):
@@ -123,7 +143,12 @@ class SitemapQuerySet(BaseAbstractModelQuerySet):
 
 
 class Sitemap(BaseAbstractModel):
-    choices_select_related = (SITEMAP_ROUTE_SELECT_RELATED,)
+    choices_select_related = (SITEMAP_ROUTE_SELECT_RELATED, "domain_group")
+    choices_meta_schema: typing.ClassVar[dict] = {
+        "domain_group": {"label": "도메인 그룹", "type": "string", "filter": "select"},
+        "hide": {"label": "숨김", "type": "boolean"},
+        "order": {"label": "순서", "type": "number"},
+    }
 
     parent_sitemap = models.ForeignKey(
         "self", null=True, blank=True, default=None, on_delete=models.SET_NULL, related_name="children"
@@ -165,6 +190,13 @@ class Sitemap(BaseAbstractModel):
 
     def __str__(self):
         return f"{self.route} ({self.name})"
+
+    def _choice_meta_fields(self) -> dict:
+        return {
+            "domain_group": str(self.domain_group),
+            "hide": self.hide,
+            "order": self.order,
+        }
 
     @functools.cached_property
     def route(self) -> str:

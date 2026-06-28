@@ -46,6 +46,9 @@ class PresentationQuerySet(BaseAbstractModelQuerySet):
 
 class PresentationType(BaseAbstractModel):
     choices_select_related = ("event",)
+    choices_meta_schema: ClassVar[dict] = {
+        "event": {"label": "이벤트", "type": "string", "filter": "select"},
+    }
 
     event = models.ForeignKey(Event, on_delete=models.PROTECT)
     name = models.CharField(max_length=256)
@@ -62,8 +65,17 @@ class PresentationType(BaseAbstractModel):
     def __str__(self) -> str:
         return f"[{self.event.name}] {self.name}"
 
+    def _choice_meta_fields(self) -> dict:
+        return {"event": self.event.name}
+
 
 class PresentationCategory(BaseAbstractModel):
+    choices_select_related = ("type", "type__event")
+    choices_meta_schema: ClassVar[dict] = {
+        "type": {"label": "발표 타입", "type": "string", "filter": "select"},
+        "event": {"label": "이벤트", "type": "string", "filter": "select"},
+    }
+
     type = models.ForeignKey(PresentationType, on_delete=models.PROTECT)
     name = models.CharField(max_length=256)
 
@@ -78,6 +90,12 @@ class PresentationCategory(BaseAbstractModel):
 
     def __str__(self) -> str:
         return self.name
+
+    def _choice_meta_fields(self) -> dict:
+        return {
+            "type": self.type.name,
+            "event": self.type.event.name,
+        }
 
 
 class Presentation(BaseAbstractModel):
@@ -154,12 +172,18 @@ class CallForPresentationSchedule(BaseAbstractModel):
 
 class Room(BaseAbstractModel):
     choices_select_related = ("event",)
+    choices_meta_schema: ClassVar[dict] = {
+        "event": {"label": "이벤트", "type": "string", "filter": "select"},
+    }
 
     event = models.ForeignKey(Event, on_delete=models.PROTECT)
     name = models.CharField(max_length=256)
 
     def __str__(self) -> str:
         return f"[{self.event.name}] {self.name}"
+
+    def _choice_meta_fields(self) -> dict:
+        return {"event": self.event.name}
 
 
 class RoomScheduleQuerySet(BaseAbstractModelQuerySet):

@@ -70,8 +70,7 @@ def test_category_json_schema_exposes_choice_meta_schema(api_client, category_fi
     ui_schema = response.json()["ui_schema"]
     meta_schema = ui_schema["event"]["ui:options"]["choiceMetaSchema"]
     assert meta_schema["organization"]["label"] == "조직"
-    # meta 정의가 없는 대상(CategoryGroup)에는 choiceMetaSchema 가 붙지 않는다.
-    assert "choiceMetaSchema" not in ui_schema.get("group", {}).get("ui:options", {})
+    assert ui_schema["group"]["ui:options"]["choiceMetaSchema"]["priority"]["label"] == "순서"
 
 
 @pytest.mark.django_db
