@@ -9,7 +9,6 @@ from user.models.organization import Organization
 
 LIST_URL = reverse("v1:admin-shop-category-list")
 CHOICES_URL = LIST_URL + "choices/"
-JSON_SCHEMA_URL = LIST_URL + "json-schema/"
 
 
 @pytest.fixture
@@ -64,16 +63,6 @@ def test_category_choices_include_meta_for_event(api_client, category_fixtures):
 
 
 @pytest.mark.django_db
-def test_category_json_schema_exposes_choice_meta_schema(api_client, category_fixtures):
-    response = api_client.get(JSON_SCHEMA_URL)
-    assert response.status_code == HTTP_200_OK
-    ui_schema = response.json()["ui_schema"]
-    meta_schema = ui_schema["event"]["ui:options"]["choiceMetaSchema"]
-    assert meta_schema["organization"]["label"] == "조직"
-    assert ui_schema["group"]["ui:options"]["choiceMetaSchema"]["priority"]["label"] == "순서"
-
-
-@pytest.mark.django_db
 def test_category_choices_include_audit_meta_for_event(api_client, category_fixtures):
     # BaseAbstractModel 의 audit 메타(created_by/updated_by/created_at/updated_at)가 자동으로 붙어야 한다.
     response = api_client.get(CHOICES_URL)
@@ -82,15 +71,6 @@ def test_category_choices_include_audit_meta_for_event(api_client, category_fixt
     event_meta = event_choices[str(category_fixtures["event"].id)]["meta"]
     assert {"created_by", "updated_by", "created_at", "updated_at"} <= set(event_meta)
     assert event_meta["created_at"] is not None
-
-
-@pytest.mark.django_db
-def test_category_json_schema_exposes_audit_meta_schema(api_client, category_fixtures):
-    response = api_client.get(JSON_SCHEMA_URL)
-    assert response.status_code == HTTP_200_OK
-    meta_schema = response.json()["ui_schema"]["event"]["ui:options"]["choiceMetaSchema"]
-    assert meta_schema["created_by"]["label"] == "생성자"
-    assert {"created_by", "updated_by", "created_at", "updated_at"} <= set(meta_schema)
 
 
 @pytest.mark.django_db

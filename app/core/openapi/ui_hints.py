@@ -1,4 +1,4 @@
-from core.models import AUDIT_CHOICE_META_SCHEMA, MarkdownField
+from core.models import MarkdownField
 from django.db.models.fields import TextField
 from django.db.models.fields.files import FileField
 from django.db.models.fields.related import ForeignKey, ManyToManyField
@@ -13,10 +13,6 @@ def ui_hints_for_model_field(model_field: object) -> dict:
             "choiceApp": model_field.related_model._meta.app_config.name.split(".")[0],
             "choiceResource": model_field.related_model._meta.model_name,
         }
-        if meta_schema := getattr(model_field.related_model, "choices_meta_schema", None):
-            if hasattr(model_field.related_model, "get_audit_choice_meta"):
-                meta_schema = meta_schema | AUDIT_CHOICE_META_SCHEMA
-            hints["ui:options"]["choiceMetaSchema"] = meta_schema
 
     if isinstance(model_field, ManyToManyField):
         return hints | {"ui:field": "m2m_select"}

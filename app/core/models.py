@@ -13,13 +13,6 @@ if typing.TYPE_CHECKING:
 
 User = get_user_model()
 
-AUDIT_CHOICE_META_SCHEMA: dict[str, dict[str, str]] = {
-    "created_by": {"label": "생성자", "type": "string", "filter": "select"},
-    "updated_by": {"label": "수정자", "type": "string", "filter": "select"},
-    "created_at": {"label": "생성일시", "type": "string", "filter": "search"},
-    "updated_at": {"label": "수정일시", "type": "string", "filter": "search"},
-}
-
 
 class BaseAbstractModelQuerySet(models.QuerySet):
     def create(self, **kwargs: dict) -> models.Model:
