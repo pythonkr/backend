@@ -33,6 +33,13 @@ class CategoryGroup(BaseAbstractModel):
 
 
 class Category(BaseAbstractModel):
+    choices_select_related = ("group", "event", "event__organization")
+    choices_meta_schema: typing.ClassVar[dict] = {
+        "is_ticket": {"label": "티켓", "type": "boolean"},
+        "group": {"label": "그룹", "type": "string", "filter": "select"},
+        "event": {"label": "이벤트", "type": "string", "filter": "select"},
+    }
+
     group = models.ForeignKey(CategoryGroup, on_delete=models.PROTECT)
     name = models.CharField(max_length=100)
     priority = models.IntegerField(default=0)
@@ -48,6 +55,13 @@ class Category(BaseAbstractModel):
 
     def __str__(self) -> str:  # pragma: no cover
         return f"{self.group.name} > {self.name}"
+
+    def get_choice_meta(self) -> dict:
+        return {
+            "group": self.group.name,
+            "is_ticket": self.is_ticket,
+            "event": str(self.event) if self.event_id else None,
+        }
 
 
 class Tag(BaseAbstractModel):
@@ -119,6 +133,14 @@ class Product(BaseAbstractModel):
         OUT_OF_ORDERABLE_PERIOD = "out_of_orderable_period", "판매 기간 아님"
         ACTIVE = "active", "노출 중"
 
+    choices_select_related = ("category", "category__group")
+    choices_meta_schema: typing.ClassVar[dict] = {
+        "category": {"label": "카테고리", "type": "string", "filter": "select"},
+        "price": {"label": "가격", "type": "number"},
+        "stock": {"label": "재고", "type": "number"},
+        "status": {"label": "상태", "type": "string", "filter": "select"},
+    }
+
     name = models.TextField()
     description = models.TextField(null=True, blank=True)
     image = models.ForeignKey(
@@ -168,6 +190,14 @@ class Product(BaseAbstractModel):
 
     def __str__(self) -> str:  # pragma: no cover
         return f"{self.category} > {self.name} ({self.price}원)"
+
+    def get_choice_meta(self) -> dict:
+        return {
+            "category": str(self.category),
+            "price": self.price,
+            "stock": self.stock,
+            "status": self.current_status.label,
+        }
 
     @property
     def visible_period(self) -> TimeSpan:

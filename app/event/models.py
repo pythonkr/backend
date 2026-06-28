@@ -1,11 +1,20 @@
+import typing
+
 from core.models import BaseAbstractModel
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 from file.models import PublicFile
 from user.models.organization import Organization
 
 
 class Event(BaseAbstractModel):
+    choices_select_related = ("organization",)
+    choices_meta_schema: typing.ClassVar[dict] = {
+        "organization": {"label": "조직", "type": "string", "filter": "select"},
+        "started_at": {"label": "시작일", "type": "string", "filter": "search"},
+    }
+
     organization = models.ForeignKey(Organization, on_delete=models.PROTECT, related_name="events")
     name = models.CharField(max_length=256)
     logo = models.ForeignKey(PublicFile, on_delete=models.PROTECT, null=True, blank=True, related_name="+")
@@ -27,6 +36,12 @@ class Event(BaseAbstractModel):
 
     def __str__(self):
         return f"{self.name} by {self.organization}"
+
+    def get_choice_meta(self) -> dict:
+        return {
+            "organization": str(self.organization),
+            "started_at": timezone.localtime(self.event_start_at).date().isoformat() if self.event_start_at else None,
+        }
 
     def clean(self) -> None:
         super().clean()

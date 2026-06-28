@@ -21,8 +21,8 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
         return super().__new__(cls)
 
     @staticmethod
-    def _get_choices_from_queryset(qs: QuerySet, is_nullable: bool) -> list[dict[str, str]]:
-        choices: list[dict[str, str]] = [{"const": None, "title": "빈 값"}] if is_nullable else []
+    def _get_choices_from_queryset(qs: QuerySet, is_nullable: bool) -> list[dict]:
+        choices: list[dict] = [{"const": None, "title": "빈 값"}] if is_nullable else []
 
         if hasattr(qs, "get_choices_queryset"):
             qs = qs.get_choices_queryset()
@@ -33,7 +33,10 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
             qs = qs.filter(is_active=True)
 
         for row in qs:
-            choices.append({"const": str(row.pk), "title": str(row)})
+            item: dict = {"const": str(row.pk), "title": str(row)}
+            if hasattr(row, "get_choice_meta") and (meta := row.get_choice_meta()):
+                item["meta"] = meta
+            choices.append(item)
 
         return choices
 
@@ -74,8 +77,8 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
 
         return result
 
-    def get_choices(self) -> dict[str, list[dict[str, str]]]:
-        choices: dict[str, list[dict[str, str]]] = {}
+    def get_choices(self) -> dict[str, list[dict]]:
+        choices: dict[str, list[dict]] = {}
 
         for field_name, field, serializer_field, is_m2m in self._get_related_field_info():
             if is_m2m:

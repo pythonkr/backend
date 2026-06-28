@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 import uuid
 from contextlib import suppress
-from typing import Self
+from typing import ClassVar, Self
 
 from core.models import BaseAbstractModel, BaseAbstractModelQuerySet, MarkdownField
 from django.contrib.auth import get_user_model
@@ -81,7 +81,11 @@ class PresentationCategory(BaseAbstractModel):
 
 
 class Presentation(BaseAbstractModel):
-    choices_select_related = ("type",)
+    choices_select_related = ("type", "type__event")
+    choices_meta_schema: ClassVar[dict] = {
+        "type": {"label": "발표 타입", "type": "string", "filter": "select"},
+        "event": {"label": "이벤트", "type": "string", "filter": "select"},
+    }
 
     type = models.ForeignKey(PresentationType, on_delete=models.PROTECT)
     title = models.CharField(max_length=256)
@@ -103,6 +107,12 @@ class Presentation(BaseAbstractModel):
 
     def __str__(self) -> str:
         return f"[{self.type.name}] {self.title}"
+
+    def get_choice_meta(self) -> dict:
+        return {
+            "type": self.type.name,
+            "event": self.type.event.name,
+        }
 
     def active_categories(self) -> list[PresentationCategory]:
         with suppress(AttributeError):

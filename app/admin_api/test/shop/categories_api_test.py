@@ -9,6 +9,7 @@ from user.models.organization import Organization
 
 LIST_URL = reverse("v1:admin-shop-category-list")
 CHOICES_URL = LIST_URL + "choices/"
+JSON_SCHEMA_URL = LIST_URL + "json-schema/"
 
 
 @pytest.fixture
@@ -49,6 +50,28 @@ def test_category_choices_returns_group_and_event(api_client, category_fixtures)
     assert {"group", "event"} <= set(data)
     assert str(category_fixtures["g2026"].id) in {c["const"] for c in data["group"]}
     assert str(category_fixtures["event"].id) in {c["const"] for c in data["event"]}
+
+
+@pytest.mark.django_db
+def test_category_choices_include_meta_for_event(api_client, category_fixtures):
+    # Event 모델이 choices_meta_schema/get_choice_meta 를 정의하므로 event choice 에 meta 가 붙어야 한다.
+    response = api_client.get(CHOICES_URL)
+    assert response.status_code == HTTP_200_OK
+    event_choices = {c["const"]: c for c in response.json()["event"] if c["const"] is not None}
+    event_meta = event_choices[str(category_fixtures["event"].id)]["meta"]
+    assert event_meta["organization"] == "Org"
+    assert event_meta["started_at"] == "2026-08-01"
+
+
+@pytest.mark.django_db
+def test_category_json_schema_exposes_choice_meta_schema(api_client, category_fixtures):
+    response = api_client.get(JSON_SCHEMA_URL)
+    assert response.status_code == HTTP_200_OK
+    ui_schema = response.json()["ui_schema"]
+    meta_schema = ui_schema["event"]["ui:options"]["choiceMetaSchema"]
+    assert meta_schema["organization"]["label"] == "조직"
+    # meta 정의가 없는 대상(CategoryGroup)에는 choiceMetaSchema 가 붙지 않는다.
+    assert "choiceMetaSchema" not in ui_schema.get("group", {}).get("ui:options", {})
 
 
 @pytest.mark.django_db

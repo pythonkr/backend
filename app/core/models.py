@@ -43,6 +43,7 @@ class BaseAbstractModelQuerySet(models.QuerySet):
 
 class BaseAbstractModel(models.Model):
     choices_select_related: typing.ClassVar[tuple[str, ...]] = ()
+    choices_meta_schema: typing.ClassVar[dict[str, dict[str, str]]] = {}
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
