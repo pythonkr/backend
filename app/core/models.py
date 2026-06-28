@@ -26,6 +26,18 @@ class BaseAbstractModelQuerySet(models.QuerySet):
         current_user = get_current_user()
         return super().create(**(kwargs | {"created_by": current_user, "updated_by": current_user}))
 
+    def bulk_create(self, objs: collections.abc.Iterable[models.Model], *args, **kwargs) -> list[models.Model]:
+        # bulk_create는 save()/create()를 우회하므로 audit FK를 직접 채움.
+        # create()/save()와 달리 호출자가 명시한 값은 보존(fill-if-missing) — 명시적 작성자 지정(예: NHN 동기화) 존중.
+        objs = list(objs)
+        current_user = get_current_user()
+        for obj in objs:
+            if obj.created_by_id is None:
+                obj.created_by = current_user
+            if obj.updated_by_id is None:
+                obj.updated_by = current_user
+        return super().bulk_create(objs, *args, **kwargs)
+
     def update(self, **kwargs: dict) -> int:
         if "updated_by" not in kwargs and "updated_by_id" not in kwargs:
             kwargs |= {"updated_by": get_current_user()}
@@ -102,7 +114,10 @@ class BaseAbstractModel(models.Model):
     ) -> None:
         if update_fields:
             update_fields = set(update_fields) | {"updated_at", "updated_by"}
-        self.updated_by = get_current_user()
+        current_user = get_current_user()
+        self.updated_by = current_user
+        if self._state.adding:
+            self.created_by = current_user
         super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
 
     def delete(self, using: str | None = None) -> None:

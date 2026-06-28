@@ -276,3 +276,17 @@ def test_create_for_recipients_templateless_uses_transient_template(system_user)
     assert history.template_id is None
     assert history.template_code == ""
     assert history.sent_from == "from@example.com"
+
+
+@pytest.mark.django_db
+def test_create_for_recipients_populates_sent_to_audit_fields(email_template, system_user):
+    # bulk_create로 만드는 sent_to 행도 history와 동일한 작성자(created_by/updated_by)를 가져야 함.
+    with patch("core.models.get_current_user", return_value=system_user):
+        history = EmailNotificationHistory.objects.create_for_recipients(
+            template=email_template,
+            recipients=[{"recipient": "a@b.c"}, {"recipient": "d@e.f"}],
+        )
+    assert history.created_by_id == system_user.id
+    for sent_to in history.sent_to_list.all():
+        assert sent_to.created_by_id == system_user.id
+        assert sent_to.updated_by_id == system_user.id
