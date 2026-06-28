@@ -1,12 +1,14 @@
 from core.models import BaseAbstractModel
 from django.core.exceptions import ValidationError
 from django.db import models
+from file.models import PublicFile
 from user.models.organization import Organization
 
 
 class Event(BaseAbstractModel):
     organization = models.ForeignKey(Organization, on_delete=models.PROTECT, related_name="events")
     name = models.CharField(max_length=256)
+    logo = models.ForeignKey(PublicFile, on_delete=models.PROTECT, null=True, blank=True, related_name="+")
     banner_image = models.TextField(null=True, blank=True)
     slogan = models.CharField(max_length=1000, null=True, blank=True)
     description = models.CharField(max_length=1000, null=True, blank=True)
