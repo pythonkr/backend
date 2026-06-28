@@ -155,3 +155,18 @@ class JsonSchemaViewSet(viewsets.GenericViewSet):
     @decorators.action(detail=False, methods=["get"], url_path="choices")
     def response_choices(self, *args: tuple, **kwargs: dict) -> response.Response:
         return response.Response(data=self.get_choices())
+
+    @utils.extend_schema(
+        tags=[OpenAPITag.ADMIN_JSON_SCHEMA],
+        summary="Selectables (this model's instances as choices)",
+        responses={status.HTTP_200_OK: openapi.OpenApiResponse(response=types.OpenApiTypes.OBJECT)},
+    )
+    @decorators.action(detail=False, methods=["get"], url_path="selectables")
+    def response_selectables(self, *args: tuple, **kwargs: dict) -> response.Response:
+        qs = self.get_queryset()
+        return response.Response(
+            data={
+                "results": self._get_choices_from_queryset(qs, False),
+                "meta_schema": getattr(qs.model, "choices_meta_schema", None) or {},
+            }
+        )

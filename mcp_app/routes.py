@@ -32,7 +32,7 @@ ROUTES: list[Route] = [
     # ── CMS 도메인 그룹(어드민 읽기) ──
     Route(
         method="GET",
-        path="/v1/admin-api/cms/domain-group/",
+        path="/v1/admin-api/cms/domaingroup/",
         summary="도메인 그룹 목록",
         description="프론트엔드 도메인 그룹(name + domains 호스트 목록)을 조회합니다. "
         "CMS 페이지/사이트맵의 domain_group 이 어떤 실제 도메인(예: 2026.pycon.kr)에 대응하는지 확인하고, "
@@ -140,54 +140,54 @@ ROUTES: list[Route] = [
     # ── 쇼핑 주문·상품(어드민 읽기 전용) ──
     Route(
         method="GET",
-        path="/v1/admin-api/shop/category-groups/",
+        path="/v1/admin-api/shop/categorygroup/",
         summary="카테고리 그룹 목록",
         description='티켓 카테고리 그룹(예: "2024"/"2025"/"2026") 목록(id+이름). '
         "여기서 얻은 id 로 상품/주문을 category_group 으로 필터해 연도를 구분하세요.",
     ),
     Route(
         method="GET",
-        path="/v1/admin-api/shop/orders/",
+        path="/v1/admin-api/shop/order/",
         summary="주문 목록",
         description="주문을 조회/필터합니다(읽기 전용, 페이지네이션 count/results). 연도 구분은 category_group=<그룹 id> 로.",
     ),
     Route(
         method="GET",
-        path="/v1/admin-api/shop/orders/{id}/",
+        path="/v1/admin-api/shop/order/{id}/",
         summary="주문 상세",
     ),
     Route(
         method="GET",
-        path="/v1/admin-api/shop/products/",
+        path="/v1/admin-api/shop/product/",
         summary="상품 목록",
         description="상품을 조회/필터합니다(읽기 전용). 연도 구분은 category_group=<그룹 id> 로.",
     ),
     Route(
         method="GET",
-        path="/v1/admin-api/shop/products/{id}/",
+        path="/v1/admin-api/shop/product/{id}/",
         summary="상품 상세",
     ),
     Route(
         method="GET",
-        path="/v1/admin-api/shop/products/choices/",
+        path="/v1/admin-api/shop/product/choices/",
         summary="상품 관계 선택지",
         description="상품의 FK/M2M 선택지(category, tag 등; const=id, title=표시명). category id 로 상품/주문을 필터할 수 있습니다.",
     ),
     Route(
         method="GET",
-        path="/v1/admin-api/shop/categories/",
+        path="/v1/admin-api/shop/category/",
         summary="카테고리 목록",
         description="카테고리 목록(id, 이름, group, event, is_ticket). group/event/is_ticket 으로 필터 가능. "
         "상품/주문을 category=<id> 로 필터할 때 id 출처.",
     ),
     Route(
         method="GET",
-        path="/v1/admin-api/shop/categories/{id}/",
+        path="/v1/admin-api/shop/category/{id}/",
         summary="카테고리 상세",
     ),
     Route(
         method="GET",
-        path="/v1/admin-api/shop/categories/choices/",
+        path="/v1/admin-api/shop/category/choices/",
         summary="카테고리 관계 선택지",
         description="카테고리의 FK 선택지: group(카테고리 그룹=연도)·event(const=id, title=표시명).",
     ),

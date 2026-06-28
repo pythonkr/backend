@@ -42,13 +42,16 @@ from admin_api.views.user import OrganizationAdminViewSet, UserAdminViewSet
 from django.urls import include, path
 from rest_framework import routers
 
+# 라우트 컨벤션: <app_label 첫 segment>/<model_name>. (프론트 ChoicePicker 가 selectables 라우트를 모델 메타로 유도)
+# 모델 없는 뷰셋(order-notifications, refund-authorizer, charts)은 유도 대상이 아니므로 기존 명시 라우트 유지.
+
 admin_user_router = routers.SimpleRouter()
 admin_user_router.register("userext", UserAdminViewSet, basename="admin-user")
 admin_user_router.register("organization", OrganizationAdminViewSet, basename="admin-organization")
-admin_user_router.register("mcp-token", McpTokenAdminViewSet, basename="admin-mcp-token")
+admin_user_router.register("mcptoken", McpTokenAdminViewSet, basename="admin-mcp-token")
 
 admin_cms_router = routers.SimpleRouter()
-admin_cms_router.register("domain-group", DomainGroupAdminViewSet, basename="admin-domain-group")
+admin_cms_router.register("domaingroup", DomainGroupAdminViewSet, basename="admin-domain-group")
 admin_cms_router.register("sitemap", SitemapAdminViewSet, basename="admin-sitemap")
 admin_cms_router.register("page", PageAdminViewSet, basename="admin-page")
 
@@ -67,76 +70,74 @@ admin_event_router.register("presentationspeaker", PresentationSpeakerAdminViewS
 admin_event_router.register("room", RoomAdminViewSet)
 admin_event_router.register("roomschedule", RoomScheduleAdminViewSet)
 
-admin_modificationaudit_router = routers.SimpleRouter()
-admin_modificationaudit_router.register(
-    "modification-audit", ModificationAuditAdminViewSet, basename="admin-modification-audit"
+admin_participant_portal_router = routers.SimpleRouter()
+admin_participant_portal_router.register(
+    "modificationaudit", ModificationAuditAdminViewSet, basename="admin-modification-audit"
 )
 
-admin_notification_email_router = routers.SimpleRouter()
-admin_notification_email_router.register(
-    "template", EmailNotificationTemplateAdminViewSet, basename="admin-notification-email-template"
+admin_notification_router = routers.SimpleRouter()
+admin_notification_router.register(
+    "emailnotificationtemplate", EmailNotificationTemplateAdminViewSet, basename="admin-notification-email-template"
 )
-admin_notification_email_router.register(
-    "history", EmailNotificationHistoryAdminViewSet, basename="admin-notification-email-history"
+admin_notification_router.register(
+    "emailnotificationhistory", EmailNotificationHistoryAdminViewSet, basename="admin-notification-email-history"
 )
-
-admin_notification_kakao_router = routers.SimpleRouter()
-admin_notification_kakao_router.register(
-    "template",
+admin_notification_router.register(
+    "nhncloudkakaoalimtalknotificationtemplate",
     NHNCloudKakaoAlimTalkNotificationTemplateAdminViewSet,
     basename="admin-notification-kakao-template",
 )
-admin_notification_kakao_router.register(
-    "history",
+admin_notification_router.register(
+    "nhncloudkakaoalimtalknotificationhistory",
     NHNCloudKakaoAlimTalkNotificationHistoryAdminViewSet,
     basename="admin-notification-kakao-history",
 )
-
-admin_notification_sms_router = routers.SimpleRouter()
-admin_notification_sms_router.register(
-    "template", NHNCloudSMSNotificationTemplateAdminViewSet, basename="admin-notification-sms-template"
+admin_notification_router.register(
+    "nhncloudsmsnotificationtemplate",
+    NHNCloudSMSNotificationTemplateAdminViewSet,
+    basename="admin-notification-sms-template",
 )
-admin_notification_sms_router.register(
-    "history", NHNCloudSMSNotificationHistoryAdminViewSet, basename="admin-notification-sms-history"
+admin_notification_router.register(
+    "nhncloudsmsnotificationhistory",
+    NHNCloudSMSNotificationHistoryAdminViewSet,
+    basename="admin-notification-sms-history",
 )
 
-admin_external_api_google_router = routers.SimpleRouter()
-admin_external_api_google_router.register("oauth2", GoogleOAuth2AdminViewSet, basename="admin-google-oauth2")
+admin_external_api_router = routers.SimpleRouter()
+admin_external_api_router.register("googleoauth2", GoogleOAuth2AdminViewSet, basename="admin-google-oauth2")
 
 admin_shop_router = routers.SimpleRouter()
-admin_shop_router.register("orders", OrderAdminViewSet, basename="admin-shop-order")
+admin_shop_router.register("order", OrderAdminViewSet, basename="admin-shop-order")
 admin_shop_router.register(
     "order-notifications", OrderNotificationAdminViewSet, basename="admin-shop-order-notification"
 )
-admin_shop_router.register("products", ProductAdminViewSet, basename="admin-shop-product")
-admin_shop_router.register("categories", CategoryAdminViewSet, basename="admin-shop-category")
-admin_shop_router.register("tags", TagAdminViewSet, basename="admin-shop-tag")
-admin_shop_router.register("category-groups", CategoryGroupAdminViewSet, basename="admin-shop-category-group")
-admin_shop_router.register("option-groups", OptionGroupAdminViewSet, basename="admin-shop-option-group")
+admin_shop_router.register("product", ProductAdminViewSet, basename="admin-shop-product")
+admin_shop_router.register("category", CategoryAdminViewSet, basename="admin-shop-category")
+admin_shop_router.register("tag", TagAdminViewSet, basename="admin-shop-tag")
+admin_shop_router.register("categorygroup", CategoryGroupAdminViewSet, basename="admin-shop-category-group")
+admin_shop_router.register("optiongroup", OptionGroupAdminViewSet, basename="admin-shop-option-group")
 admin_shop_router.register("refund-authorizer", RefundAuthorizerAdminViewSet, basename="admin-shop-refund-authorizer")
 
 admin_document_router = routers.SimpleRouter()
-admin_document_router.register("templates", DocumentTemplateAdminViewSet, basename="admin-document-template")
-admin_document_router.register("issued", IssuedDocumentAdminViewSet, basename="admin-document-issued")
+admin_document_router.register("documenttemplate", DocumentTemplateAdminViewSet, basename="admin-document-template")
+admin_document_router.register("issueddocument", IssuedDocumentAdminViewSet, basename="admin-document-issued")
 
 admin_dashboard_router = routers.SimpleRouter()
 admin_dashboard_router.register("charts", DashboardChartAdminViewSet, basename="admin-dashboard-chart")
 
 admin_allauth_router = routers.SimpleRouter()
-admin_allauth_router.register("social-app", SocialAppAdminViewSet, basename="admin-social-app")
-admin_allauth_router.register("social-account", SocialAccountAdminViewSet, basename="admin-social-account")
-admin_allauth_router.register("email-address", EmailAddressAdminViewSet, basename="admin-email-address")
+admin_allauth_router.register("socialapp", SocialAppAdminViewSet, basename="admin-social-app")
+admin_allauth_router.register("socialaccount", SocialAccountAdminViewSet, basename="admin-social-account")
+admin_allauth_router.register("emailaddress", EmailAddressAdminViewSet, basename="admin-email-address")
 
 urlpatterns = [
     path("cms/", include(admin_cms_router.urls)),
     path("file/", include(admin_file_router.urls)),
     path("user/", include(admin_user_router.urls)),
     path("event/", include(admin_event_router.urls)),
-    path("modification-audit/", include(admin_modificationaudit_router.urls)),
-    path("notification/email/", include(admin_notification_email_router.urls)),
-    path("notification/kakao-alimtalk/", include(admin_notification_kakao_router.urls)),
-    path("notification/sms/", include(admin_notification_sms_router.urls)),
-    path("external-api/google/", include(admin_external_api_google_router.urls)),
+    path("participant_portal_api/", include(admin_participant_portal_router.urls)),
+    path("notification/", include(admin_notification_router.urls)),
+    path("external_api/", include(admin_external_api_router.urls)),
     path("shop/", include(admin_shop_router.urls)),
     path("document/", include(admin_document_router.urls)),
     path("dashboard/", include(admin_dashboard_router.urls)),

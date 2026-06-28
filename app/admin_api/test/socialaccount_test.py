@@ -165,7 +165,7 @@ def test_social_account_provider_filter_enum_exposed_in_openapi(api_client):
     assert response.status_code == http.HTTPStatus.OK
     schema = yaml.safe_load(response.content)
 
-    list_path = next(p for p in schema["paths"] if p.endswith("/allauth/social-account/"))
+    list_path = next(p for p in schema["paths"] if p.endswith("/allauth/socialaccount/"))
     params = schema["paths"][list_path]["get"]["parameters"]
     provider = next(p for p in params if p["name"] == "provider")
     assert provider["schema"]["items"]["enum"] == ["google", "kakao"]
