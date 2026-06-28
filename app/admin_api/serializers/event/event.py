@@ -10,6 +10,7 @@ class EventAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, seriali
         model = Event
         fields = COMMON_ADMIN_FIELDS + (
             "organization",
+            "logo",
             "name_ko",
             "name_en",
             "event_start_at",
