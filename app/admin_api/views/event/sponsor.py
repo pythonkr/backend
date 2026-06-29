@@ -12,7 +12,9 @@ from admin_api.serializers.event.sponsor import (
 )
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.viewset.json_schema_viewset import JsonSchemaViewSet
+from core.pagination import AdminPagination
+from core.viewset.json_schema_viewset import JsonSchemaMixin
+from core.viewset.selectables_viewset import SelectablesMixin
 from django.db import models
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from event.sponsor.models import Sponsor, SponsorTag, SponsorTier
@@ -22,7 +24,8 @@ ADMIN_METHODS = ["list", "retrieve", "create", "update", "partial_update", "dest
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_SPONSOR]) for m in ADMIN_METHODS})
-class SponsorTierAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+class SponsorTierAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = SponsorTierAdminSerializer
     permission_classes = [IsSuperUser]
@@ -42,7 +45,8 @@ class SponsorTierAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_SPONSOR]) for m in ADMIN_METHODS})
-class SponsorTagAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+class SponsorTagAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = SponsorTagAdminSerializer
     permission_classes = [IsSuperUser]
@@ -53,7 +57,8 @@ class SponsorTagAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_SPONSOR]) for m in ADMIN_METHODS})
-class SponsorAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+class SponsorAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = SponsorAdminSerializer
     permission_classes = [IsSuperUser]

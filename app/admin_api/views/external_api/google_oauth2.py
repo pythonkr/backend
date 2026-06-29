@@ -4,7 +4,9 @@ from admin_api.serializers.external_api.google_oauth2 import (
 )
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.viewset.json_schema_viewset import JsonSchemaViewSet
+from core.pagination import AdminPagination
+from core.viewset.json_schema_viewset import JsonSchemaMixin
+from core.viewset.selectables_viewset import SelectablesMixin
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from external_api.google_oauth2.models import GoogleOAuth2
 from rest_framework import decorators, request, response, status, viewsets
@@ -13,7 +15,8 @@ ADMIN_METHODS = ["list", "retrieve", "create", "partial_update", "destroy"]
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EXT_API_GOOGLE_OAUTH2]) for m in ADMIN_METHODS})
-class GoogleOAuth2AdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+class GoogleOAuth2AdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = GoogleOAuth2AdminSerializer
     permission_classes = [IsSuperUser]

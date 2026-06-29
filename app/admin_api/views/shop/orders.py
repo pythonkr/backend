@@ -9,7 +9,9 @@ from admin_api.filtersets.shop.orders import OrderAdminFilterSet
 from admin_api.serializers.shop.orders import OrderAdminSerializer, OrderExportRequestSerializer
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.viewset.json_schema_viewset import JsonSchemaViewSet
+from core.pagination import AdminPagination
+from core.viewset.json_schema_viewset import JsonSchemaMixin
+from core.viewset.selectables_viewset import SelectablesMixin
 from django.core.files import File
 from django.db import models, transaction
 from django.http.response import StreamingHttpResponse
@@ -57,12 +59,14 @@ def _payment_history_created_at_subquery(*, latest: bool) -> models.Subquery:
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_SHOP_ORDER]) for m in ADMIN_METHODS})
 class OrderAdminViewSet(
-    JsonSchemaViewSet,
+    JsonSchemaMixin,
+    SelectablesMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
     viewsets.GenericViewSet,
 ):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch"]
     serializer_class = OrderAdminSerializer
     filterset_class = OrderAdminFilterSet

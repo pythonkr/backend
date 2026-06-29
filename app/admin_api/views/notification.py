@@ -14,7 +14,9 @@ from admin_api.serializers.notification import (
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
 from core.openapi.schemas import build_html_responses
-from core.viewset.json_schema_viewset import JsonSchemaViewSet
+from core.pagination import AdminPagination
+from core.viewset.json_schema_viewset import JsonSchemaMixin
+from core.viewset.selectables_viewset import SelectablesMixin
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from notification.models import (
     EmailNotificationHistory,
@@ -40,7 +42,7 @@ HISTORY_METHODS = ["list", "retrieve", "create", "retry", "retry_sent_to", "rend
 # ---- Template -----------------------------------------------------------
 
 
-class _NotiTemplateAdminActionMixin(JsonSchemaViewSet):
+class _NotiTemplateAdminActionMixin(JsonSchemaMixin, SelectablesMixin):
     permission_classes = [IsSuperUser]
     filterset_class = NotificationTemplateAdminFilterSet
 
@@ -61,6 +63,7 @@ class _NotiTemplateAdminActionMixin(JsonSchemaViewSet):
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_NOTI_EMAIL]) for m in TEMPLATE_CRUD_METHODS})
 class EmailNotificationTemplateAdminViewSet(_NotiTemplateAdminActionMixin, ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = EmailNotificationTemplateAdminSerializer
     queryset = (
@@ -70,6 +73,7 @@ class EmailNotificationTemplateAdminViewSet(_NotiTemplateAdminActionMixin, Model
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_NOTI_KAKAO_ALIMTALK]) for m in TEMPLATE_READ_METHODS})
 class NHNCloudKakaoAlimTalkNotificationTemplateAdminViewSet(_NotiTemplateAdminActionMixin, ReadOnlyModelViewSet):
+    pagination_class = AdminPagination
     serializer_class = NHNCloudKakaoAlimTalkNotificationTemplateAdminSerializer
     queryset = (
         NHNCloudKakaoAlimTalkNotificationTemplate.objects.filter_active()
@@ -85,6 +89,7 @@ class NHNCloudKakaoAlimTalkNotificationTemplateAdminViewSet(_NotiTemplateAdminAc
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_NOTI_SMS]) for m in TEMPLATE_CRUD_METHODS})
 class NHNCloudSMSNotificationTemplateAdminViewSet(_NotiTemplateAdminActionMixin, ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = NHNCloudSMSNotificationTemplateAdminSerializer
     queryset = (
@@ -95,7 +100,10 @@ class NHNCloudSMSNotificationTemplateAdminViewSet(_NotiTemplateAdminActionMixin,
 # ---- History ----------------------------------------------------------------
 
 
-class _NotiHistoryAdminViewSetBase(CreateModelMixin, ListModelMixin, RetrieveModelMixin, JsonSchemaViewSet):
+class _NotiHistoryAdminViewSetBase(
+    CreateModelMixin, ListModelMixin, RetrieveModelMixin, JsonSchemaMixin, SelectablesMixin
+):
+    pagination_class = AdminPagination
     permission_classes = [IsSuperUser]
     filterset_class = NotificationHistoryAdminFilterSet
 

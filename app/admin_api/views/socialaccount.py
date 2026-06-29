@@ -9,7 +9,9 @@ from allauth.account.models import EmailAddress
 from allauth.socialaccount.models import SocialAccount, SocialApp
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.viewset.json_schema_viewset import JsonSchemaViewSet
+from core.pagination import AdminPagination
+from core.viewset.json_schema_viewset import JsonSchemaMixin
+from core.viewset.selectables_viewset import SelectablesMixin
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import mixins, viewsets
 
@@ -18,7 +20,8 @@ ADMIN_METHODS = DESTROY_ONLY_METHODS + ["create", "partial_update"]
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_ALLAUTH]) for m in ADMIN_METHODS})
-class SocialAppAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+class SocialAppAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     permission_classes = [IsSuperUser]
     serializer_class = SocialAppAdminSerializer
@@ -30,9 +33,11 @@ class SocialAccountAdminViewSet(
     mixins.RetrieveModelMixin,
     mixins.ListModelMixin,
     mixins.DestroyModelMixin,
-    JsonSchemaViewSet,
+    JsonSchemaMixin,
+    SelectablesMixin,
     viewsets.GenericViewSet,
 ):
+    pagination_class = AdminPagination
     http_method_names = ["get", "delete"]
     permission_classes = [IsSuperUser]
     serializer_class = SocialAccountAdminSerializer
@@ -44,7 +49,8 @@ class SocialAccountAdminViewSet(
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_ALLAUTH]) for m in ADMIN_METHODS})
-class EmailAddressAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+class EmailAddressAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = EmailAddressAdminSerializer
     permission_classes = [IsSuperUser]

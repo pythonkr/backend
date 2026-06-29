@@ -1,13 +1,14 @@
 import typing
 import unicodedata
 
+from core.serializer.json_schema_serializer import JsonSchemaSerializer
 from event.presentation.models import Presentation, PresentationSpeaker
 from participant_portal_api.models import ModificationAudit, ModificationAuditComment
 from rest_framework import serializers
 from user.models import UserExt
 
 
-class ModificationAuditResponseAdminSerializer(serializers.ModelSerializer):
+class ModificationAuditResponseAdminSerializer(JsonSchemaSerializer, serializers.ModelSerializer):
     class ModificationAuditCommentAdminSerializer(serializers.ModelSerializer):
         class ModificationAuditCommentAdminUserSerializer(serializers.ModelSerializer):
             class Meta:

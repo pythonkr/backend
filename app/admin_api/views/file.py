@@ -2,7 +2,9 @@ from admin_api.filtersets.file import PublicFileAdminFilterSet
 from admin_api.serializers.file import PublicFileAdmimUploadSerializer, PublicFileAdminSerializer
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.viewset.json_schema_viewset import JsonSchemaViewSet
+from core.pagination import AdminPagination
+from core.viewset.json_schema_viewset import JsonSchemaMixin
+from core.viewset.selectables_viewset import SelectablesMixin
 from drf_spectacular import utils
 from file.models import PublicFile
 from rest_framework import decorators, mixins, parsers, request, response, serializers, status, viewsets
@@ -15,9 +17,11 @@ class PublicFileAdminViewSet(
     mixins.RetrieveModelMixin,
     mixins.DestroyModelMixin,
     mixins.ListModelMixin,
-    JsonSchemaViewSet,
+    JsonSchemaMixin,
+    SelectablesMixin,
     viewsets.GenericViewSet,
 ):
+    pagination_class = AdminPagination
     serializer_class = PublicFileAdminSerializer
     permission_classes = [IsSuperUser]
     filterset_class = PublicFileAdminFilterSet

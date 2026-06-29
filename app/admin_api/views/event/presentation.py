@@ -18,7 +18,9 @@ from admin_api.serializers.event.presentation import (
 )
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.viewset.json_schema_viewset import JsonSchemaViewSet
+from core.pagination import AdminPagination
+from core.viewset.json_schema_viewset import JsonSchemaMixin
+from core.viewset.selectables_viewset import SelectablesMixin
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from event.presentation.models import (
     Presentation,
@@ -34,7 +36,8 @@ ADMIN_METHODS = ["list", "retrieve", "create", "update", "partial_update", "dest
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION]) for m in ADMIN_METHODS})
-class PresentationTypeAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+class PresentationTypeAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = PresentationTypeAdminSerializer
     permission_classes = [IsSuperUser]
@@ -47,7 +50,8 @@ class PresentationTypeAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION]) for m in ADMIN_METHODS})
-class PresentationCategoryAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+class PresentationCategoryAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = PresentationCategoryAdminSerializer
     permission_classes = [IsSuperUser]
@@ -60,7 +64,8 @@ class PresentationCategoryAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet)
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION]) for m in ADMIN_METHODS})
-class PresentationAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+class PresentationAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = PresentationAdminSerializer
     permission_classes = [IsSuperUser]
@@ -74,7 +79,8 @@ class PresentationAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION]) for m in ADMIN_METHODS})
-class PresentationSpeakerAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+class PresentationSpeakerAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = PresentationSpeakerAdminSerializer
     permission_classes = [IsSuperUser]
@@ -85,7 +91,8 @@ class PresentationSpeakerAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION]) for m in ADMIN_METHODS})
-class RoomAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+class RoomAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = RoomAdminSerializer
     permission_classes = [IsSuperUser]
@@ -94,7 +101,8 @@ class RoomAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION]) for m in ADMIN_METHODS})
-class RoomScheduleAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+class RoomScheduleAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = RoomScheduleAdminSerializer
     permission_classes = [IsSuperUser]

@@ -12,7 +12,9 @@ from admin_api.serializers.cms import (
 from cms.models import DomainGroup, Page, Section, Sitemap
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.viewset.json_schema_viewset import JsonSchemaViewSet
+from core.pagination import AdminPagination
+from core.viewset.json_schema_viewset import JsonSchemaMixin
+from core.viewset.selectables_viewset import SelectablesMixin
 from django.db import transaction
 from drf_spectacular.utils import extend_schema, extend_schema_view, inline_serializer
 from drf_standardized_errors.openapi_serializers import (
@@ -26,7 +28,8 @@ ADMIN_METHODS = ["list", "retrieve", "create", "update", "partial_update", "dest
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_CMS]) for m in ADMIN_METHODS})
-class DomainGroupAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+class DomainGroupAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = DomainGroupAdminSerializer
     permission_classes = [IsSuperUser]
@@ -61,7 +64,8 @@ class SectionData(typing.TypedDict):
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_CMS]) for m in ADMIN_METHODS})
-class SitemapAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+class SitemapAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = SitemapAdminSerializer
     permission_classes = [IsSuperUser]
@@ -70,7 +74,8 @@ class SitemapAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_CMS]) for m in ADMIN_METHODS})
-class PageAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+class PageAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet):
+    pagination_class = AdminPagination
     serializer_class = PageAdminSerializer
     permission_classes = [IsSuperUser]
     filterset_class = PageAdminFilterSet

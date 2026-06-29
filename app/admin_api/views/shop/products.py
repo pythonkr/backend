@@ -8,7 +8,9 @@ from admin_api.serializers.shop.products import (
 )
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.viewset.json_schema_viewset import JsonSchemaViewSet
+from core.pagination import AdminPagination
+from core.viewset.json_schema_viewset import JsonSchemaMixin
+from core.viewset.selectables_viewset import SelectablesMixin
 from django.db.models import Count, Prefetch, Q
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import viewsets
@@ -19,7 +21,8 @@ CRUD_METHODS = READONLY_METHODS + ["create", "update", "partial_update", "destro
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_SHOP_CATEGORY]) for m in CRUD_METHODS})
-class CategoryGroupAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+class CategoryGroupAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = CategoryGroupAdminSerializer
     permission_classes = [IsSuperUser]
@@ -34,7 +37,8 @@ class CategoryGroupAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_SHOP_CATEGORY]) for m in READONLY_METHODS})
-class CategoryAdminViewSet(JsonSchemaViewSet, viewsets.ReadOnlyModelViewSet):
+class CategoryAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ReadOnlyModelViewSet):
+    pagination_class = AdminPagination
     serializer_class = CategoryReadAdminSerializer
     permission_classes = [IsSuperUser]
     filterset_fields = ["group", "event", "is_ticket"]
@@ -42,7 +46,8 @@ class CategoryAdminViewSet(JsonSchemaViewSet, viewsets.ReadOnlyModelViewSet):
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_SHOP_TAG]) for m in CRUD_METHODS})
-class TagAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+class TagAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = TagAdminSerializer
     permission_classes = [IsSuperUser]
@@ -50,7 +55,8 @@ class TagAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_SHOP_PRODUCT]) for m in CRUD_METHODS})
-class ProductAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+class ProductAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = ProductAdminSerializer
     permission_classes = [IsSuperUser]
@@ -74,7 +80,8 @@ class ProductAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_SHOP_PRODUCT]) for m in CRUD_METHODS})
-class OptionGroupAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+class OptionGroupAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = OptionGroupAdminSerializer
     permission_classes = [IsSuperUser]

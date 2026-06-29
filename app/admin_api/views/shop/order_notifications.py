@@ -10,7 +10,8 @@ from admin_api.serializers.shop.orders import (
 )
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.viewset.json_schema_viewset import JsonSchemaViewSet
+from core.viewset.json_schema_viewset import JsonSchemaMixin
+from core.viewset.selectables_viewset import SelectablesMixin
 from django.db import models
 from drf_spectacular.utils import PolymorphicProxySerializer, extend_schema, extend_schema_view
 from rest_framework import request, response, status, viewsets
@@ -22,7 +23,7 @@ ACTION_METHODS = ["preview", "send"]
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_SHOP_ORDER]) for m in ACTION_METHODS})
-class OrderNotificationAdminViewSet(JsonSchemaViewSet, viewsets.GenericViewSet):
+class OrderNotificationAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.GenericViewSet):
     http_method_names = ["post"]
     permission_classes = [IsSuperUser]
     filterset_class = OrderAdminFilterSet

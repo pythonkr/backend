@@ -2,7 +2,9 @@ from admin_api.filtersets.document import IssuedDocumentAdminFilterSet
 from admin_api.serializers.document import DocumentTemplateAdminSerializer, IssuedDocumentAdminSerializer
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.viewset.json_schema_viewset import JsonSchemaViewSet
+from core.pagination import AdminPagination
+from core.viewset.json_schema_viewset import JsonSchemaMixin
+from core.viewset.selectables_viewset import SelectablesMixin
 from document.models import DocumentTemplate, IssuedDocument
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import request, response
@@ -14,7 +16,8 @@ ISSUED_METHODS = ["list", "retrieve", "revoke"]
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_DOCUMENT]) for m in TEMPLATE_METHODS})
-class DocumentTemplateAdminViewSet(JsonSchemaViewSet, ModelViewSet):
+class DocumentTemplateAdminViewSet(JsonSchemaMixin, SelectablesMixin, ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     permission_classes = [IsSuperUser]
     serializer_class = DocumentTemplateAdminSerializer
@@ -22,7 +25,8 @@ class DocumentTemplateAdminViewSet(JsonSchemaViewSet, ModelViewSet):
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_DOCUMENT]) for m in ISSUED_METHODS})
-class IssuedDocumentAdminViewSet(JsonSchemaViewSet, ReadOnlyModelViewSet):
+class IssuedDocumentAdminViewSet(JsonSchemaMixin, SelectablesMixin, ReadOnlyModelViewSet):
+    pagination_class = AdminPagination
     permission_classes = [IsSuperUser]
     filterset_class = IssuedDocumentAdminFilterSet
     serializer_class = IssuedDocumentAdminSerializer

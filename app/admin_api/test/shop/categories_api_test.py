@@ -8,7 +8,7 @@ from shop.product.models import Category, CategoryGroup
 from user.models.organization import Organization
 
 LIST_URL = reverse("v1:admin-shop-category-list")
-CHOICES_URL = LIST_URL + "choices/"
+SELECTABLES_URL = LIST_URL + "selectables/"
 
 
 @pytest.fixture
@@ -42,35 +42,27 @@ def test_category_list_returns_categories(api_client, category_fixtures):
 
 
 @pytest.mark.django_db
-def test_category_choices_returns_group_and_event(api_client, category_fixtures):
-    response = api_client.get(CHOICES_URL)
+def test_category_selectables_include_meta(api_client, category_fixtures):
+    # selectables 결과의 각 category 는 Category.get_choice_meta() 로 group/is_ticket/event 메타를 실어야 한다.
+    response = api_client.get(SELECTABLES_URL)
     assert response.status_code == HTTP_200_OK
-    data = response.json()
-    assert {"group", "event"} <= set(data)
-    assert str(category_fixtures["g2026"].id) in {c["const"] for c in data["group"]}
-    assert str(category_fixtures["event"].id) in {c["const"] for c in data["event"]}
+    body = response.json()
+    ticket_meta = {c["const"]: c for c in body["results"]}[str(category_fixtures["ticket"].id)]["meta"]
+    assert ticket_meta["group"] == "2026"
+    assert ticket_meta["is_ticket"] is True
+    assert ticket_meta["event"] == str(category_fixtures["event"])
+    # meta_schema 는 모델의 choices_meta_schema 를 반영한다.
+    assert {"is_ticket", "group", "event"} <= set(body["meta_schema"])
 
 
 @pytest.mark.django_db
-def test_category_choices_include_meta_for_event(api_client, category_fixtures):
-    # Event 모델이 choices_meta_schema/get_choice_meta 를 정의하므로 event choice 에 meta 가 붙어야 한다.
-    response = api_client.get(CHOICES_URL)
-    assert response.status_code == HTTP_200_OK
-    event_choices = {c["const"]: c for c in response.json()["event"] if c["const"] is not None}
-    event_meta = event_choices[str(category_fixtures["event"].id)]["meta"]
-    assert event_meta["organization"] == "Org"
-    assert event_meta["started_at"] == "2026-08-01"
-
-
-@pytest.mark.django_db
-def test_category_choices_include_audit_meta_for_event(api_client, category_fixtures):
+def test_category_selectables_include_audit_meta(api_client, category_fixtures):
     # BaseAbstractModel 의 audit 메타(created_by/updated_by/created_at/updated_at)가 자동으로 붙어야 한다.
-    response = api_client.get(CHOICES_URL)
+    response = api_client.get(SELECTABLES_URL)
     assert response.status_code == HTTP_200_OK
-    event_choices = {c["const"]: c for c in response.json()["event"] if c["const"] is not None}
-    event_meta = event_choices[str(category_fixtures["event"].id)]["meta"]
-    assert {"created_by", "updated_by", "created_at", "updated_at"} <= set(event_meta)
-    assert event_meta["created_at"] is not None
+    ticket_meta = {c["const"]: c for c in response.json()["results"]}[str(category_fixtures["ticket"].id)]["meta"]
+    assert {"created_by", "updated_by", "created_at", "updated_at"} <= set(ticket_meta)
+    assert ticket_meta["created_at"] is not None
 
 
 @pytest.mark.django_db

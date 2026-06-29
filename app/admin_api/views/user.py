@@ -10,7 +10,9 @@ from core.authn.mcp_jwt import McpJwtTokenSerializer
 from core.authz import IsSuperUser
 from core.const.account import generate_random_password
 from core.const.tag import OpenAPITag
-from core.viewset.json_schema_viewset import JsonSchemaViewSet
+from core.pagination import AdminPagination
+from core.viewset.json_schema_viewset import JsonSchemaMixin
+from core.viewset.selectables_viewset import SelectablesMixin
 from django.contrib.auth import login, logout
 from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import decorators, mixins, request, response, status, viewsets
@@ -29,9 +31,11 @@ class UserAdminViewSet(
     mixins.ListModelMixin,
     mixins.CreateModelMixin,
     mixins.UpdateModelMixin,
-    JsonSchemaViewSet,
+    JsonSchemaMixin,
+    SelectablesMixin,
     viewsets.GenericViewSet,
 ):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = UserAdminSerializer
     permission_classes = [IsSuperUser]
@@ -126,7 +130,8 @@ class UserAdminViewSet(
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_USER]) for m in ADMIN_METHODS})
-class OrganizationAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
+class OrganizationAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet):
+    pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = OrganizationAdminSerializer
     permission_classes = [IsSuperUser]

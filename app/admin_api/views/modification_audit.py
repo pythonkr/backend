@@ -9,6 +9,7 @@ from admin_api.serializers.modification_audit import (
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
 from core.pagination import AdminPagination
+from core.viewset.json_schema_viewset import JsonSchemaMixin
 from django.db import models
 from drf_spectacular import utils
 from drf_standardized_errors.openapi_serializers import (
@@ -18,7 +19,7 @@ from drf_standardized_errors.openapi_serializers import (
 )
 from event.presentation.models import Presentation
 from participant_portal_api.models import ModificationAudit, ModificationAuditComment
-from rest_framework import decorators, mixins, request, response, serializers, status, viewsets
+from rest_framework import decorators, mixins, request, response, serializers, status
 from user.models import UserExt
 
 MODEL_SERIALIZER_MAP: dict[models.Model, type[serializers.Serializer]] = {
@@ -28,7 +29,7 @@ MODEL_SERIALIZER_MAP: dict[models.Model, type[serializers.Serializer]] = {
 
 
 @utils.extend_schema_view(list=utils.extend_schema(tags=[OpenAPITag.ADMIN_MODIFICATION_AUDIT]))
-class ModificationAuditAdminViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+class ModificationAuditAdminViewSet(JsonSchemaMixin, mixins.ListModelMixin):
     serializer_class = ModificationAuditResponseAdminSerializer
     permission_classes = [IsSuperUser]
     filterset_class = ModificationAuditAdminFilterSet
