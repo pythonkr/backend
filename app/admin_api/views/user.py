@@ -10,7 +10,6 @@ from core.authn.mcp_jwt import McpJwtTokenSerializer
 from core.authz import IsSuperUser
 from core.const.account import generate_random_password
 from core.const.tag import OpenAPITag
-from core.pagination import AdminPagination
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from django.contrib.auth import login, logout
 from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
@@ -37,7 +36,6 @@ class UserAdminViewSet(
     serializer_class = UserAdminSerializer
     permission_classes = [IsSuperUser]
     filterset_class = UserAdminFilterSet
-    pagination_class = AdminPagination
     queryset = UserExt.objects.filter(is_active=True).prefetch_related("emailaddress_set", "socialaccount_set")
 
     def create(self, request: request.Request, *args: tuple, **kwargs: dict) -> response.Response:
@@ -132,4 +130,4 @@ class OrganizationAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = OrganizationAdminSerializer
     permission_classes = [IsSuperUser]
-    queryset = Organization.objects.filter_active()
+    queryset = Organization.objects.filter_active().select_related_with_user().order_by("-created_at", "pk")

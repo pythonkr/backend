@@ -2,7 +2,6 @@ from admin_api.filtersets.document import IssuedDocumentAdminFilterSet
 from admin_api.serializers.document import DocumentTemplateAdminSerializer, IssuedDocumentAdminSerializer
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.pagination import AdminPagination
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from document.models import DocumentTemplate, IssuedDocument
 from drf_spectacular.utils import extend_schema, extend_schema_view
@@ -18,22 +17,20 @@ ISSUED_METHODS = ["list", "retrieve", "revoke"]
 class DocumentTemplateAdminViewSet(JsonSchemaViewSet, ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete"]
     permission_classes = [IsSuperUser]
-    pagination_class = AdminPagination
     serializer_class = DocumentTemplateAdminSerializer
-    queryset = DocumentTemplate.objects.filter_active().select_related_with_user().order_by("-created_at")
+    queryset = DocumentTemplate.objects.filter_active().select_related_with_user().order_by("-created_at", "pk")
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_DOCUMENT]) for m in ISSUED_METHODS})
 class IssuedDocumentAdminViewSet(JsonSchemaViewSet, ReadOnlyModelViewSet):
     permission_classes = [IsSuperUser]
-    pagination_class = AdminPagination
     filterset_class = IssuedDocumentAdminFilterSet
     serializer_class = IssuedDocumentAdminSerializer
     queryset = (
         IssuedDocument.objects.filter_active()
         .select_related_with_user("template", "revoked_by")
         .prefetch_related("issuable")
-        .order_by("-created_at")
+        .order_by("-created_at", "pk")
     )
 
     @extend_schema(request=None, responses={200: IssuedDocumentAdminSerializer})

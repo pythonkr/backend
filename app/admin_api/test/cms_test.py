@@ -36,7 +36,7 @@ def test_unauthenticated_request_to_domain_group_is_rejected():
 def test_domain_group_list(api_client, domain_group):
     response = api_client.get(reverse("v1:admin-domain-group-list"))
     assert response.status_code == http.HTTPStatus.OK
-    rows = response.json()
+    rows = response.json()["results"]
     assert any(row["name"] == domain_group.name for row in rows)
 
 
@@ -309,7 +309,7 @@ def test_sitemap_admin_serializer_exposes_domain_group(api_client, superuser, do
     response = api_client.get(reverse("v1:admin-sitemap-list"))
     assert response.status_code == http.HTTPStatus.OK
 
-    rows = response.json()
+    rows = response.json()["results"]
     row = next(r for r in rows if r["id"] == str(sitemap.id))
     assert row["domain_group"] == str(domain_group.id)
 
@@ -479,5 +479,5 @@ def test_sitemap_admin_filter_by_domain_group(api_client, superuser):
 
     response = api_client.get(reverse("v1:admin-sitemap-list"), {"domain_group": str(group_a.id)})
     assert response.status_code == http.HTTPStatus.OK
-    rows = response.json()
+    rows = response.json()["results"]
     assert {r["id"] for r in rows} == {str(sitemap_a.id)}

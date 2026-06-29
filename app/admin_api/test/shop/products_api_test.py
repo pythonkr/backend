@@ -225,7 +225,7 @@ def test_admin_product_list_filters_by_category(api_client, ticket_product):
 
     response = ProductsAdminApi(http_client=api_client).list({"category": str(ticket_product.category.id)})
     assert response.status_code == HTTP_200_OK
-    ids = [p["id"] for p in response.json()]
+    ids = [p["id"] for p in response.json()["results"]]
     assert ids == [str(ticket_product.id)]
 
 
@@ -438,7 +438,7 @@ def test_admin_option_group_create_allows_non_required_group_with_explicit_windo
 def test_admin_product_list_filters_by_status(api_client, products_by_status, status):
     response = ProductsAdminApi(http_client=api_client).list({"status": status.value})
     assert response.status_code == HTTP_200_OK
-    assert [p["id"] for p in response.json()] == [str(products_by_status[status].id)]
+    assert [p["id"] for p in response.json()["results"]] == [str(products_by_status[status].id)]
 
 
 @pytest.mark.django_db

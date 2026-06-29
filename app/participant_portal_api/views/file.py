@@ -10,7 +10,7 @@ from rest_framework import decorators, mixins, parsers, request, response, seria
 @utils.extend_schema_view(list=utils.extend_schema(tags=[OpenAPITag.PARTICIPANT_PORTAL_PUBLIC_FILE]))
 class PublicFilePortalViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = PublicFilePortalSerializer
-    queryset = PublicFile.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")
+    queryset = PublicFile.objects.filter_active().select_related_with_user()
     permission_classes = [IsSessionSpeaker]
 
     def get_queryset(self) -> models.QuerySet[PublicFile]:

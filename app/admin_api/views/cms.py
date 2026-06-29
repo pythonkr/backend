@@ -12,7 +12,6 @@ from admin_api.serializers.cms import (
 from cms.models import DomainGroup, Page, Section, Sitemap
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.pagination import AdminPagination
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from django.db import transaction
 from drf_spectacular.utils import extend_schema, extend_schema_view, inline_serializer
@@ -31,7 +30,7 @@ class DomainGroupAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = DomainGroupAdminSerializer
     permission_classes = [IsSuperUser]
-    queryset = DomainGroup.objects.filter_active().select_related_with_user()
+    queryset = DomainGroup.objects.filter_active().select_related_with_user().order_by("-created_at", "pk")
 
     def perform_destroy(self, instance: DomainGroup) -> None:
         if DomainGroup.objects.filter_active().count() <= 1:
@@ -75,8 +74,7 @@ class PageAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     serializer_class = PageAdminSerializer
     permission_classes = [IsSuperUser]
     filterset_class = PageAdminFilterSet
-    pagination_class = AdminPagination
-    queryset = Page.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")
+    queryset = Page.objects.filter_active().select_related_with_user().order_by("-created_at", "pk")
 
     @staticmethod
     def _response_section_validation_error(detail: str) -> response.Response:
@@ -108,10 +106,7 @@ class PageAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
         return response.Response(
             data=SectionAdminSerializer(
                 instance=(
-                    Section.objects.filter_active()
-                    .filter(page_id=page_id)
-                    .select_related("created_by", "updated_by", "deleted_by")
-                    .order_by("order")
+                    Section.objects.filter_active().filter(page_id=page_id).select_related_with_user().order_by("order")
                 ),
                 many=True,
             ).data,

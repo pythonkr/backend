@@ -17,7 +17,7 @@ class GoogleOAuth2AdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = GoogleOAuth2AdminSerializer
     permission_classes = [IsSuperUser]
-    queryset = GoogleOAuth2.objects.filter_active().select_related_with_user()
+    queryset = GoogleOAuth2.objects.filter_active().select_related_with_user().order_by("-created_at", "pk")
 
     @extend_schema(
         tags=[OpenAPITag.ADMIN_EXT_API_GOOGLE_OAUTH2],

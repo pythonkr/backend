@@ -36,7 +36,7 @@ def test_unauthenticated_request_is_rejected(email_template):
 def test_template_list_returns_active_templates(api_client, email_template):
     response = api_client.get(reverse("v1:admin-notification-email-template-list"))
     assert response.status_code == http.HTTPStatus.OK
-    body = response.json()
+    body = response.json()["results"]
     assert any(row["code"] == email_template.code for row in body)
 
 
@@ -100,7 +100,7 @@ def test_template_list_filter_by_code(api_client, superuser):
 
     response = api_client.get(reverse("v1:admin-notification-email-template-list"), {"code": "welc"})
     assert response.status_code == http.HTTPStatus.OK
-    codes = [row["code"] for row in response.json()]
+    codes = [row["code"] for row in response.json()["results"]]
     assert codes == ["welcome"]
 
 
@@ -115,7 +115,7 @@ def test_template_list_filter_by_title(api_client, superuser):
 
     response = api_client.get(reverse("v1:admin-notification-email-template-list"), {"title": "환영"})
     assert response.status_code == http.HTTPStatus.OK
-    titles = [row["title"] for row in response.json()]
+    titles = [row["title"] for row in response.json()["results"]]
     assert titles == ["환영합니다"]
 
 
@@ -336,7 +336,7 @@ def email_history(email_template):
 def test_history_list_returns_rows(api_client, email_history):
     response = api_client.get(reverse("v1:admin-notification-email-history-list"))
     assert response.status_code == http.HTTPStatus.OK
-    ids = [row["id"] for row in response.json()]
+    ids = [row["id"] for row in response.json()["results"]]
     assert str(email_history.id) in ids
 
 
@@ -352,7 +352,7 @@ def test_history_list_filter_by_template(api_client, email_template, superuser):
 
     response = api_client.get(reverse("v1:admin-notification-email-history-list"), {"template": str(email_template.id)})
     assert response.status_code == http.HTTPStatus.OK
-    ids = [row["id"] for row in response.json()]
+    ids = [row["id"] for row in response.json()["results"]]
     assert ids == [str(matching.id)]
 
 
@@ -374,7 +374,7 @@ def test_history_list_filter_by_created_by_username(api_client, email_template, 
         reverse("v1:admin-notification-email-history-list"), {"created_by__username": superuser.username}
     )
     assert response.status_code == http.HTTPStatus.OK
-    assert len(response.json()) == 1
+    assert response.json()["count"] == 1
 
 
 # ---- History Retry ----------------------------------------------------------
@@ -632,6 +632,6 @@ def test_email_history_endpoint_does_not_return_sms_histories(api_client, sms_te
 
     response = api_client.get(reverse("v1:admin-notification-email-history-list"))
     assert response.status_code == http.HTTPStatus.OK
-    assert response.json() == []
+    assert response.json()["results"] == []
     response = api_client.get(reverse("v1:admin-notification-sms-history-list"))
-    assert len(response.json()) == 1
+    assert response.json()["count"] == 1

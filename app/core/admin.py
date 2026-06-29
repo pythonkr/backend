@@ -22,7 +22,7 @@ class AdminProtocol(admin.ModelAdmin):
 class BaseAbstractModelAdminMixin(AdminProtocol):
     def get_queryset(self, request: HttpRequest) -> models.QuerySet[BaseAbstractModel]:
         """Override the default queryset to filter out soft-deleted objects."""
-        return super().get_queryset(request).filter_active().select_related("created_by", "updated_by", "deleted_by")
+        return super().get_queryset(request).filter_active().select_related_with_user()
 
     def save_model(self, request: HttpRequest, obj: BaseAbstractModel, form: ModelForm, change: bool) -> None:
         """Override save_model to set created_by and updated_by fields."""

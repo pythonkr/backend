@@ -31,7 +31,7 @@ def test_unauthenticated_request_is_rejected():
 def test_list_returns_active_records(api_client, google_oauth_record):
     response = api_client.get(reverse("v1:admin-google-oauth2-list"))
     assert response.status_code == http.HTTPStatus.OK
-    ids = [row["id"] for row in response.json()]
+    ids = [row["id"] for row in response.json()["results"]]
     assert str(google_oauth_record.id) in ids
 
 
@@ -40,7 +40,7 @@ def test_list_excludes_soft_deleted(api_client, google_oauth_record):
     GoogleOAuth2.objects.filter(id=google_oauth_record.id).delete()
     response = api_client.get(reverse("v1:admin-google-oauth2-list"))
     assert response.status_code == http.HTTPStatus.OK
-    assert response.json() == []
+    assert response.json()["results"] == []
 
 
 @pytest.mark.django_db

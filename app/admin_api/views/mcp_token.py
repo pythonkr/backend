@@ -1,7 +1,6 @@
 from admin_api.serializers.mcp_token import McpTokenAdminSerializer
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.pagination import AdminPagination
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import mixins, viewsets
@@ -21,6 +20,5 @@ class McpTokenAdminViewSet(
     http_method_names = ["get", "delete"]
     serializer_class = McpTokenAdminSerializer
     permission_classes = [IsSuperUser]
-    pagination_class = AdminPagination
     filterset_fields = ["user"]
-    queryset = McpToken.objects.filter_active().select_related_with_user("user").order_by("-created_at")
+    queryset = McpToken.objects.filter_active().select_related_with_user("user").order_by("-created_at", "pk")

@@ -18,7 +18,6 @@ from admin_api.serializers.event.presentation import (
 )
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.pagination import AdminPagination
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from event.presentation.models import (
@@ -40,7 +39,11 @@ class PresentationTypeAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     serializer_class = PresentationTypeAdminSerializer
     permission_classes = [IsSuperUser]
     filterset_class = PresentationTypeAdminFilterSet
-    queryset = PresentationType.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")
+    queryset = (
+        PresentationType.objects.filter_active()
+        .select_related_with_user("event")
+        .order_by("-event__event_end_at", "-created_at", "pk")
+    )
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION]) for m in ADMIN_METHODS})
@@ -49,7 +52,11 @@ class PresentationCategoryAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet)
     serializer_class = PresentationCategoryAdminSerializer
     permission_classes = [IsSuperUser]
     filterset_class = PresentationCategoryAdminFilterSet
-    queryset = PresentationCategory.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")
+    queryset = (
+        PresentationCategory.objects.filter_active()
+        .select_related_with_user("type", "type__event")
+        .order_by("-type__event__event_end_at", "-created_at", "pk")
+    )
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION]) for m in ADMIN_METHODS})
@@ -58,7 +65,12 @@ class PresentationAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     serializer_class = PresentationAdminSerializer
     permission_classes = [IsSuperUser]
     filterset_class = PresentationAdminFilterSet
-    queryset = Presentation.objects.filter_active().select_related_with_user("type").prefetch_related("categories")
+    queryset = (
+        Presentation.objects.filter_active()
+        .select_related_with_user("type", "type__event")
+        .prefetch_related("categories")
+        .order_by("-type__event__event_end_at", "title", "pk")
+    )
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION]) for m in ADMIN_METHODS})
@@ -67,7 +79,9 @@ class PresentationSpeakerAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     serializer_class = PresentationSpeakerAdminSerializer
     permission_classes = [IsSuperUser]
     filterset_class = PresentationSpeakerAdminFilterSet
-    queryset = PresentationSpeaker.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")
+    queryset = (
+        PresentationSpeaker.objects.filter_active().select_related_with_user("user").order_by("user__username", "pk")
+    )
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION]) for m in ADMIN_METHODS})
@@ -76,8 +90,7 @@ class RoomAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     serializer_class = RoomAdminSerializer
     permission_classes = [IsSuperUser]
     filterset_class = RoomAdminFilterSet
-    pagination_class = AdminPagination
-    queryset = Room.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")
+    queryset = Room.objects.filter_active().select_related_with_user("event").order_by("-event__event_end_at", "pk")
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION]) for m in ADMIN_METHODS})
@@ -86,4 +99,8 @@ class RoomScheduleAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     serializer_class = RoomScheduleAdminSerializer
     permission_classes = [IsSuperUser]
     filterset_class = RoomScheduleAdminFilterSet
-    queryset = RoomSchedule.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")
+    queryset = (
+        RoomSchedule.objects.filter_active()
+        .select_related_with_user("room", "room__event")
+        .order_by("-room__event__event_end_at", "end_at", "pk")
+    )

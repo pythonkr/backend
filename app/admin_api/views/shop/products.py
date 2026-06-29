@@ -46,7 +46,7 @@ class TagAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = TagAdminSerializer
     permission_classes = [IsSuperUser]
-    queryset = Tag.objects.filter_active().select_related_with_user()
+    queryset = Tag.objects.filter_active().select_related_with_user().order_by("-created_at", "pk")
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_SHOP_PRODUCT]) for m in CRUD_METHODS})
@@ -69,6 +69,7 @@ class ProductAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
                 ),
             ),
         )
+        .order_by("-created_at", "pk")
     )
 
 

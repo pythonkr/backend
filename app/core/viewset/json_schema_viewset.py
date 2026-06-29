@@ -4,6 +4,7 @@ import typing
 
 from core.const.tag import OpenAPITag
 from core.openapi.ui_hints import ui_hints_for_model_field
+from core.pagination import AdminPagination
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
 from django.db.models.fields import URLField
 from django.db.models.fields.related import ForeignKey, ManyToManyField
@@ -14,6 +15,8 @@ from rest_framework import decorators, response, serializers, status, viewsets
 
 
 class JsonSchemaViewSet(viewsets.GenericViewSet):
+    pagination_class = AdminPagination
+
     def __new__(cls, *args: tuple, **kwargs: dict) -> JsonSchemaViewSet:
         if cls.serializer_class and not hasattr(cls.serializer_class, "get_json_schema"):
             raise TypeError(f"{cls.__name__} must have a serializer class with a 'get_json_schema' method.")

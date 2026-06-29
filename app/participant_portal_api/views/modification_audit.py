@@ -36,9 +36,9 @@ class ModificationAuditPortalViewSet(mixins.RetrieveModelMixin, mixins.ListModel
     queryset = (
         ModificationAudit.objects.filter_active()
         .prefetch_related(
-            models.Prefetch("comments", queryset=ModificationAuditComment.objects.select_related("created_by"))
+            models.Prefetch("comments", queryset=ModificationAuditComment.objects.select_related_with_user())
         )
-        .select_related("created_by", "updated_by", "deleted_by")
+        .select_related_with_user()
     )
 
     def get_queryset(self):

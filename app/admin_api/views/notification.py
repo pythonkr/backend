@@ -63,13 +63,19 @@ class _NotiTemplateAdminActionMixin(JsonSchemaViewSet):
 class EmailNotificationTemplateAdminViewSet(_NotiTemplateAdminActionMixin, ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = EmailNotificationTemplateAdminSerializer
-    queryset = EmailNotificationTemplate.objects.filter_active().select_related_with_user()
+    queryset = (
+        EmailNotificationTemplate.objects.filter_active().select_related_with_user().order_by("-created_at", "pk")
+    )
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_NOTI_KAKAO_ALIMTALK]) for m in TEMPLATE_READ_METHODS})
 class NHNCloudKakaoAlimTalkNotificationTemplateAdminViewSet(_NotiTemplateAdminActionMixin, ReadOnlyModelViewSet):
     serializer_class = NHNCloudKakaoAlimTalkNotificationTemplateAdminSerializer
-    queryset = NHNCloudKakaoAlimTalkNotificationTemplate.objects.filter_active().select_related_with_user()
+    queryset = (
+        NHNCloudKakaoAlimTalkNotificationTemplate.objects.filter_active()
+        .select_related_with_user()
+        .order_by("-created_at", "pk")
+    )
 
     def get_queryset(self):
         if self.action in TEMPLATE_READ_METHODS:
@@ -81,7 +87,9 @@ class NHNCloudKakaoAlimTalkNotificationTemplateAdminViewSet(_NotiTemplateAdminAc
 class NHNCloudSMSNotificationTemplateAdminViewSet(_NotiTemplateAdminActionMixin, ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = NHNCloudSMSNotificationTemplateAdminSerializer
-    queryset = NHNCloudSMSNotificationTemplate.objects.filter_active().select_related_with_user()
+    queryset = (
+        NHNCloudSMSNotificationTemplate.objects.filter_active().select_related_with_user().order_by("-created_at", "pk")
+    )
 
 
 # ---- History ----------------------------------------------------------------
@@ -129,6 +137,7 @@ class EmailNotificationHistoryAdminViewSet(_NotiHistoryAdminViewSetBase):
         EmailNotificationHistory.objects.filter_active()
         .select_related_with_user("template")
         .prefetch_related("sent_to_list")
+        .order_by("-created_at", "pk")
     )
 
 
@@ -139,6 +148,7 @@ class NHNCloudKakaoAlimTalkNotificationHistoryAdminViewSet(_NotiHistoryAdminView
         NHNCloudKakaoAlimTalkNotificationHistory.objects.filter_active()
         .select_related_with_user("template")
         .prefetch_related("sent_to_list")
+        .order_by("-created_at", "pk")
     )
 
 
@@ -149,4 +159,5 @@ class NHNCloudSMSNotificationHistoryAdminViewSet(_NotiHistoryAdminViewSetBase):
         NHNCloudSMSNotificationHistory.objects.filter_active()
         .select_related_with_user("template")
         .prefetch_related("sent_to_list")
+        .order_by("-created_at", "pk")
     )

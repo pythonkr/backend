@@ -9,7 +9,6 @@ from allauth.account.models import EmailAddress
 from allauth.socialaccount.models import SocialAccount, SocialApp
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.pagination import AdminPagination
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import mixins, viewsets
@@ -22,7 +21,6 @@ ADMIN_METHODS = DESTROY_ONLY_METHODS + ["create", "partial_update"]
 class SocialAppAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete"]
     permission_classes = [IsSuperUser]
-    pagination_class = AdminPagination
     serializer_class = SocialAppAdminSerializer
     queryset = SocialApp.objects.all().order_by("provider", "id")
 
@@ -37,7 +35,6 @@ class SocialAccountAdminViewSet(
 ):
     http_method_names = ["get", "delete"]
     permission_classes = [IsSuperUser]
-    pagination_class = AdminPagination
     serializer_class = SocialAccountAdminSerializer
     queryset = SocialAccount.objects.all().select_related("user").order_by("-date_joined", "-id")
     filterset_class = SocialAccountAdminFilterSet
@@ -51,6 +48,5 @@ class EmailAddressAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = EmailAddressAdminSerializer
     permission_classes = [IsSuperUser]
-    pagination_class = AdminPagination
     queryset = EmailAddress.objects.all().select_related("user").order_by("-id")
     filterset_class = EmailAddressAdminFilterSet

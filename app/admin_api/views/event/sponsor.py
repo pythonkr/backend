@@ -12,7 +12,6 @@ from admin_api.serializers.event.sponsor import (
 )
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
-from core.pagination import AdminPagination
 from core.viewset.json_schema_viewset import JsonSchemaViewSet
 from django.db import models
 from drf_spectacular.utils import extend_schema, extend_schema_view
@@ -28,17 +27,17 @@ class SponsorTierAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     serializer_class = SponsorTierAdminSerializer
     permission_classes = [IsSuperUser]
     filterset_class = SponsorTierAdminFilterSet
-    pagination_class = AdminPagination
     queryset = (
         SponsorTier.objects.filter_active()
         .prefetch_related(
             models.Prefetch(
                 lookup="sponsors",
-                queryset=Sponsor.objects.filter_active().select_related("created_by", "updated_by", "deleted_by"),
+                queryset=Sponsor.objects.filter_active().select_related_with_user(),
                 to_attr="_prefetched_active_sponsors",
             ),
         )
-        .select_related("created_by", "updated_by", "deleted_by")
+        .select_related_with_user("event")
+        .order_by("-event__event_end_at", "order", "pk")
     )
 
 
@@ -48,8 +47,9 @@ class SponsorTagAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     serializer_class = SponsorTagAdminSerializer
     permission_classes = [IsSuperUser]
     filterset_class = SponsorTagAdminFilterSet
-    pagination_class = AdminPagination
-    queryset = SponsorTag.objects.filter_active().select_related("created_by", "updated_by", "deleted_by")
+    queryset = (
+        SponsorTag.objects.filter_active().select_related_with_user("event").order_by("-event__event_end_at", "pk")
+    )
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_SPONSOR]) for m in ADMIN_METHODS})
@@ -58,5 +58,9 @@ class SponsorAdminViewSet(JsonSchemaViewSet, viewsets.ModelViewSet):
     serializer_class = SponsorAdminSerializer
     permission_classes = [IsSuperUser]
     filterset_class = SponsorAdminFilterSet
-    pagination_class = AdminPagination
-    queryset = Sponsor.objects.filter_active().select_related_with_user("event").prefetch_related("tiers", "tags")
+    queryset = (
+        Sponsor.objects.filter_active()
+        .select_related_with_user("event")
+        .prefetch_related("tiers", "tags")
+        .order_by("-event__event_end_at", "-created_at", "pk")
+    )
