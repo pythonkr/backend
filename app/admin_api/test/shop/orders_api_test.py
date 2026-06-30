@@ -7,6 +7,7 @@ from admin_api.serializers.shop.orders import OrderAdminSerializer
 from admin_api.test.helpers import OrdersAdminApi
 from admin_api.views.shop.orders import OrderAdminViewSet
 from freezegun import freeze_time
+from model_bakery import baker
 from rest_framework.fields import DateTimeField
 from rest_framework.status import (
     HTTP_200_OK,
@@ -99,6 +100,21 @@ def test_admin_list_filters_by_active_opr_category_group(api_client, ticket_prod
     response = OrdersAdminApi(http_client=api_client).list({"category_group_id": str(ticket_product.category.group_id)})
     assert response.status_code == HTTP_200_OK
     assert {row["id"] for row in response.json()["results"]} == {str(completed_order.id)}
+
+
+@pytest.mark.django_db
+def test_admin_list_filters_by_active_opr_event(api_client, ticket_product, non_ticket_product, order_factory):
+    """`?event_id=` 가 해당 이벤트 카테고리의 상품을 가진 주문만 매칭한다."""
+    event = baker.make("event.Event", name="파이콘 한국 2026")
+    ticket_product.category.event = event
+    ticket_product.category.save()
+
+    in_event_order = order_factory(status="completed")  # ticket_product → event 연결됨
+    order_factory(status="completed", is_ticket=False)  # non_ticket_product → event 없음
+
+    response = OrdersAdminApi(http_client=api_client).list({"event_id": str(event.id)})
+    assert response.status_code == HTTP_200_OK
+    assert {row["id"] for row in response.json()["results"]} == {str(in_event_order.id)}
 
 
 @pytest.mark.django_db
@@ -226,7 +242,7 @@ def test_admin_export_returns_xlsx_filtering_refunded_per_include_flag(
 ):
     refunded_order = order_factory(status="refunded")
     response = OrdersAdminApi(http_client=api_client).export(
-        {"product_ids": [str(ticket_product.id)], "include_refunded": include_refunded}
+        {"product_id": str(ticket_product.id), "include_refunded": include_refunded}
     )
     assert response.status_code == HTTP_200_OK
     assert response.headers["Content-Type"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -281,11 +297,49 @@ def test_admin_export_returns_xlsx_filtering_refunded_per_include_flag(
     ]
 
 
-@pytest.mark.parametrize("payload", [{}, {"product_ids": []}])
+def _export_order_ids(response) -> set[str]:
+    """export XLSX 응답의 '주문' 시트에서 주문 번호 집합을 추출."""
+    df = pandas.read_excel(BytesIO(b"".join(response.streaming_content)), sheet_name="주문", index_col=0, dtype=str)
+    return set(df["주문 번호"].tolist()) if not df.empty else set()
+
+
 @pytest.mark.django_db
-def test_admin_export_rejects_missing_or_empty_product_ids(api_client, payload):
-    response = OrdersAdminApi(http_client=api_client).export(payload)
-    assert response.status_code == HTTP_400_BAD_REQUEST
+def test_admin_export_without_filters_returns_all_purchased_orders(api_client, ticket_product, order_factory):
+    """필터 없이 호출하면 결제 완료 주문 전체를 내보낸다 (기본 include_refunded=false → 환불 제외)."""
+    completed_order = order_factory(status="completed")
+    order_factory(status="refunded")  # include_refunded 기본 false → 제외
+    response = OrdersAdminApi(http_client=api_client).export()
+    assert response.status_code == HTTP_200_OK
+    # streaming_content 는 1회성 iterator — 한 번만 읽어 비교 (== 비교가 환불 주문 제외도 함께 검증).
+    assert _export_order_ids(response) == {str(completed_order.id)}
+
+
+@pytest.mark.django_db
+def test_admin_export_scopes_by_event_id(api_client, ticket_product, non_ticket_product, order_factory):
+    """`?event_id=` 가 해당 이벤트 카테고리의 상품을 가진 주문만 내보낸다."""
+    event = baker.make("event.Event", name="파이콘 한국 2026")
+    ticket_product.category.event = event
+    ticket_product.category.save()
+
+    in_event_order = order_factory(status="completed")  # ticket_product (event 연결됨)
+    order_factory(status="completed", is_ticket=False)  # non_ticket_product (event 없음)
+
+    response = OrdersAdminApi(http_client=api_client).export({"event_id": str(event.id)})
+    assert response.status_code == HTTP_200_OK
+    assert _export_order_ids(response) == {str(in_event_order.id)}
+
+
+@pytest.mark.django_db
+def test_admin_export_scopes_by_category_group_id(api_client, ticket_product, non_ticket_product, order_factory):
+    """`?category_group_id=` 가 해당 그룹 상품을 가진 주문만 내보낸다."""
+    ticket_order = order_factory(status="completed")
+    order_factory(status="completed", is_ticket=False)
+
+    response = OrdersAdminApi(http_client=api_client).export(
+        {"category_group_id": str(ticket_product.category.group_id)}
+    )
+    assert response.status_code == HTTP_200_OK
+    assert _export_order_ids(response) == {str(ticket_order.id)}
 
 
 @pytest.mark.django_db

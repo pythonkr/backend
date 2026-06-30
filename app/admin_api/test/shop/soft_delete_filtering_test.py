@@ -44,7 +44,7 @@ def test_admin_export_excludes_soft_deleted_opr_from_product_sheet(api_client, o
     stale_opr.delete()
 
     response = OrdersAdminApi(http_client=api_client).export(
-        {"product_ids": [str(ticket_product.id)], "include_refunded": False}
+        {"product_id": str(ticket_product.id), "include_refunded": False}
     )
     assert response.status_code == HTTP_200_OK
     df_dict = pandas.read_excel(
@@ -101,7 +101,7 @@ def test_admin_export_excludes_order_with_only_soft_deleted_matching_opr(
     PaymentHistory.objects.create(order=leak_candidate, imp_id="leak", status=PaymentHistoryStatus.completed, price=500)
 
     response = OrdersAdminApi(http_client=api_client).export(
-        {"product_ids": [str(target_product.id)], "include_refunded": True}
+        {"product_id": str(target_product.id), "include_refunded": True}
     )
     assert response.status_code == HTTP_200_OK
     df_dict = pandas.read_excel(

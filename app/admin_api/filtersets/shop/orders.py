@@ -30,6 +30,7 @@ class OrderAdminFilterSet(filters.FilterSet):
     product_id = filters.BaseCSVFilter(method="filter_by_active_opr_product_id")
     category_id = filters.BaseCSVFilter(method="filter_by_active_opr_category_id")
     category_group_id = filters.BaseCSVFilter(method="filter_by_active_opr_category_group_id")
+    event_id = filters.BaseCSVFilter(method="filter_by_active_opr_event_id")
 
     price_min = filters.NumberFilter(field_name="latest_price", lookup_expr="gte")
     price_max = filters.NumberFilter(field_name="latest_price", lookup_expr="lte")
@@ -45,6 +46,9 @@ class OrderAdminFilterSet(filters.FilterSet):
 
     def filter_by_active_opr_category_group_id(self, qs: QuerySet[Order], n: str, v: list[str]) -> QuerySet[Order]:
         return self._filter_by_active_opr_exists(qs, product__category__group_id__in=v) if v else qs
+
+    def filter_by_active_opr_event_id(self, qs: QuerySet[Order], n: str, vs: list[str]) -> QuerySet[Order]:
+        return self._filter_by_active_opr_exists(qs, product__category__event_id__in=vs) if vs else qs
 
     class Meta:
         model = Order
@@ -65,6 +69,7 @@ class OrderAdminFilterSet(filters.FilterSet):
             "product_id",
             "category_id",
             "category_group_id",
+            "event_id",
             "price_min",
             "price_max",
         ]

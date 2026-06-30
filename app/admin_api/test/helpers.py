@@ -1,4 +1,5 @@
 from typing import ClassVar
+from urllib.parse import urlencode
 
 from core.util.testutil import ModelApiFixture
 from django.urls import reverse
@@ -22,8 +23,11 @@ class OrdersAdminApi(ModelApiFixture):
         data = {"csv_file": csv_file} if csv_file is not None else {}
         return self.http_client.post(reverse(f"{self.name}-import-csv"), data, format="multipart")
 
-    def export(self, data=None):
-        return self.http_client.post(reverse(f"{self.name}-export"), data, format="json")
+    def export(self, params=None):
+        url = reverse(f"{self.name}-export")
+        if params:
+            url = f"{url}?{urlencode(params, doseq=True)}"
+        return self.http_client.post(url, format="json")
 
 
 class OrderNotificationsAdminApi(ModelApiFixture):

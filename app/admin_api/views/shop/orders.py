@@ -135,9 +135,7 @@ class OrderAdminViewSet(
     @extend_schema(
         summary="주문 CSV 가져오기 템플릿 다운로드",
         tags=[OpenAPITag.ADMIN_SHOP_ORDER],
-        parameters=[
-            OpenApiParameter(name="product_id", type=OpenApiTypes.UUID, location=OpenApiParameter.QUERY, required=True),
-        ],
+        parameters=[OpenApiParameter(name="product_id", type=OpenApiTypes.UUID, required=True)],
         responses={status.HTTP_200_OK: OpenApiTypes.STR},
     )
     @action(detail=False, methods=["get"], url_path="import-template")
@@ -196,32 +194,38 @@ class OrderAdminViewSet(
     @extend_schema(
         summary="주문 XLSX 내보내기",
         tags=[OpenAPITag.ADMIN_SHOP_ORDER],
-        request=OrderExportRequestSerializer,
+        parameters=[
+            OpenApiParameter(name="event_id", description="이벤트 ID (CSV 다중값)"),
+            OpenApiParameter(name="category_group_id", description="카테고리 그룹 ID (CSV 다중값)"),
+            OpenApiParameter(name="category_id", description="카테고리 ID (CSV 다중값)"),
+            OpenApiParameter(name="product_id", description="상품 ID (CSV 다중값)"),
+            OpenApiParameter(
+                name="include_refunded", type=OpenApiTypes.BOOL, description="환불 주문 포함 여부 (기본 false)"
+            ),
+        ],
+        request=None,
         responses={status.HTTP_200_OK: OpenApiTypes.BINARY},
     )
     @action(detail=False, methods=["post"], url_path="export")
     def export(self, request: request.Request) -> StreamingHttpResponse:
-        req = OrderExportRequestSerializer(data=request.data)
+        req = OrderExportRequestSerializer(data=request.query_params)
         req.is_valid(raise_exception=True)
-        product_ids = req.validated_data["product_ids"]
-        include_refunded = req.validated_data["include_refunded"]
+        statuses = PURCHASED_STATUSES if req.validated_data["include_refunded"] else REFUNDABLE_STATUSES
 
-        statuses = PURCHASED_STATUSES if include_refunded else REFUNDABLE_STATUSES
-
-        order_qs = (
+        base_qs = (
             Order.objects.filter_active()
-            .annotate(current_status=PaymentHistory.objects.latest_per_order_field("status"))
             .select_related("user")
             .with_dto_prefetches()
-            .filter(
-                models.Exists(
-                    OrderProductRelation.objects.filter_active().filter(
-                        order_id=models.OuterRef("pk"), product_id__in=product_ids
-                    )
-                ),
-                current_status__in=statuses,
+            .annotate(
+                current_status=PaymentHistory.objects.latest_per_order_field("status"),
+                latest_imp_id=PaymentHistory.objects.latest_per_order_field("imp_id"),
+                latest_price=PaymentHistory.objects.latest_per_order_field("price"),
+                first_paid_at=_payment_history_created_at_subquery(latest=False),
+                status_changed_at=_payment_history_created_at_subquery(latest=True),
             )
+            .filter(current_status__in=statuses)
         )
+        order_qs = OrderAdminFilterSet(request.query_params, queryset=base_qs, request=request).qs
         order_product_qs = (
             OrderProductRelation.objects.filter_active()
             .filter(order__in=order_qs)

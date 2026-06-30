@@ -42,6 +42,18 @@ def test_admin_category_group_create_rejects_duplicate_name(api_client):
     assert response.status_code == HTTP_400_BAD_REQUEST
 
 
+@pytest.mark.django_db
+def test_admin_category_group_selectables_include_priority_meta(api_client):
+    # selectables 의 각 그룹은 CategoryGroup.get_choice_meta() 로 priority 메타를 실어야 한다.
+    group = CategoryGroup.objects.create(name="굿즈", priority=7)
+    url = reverse("v1:admin-shop-category-group-list") + "selectables/"
+    response = api_client.get(url)
+    assert response.status_code == HTTP_200_OK
+    body = response.json()
+    assert {c["const"]: c for c in body["results"]}[str(group.id)]["meta"]["priority"] == 7
+    assert "priority" in body["meta_schema"]
+
+
 def _patch_category(api_client, category: Category, **fields) -> object:
     # 카테고리는 CategoryGroup nested 로만 수정 — 그룹에 카테고리 1개뿐이므로 단건 전송이 전체 목록.
     return CategoryGroupsAdminApi(http_client=api_client).update(

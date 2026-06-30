@@ -121,7 +121,6 @@ class OrderAdminSerializer(
 
 
 class OrderExportRequestSerializer(JsonSchemaSerializer, serializers.Serializer):
-    product_ids = serializers.ListField(child=serializers.UUIDField(), required=True, min_length=1)
     include_refunded = serializers.BooleanField(default=False)
 
 
