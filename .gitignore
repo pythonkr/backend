@@ -262,3 +262,6 @@ pyconkr.code-workspace
 .ipynb_checkpoints
 .ipynb_checkpoints/*
 **/*.ipynb
+
+# Claude
+.claude
