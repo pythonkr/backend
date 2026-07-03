@@ -20,3 +20,4 @@ class UserConfig(AppConfig):
         register(Organization)
 
         from user.models.mcp_token import McpToken  # noqa: F401
+        from user.models.merge import UserMergeHistory, UserMergeObject  # noqa: F401

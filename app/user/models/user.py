@@ -24,6 +24,8 @@ class UserExt(ScanCodeMixin, AbstractUser):
     nickname = models.CharField(max_length=128, null=True, blank=True)
     unique_id = models.UUIDField(unique=True, editable=False, null=False, blank=False, default=uuid4)
 
+    merged_to = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="merged_from")
+
     class Meta(AbstractUser.Meta):
         ordering = ["-date_joined"]
         indexes = [models.Index(fields=["unique_id"], name="userext_unique_id_idx")]
