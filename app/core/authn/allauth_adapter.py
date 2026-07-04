@@ -27,6 +27,9 @@ class NoNewUsersAccountAdapter(DefaultAccountAdapter):
     def is_open_for_signup(self, request: HttpRequest) -> bool:
         return False
 
+    def get_email_confirmation_url(self, request: HttpRequest, emailconfirmation: Any) -> str:
+        return request.build_absolute_uri(reverse("account-email-confirm", kwargs={"key": emailconfirmation.key}))
+
 
 class SocialAccountLoggingAdapter(DefaultSocialAccountAdapter):
     def is_open_for_signup(self, request: HttpRequest, sociallogin: SocialLogin) -> bool:

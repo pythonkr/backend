@@ -262,7 +262,8 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = "https"
-ACCOUNT_LOGIN_METHODS = {"username", "email"}
+ACCOUNT_LOGIN_METHODS = {"email"}
+ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 ACCOUNT_EMAIL_VERIFICATION = "none"
 ACCOUNT_ADAPTER = "core.authn.allauth_adapter.NoNewUsersAccountAdapter"
 

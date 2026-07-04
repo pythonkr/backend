@@ -1,0 +1,1 @@
+{% is_english as en %}{% if en %}Verify your email · PyCon Korea{% else %}이메일 인증 · 파이콘 한국{% endif %}

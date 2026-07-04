@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="https://unpkg.com/mvp.css" />
   <style>
     section aside { width: 100%; max-width: 520px; margin: 2rem auto; text-align: left; }
-    form { border: 0; box-shadow: none; padding: 0; margin: 0; }
+    form { border: 0; box-shadow: none; padding: 0; margin: 0; min-width: 0; max-width: none; }
     button { padding: .55rem 1.2rem; }
     button.provider { display: flex; align-items: center; justify-content: center; gap: .5rem; width: 100%; }
     .provider svg { flex-shrink: 0; }
@@ -19,8 +19,27 @@
     .kv small { color: #888; }
     .error { margin: 1rem 0; padding: .8rem 1rem; border-left: 4px solid #b23b3b;
       background: #fdecec; color: #b23b3b; border-radius: .3rem; }
+    .notice { margin: 1rem 0; padding: .8rem 1rem; border-left: 4px solid #2e7d32;
+      background: #eaf6ec; color: #2e7d32; border-radius: .3rem; }
     .muted { color: #888; }
+    .ok-text { color: #2e7d32; }
     .or { text-align: center; color: #aaa; margin: 1rem 0; }
+    table.emails { display: table; table-layout: fixed; width: 100%; margin: 1rem 0; white-space: normal; overflow-x: visible; }
+    table.emails td { vertical-align: middle; padding: .5rem .6rem; word-break: break-word; }
+    table.emails .badges { margin-top: .15rem; }
+    table.emails .badges sup { margin-right: .3rem; }
+    table.emails td.actions { width: 9rem; }
+    table.emails .btns { display: flex; gap: .3rem; justify-content: flex-end; }
+    table.emails .btns form { display: contents; }
+    table.emails .btns button { flex-shrink: 0; white-space: nowrap; }
+    table.emails .btns .action-btn { width: 5rem; }
+    html[lang="en"] table.emails td.actions { width: 12.5rem; }
+    html[lang="en"] table.emails .btns .action-btn { width: 7rem; }
+    button.sm { padding: .28rem .7rem; font-size: .8rem; margin: 0; }
+    button.danger { background: #b23b3b; border-color: #b23b3b; }
+    .add-email { display: flex; gap: .5rem; align-items: stretch; }
+    .add-email input { flex: 1; margin: 0; }
+    .add-email button { margin: 0; }
   </style>
 </head>
 <body>

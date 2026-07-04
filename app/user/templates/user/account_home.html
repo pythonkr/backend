@@ -3,8 +3,9 @@
 {% block body %}
   <h1>{% if en %}Account{% else %}계정 관리{% endif %}</h1>
   <p class="muted">{{ user.email }}</p>
+  <p><a href="{% url 'account-email' %}"><b>{% if en %}Manage email addresses{% else %}이메일 관리{% endif %}</b></a></p>
   <p><a href="{% url 'account-merge-start' %}"><b>{% if en %}Merge another account{% else %}다른 계정 병합{% endif %}</b></a></p>
   <p class="muted">
-    {% if en %}Email management and password change are coming soon.{% else %}이메일 관리 · 비밀번호 변경은 준비 중입니다.{% endif %}
+    {% if en %}Password change is coming soon.{% else %}비밀번호 변경은 준비 중입니다.{% endif %}
   </p>
 {% endblock %}

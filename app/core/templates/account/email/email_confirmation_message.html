@@ -1,0 +1,25 @@
+{% is_english as en %}<!DOCTYPE html>
+<html lang="{% if en %}en{% else %}ko{% endif %}">
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 0;">
+    <tr><td align="center">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#ffffff;border-radius:8px;padding:32px;">
+        <tr><td>
+          <h1 style="margin:0 0 16px;font-size:20px;color:#111827;">{% if en %}Verify your email{% else %}이메일 인증{% endif %}</h1>
+          <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#374151;">
+            {% if en %}Please confirm this email address by clicking the button below.{% else %}아래 버튼을 눌러 이메일 주소를 인증해 주세요.{% endif %}
+          </p>
+          <p style="margin:0 0 24px;">
+            <a href="{{ activate_url }}" style="display:inline-block;background:#3d5afe;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-size:14px;font-weight:600;">{% if en %}Verify email{% else %}이메일 인증하기{% endif %}</a>
+          </p>
+          <p style="margin:0 0 6px;font-size:12px;color:#6b7280;">{% if en %}Or open this link:{% else %}또는 이 링크를 여세요:{% endif %}</p>
+          <p style="margin:0 0 24px;font-size:12px;word-break:break-all;"><a href="{{ activate_url }}" style="color:#3d5afe;">{{ activate_url }}</a></p>
+          <p style="margin:0;font-size:12px;color:#9ca3af;">
+            {% if en %}If you didn't request this, you can safely ignore this email. — PyCon Korea{% else %}요청하지 않으셨다면 이 메일을 무시하셔도 됩니다. — 파이콘 한국{% endif %}
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

@@ -1,0 +1,56 @@
+{% extends "user/account_base.html" %}
+{% block title %}{% if en %}Email · PyCon Korea{% else %}이메일 관리 · PyCon Korea{% endif %}{% endblock %}
+{% block body %}
+  <h1>{% if en %}Email addresses{% else %}이메일 관리{% endif %}</h1>
+  {% if notice %}<div class="notice">{{ notice }}</div>{% endif %}
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+  <table class="emails">
+    <tbody>
+      {% for email in emails %}
+        <tr>
+          <td>
+            {{ email.email }}
+            <div class="badges">
+              {% if email.primary %}<sup>{% if en %}primary{% else %}대표{% endif %}</sup>{% endif %}
+              {% if email.verified %}
+                <sup>{% if en %}verified{% else %}인증됨{% endif %}</sup>
+              {% else %}
+                <sup>{% if en %}unverified{% else %}미인증{% endif %}</sup>
+              {% endif %}
+            </div>
+          </td>
+          <td class="actions">
+            <div class="btns">
+              {% if not email.verified %}
+                <form method="post" action="{% url 'account-email-resend' %}">
+                  {% csrf_token %}<input type="hidden" name="email_id" value="{{ email.pk }}">
+                  <button class="sm action-btn">{% if en %}Resend{% else %}재발송{% endif %}</button>
+                </form>
+              {% endif %}
+              {% if email.verified and not email.primary %}
+                <form method="post" action="{% url 'account-email-primary' %}">
+                  {% csrf_token %}<input type="hidden" name="email_id" value="{{ email.pk }}">
+                  <button class="sm action-btn">{% if en %}Set primary{% else %}대표 지정{% endif %}</button>
+                </form>
+              {% endif %}
+              <form method="post" action="{% url 'account-email-delete' %}">
+                {% csrf_token %}<input type="hidden" name="email_id" value="{{ email.pk }}">
+                <button class="sm danger">{% if en %}Delete{% else %}삭제{% endif %}</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <hr>
+  <h3>{% if en %}Add email{% else %}이메일 추가{% endif %}</h3>
+  <form method="post" action="{% url 'account-email-add' %}" class="add-email">
+    {% csrf_token %}
+    <input type="email" name="email" required placeholder="you@example.com">
+    <button>{% if en %}Add{% else %}추가{% endif %}</button>
+  </form>
+  <p><a href="{% url 'account-home' %}"><em>{% if en %}Back{% else %}돌아가기{% endif %}</em></a></p>
+{% endblock %}

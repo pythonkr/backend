@@ -1,0 +1,14 @@
+{% extends "user/account_base.html" %}
+{% block title %}{% if en %}Email verification · PyCon Korea{% else %}이메일 인증 · PyCon Korea{% endif %}{% endblock %}
+{% block body %}
+  <h1>{% if en %}Email verification{% else %}이메일 인증{% endif %}</h1>
+  {% if error %}
+    <div class="error">{{ error }}</div>
+  {% else %}
+    <div class="notice">
+      {% if en %}Your email has been verified.{% else %}이메일이 인증되었습니다.{% endif %}
+      {% if email %}({{ email }}){% endif %}
+    </div>
+  {% endif %}
+  <p><a href="{% url 'account-email' %}"><em>{% if en %}Manage emails{% else %}이메일 관리{% endif %}</em></a></p>
+{% endblock %}

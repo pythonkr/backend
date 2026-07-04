@@ -3,11 +3,12 @@ from allauth.account.models import EmailAddress
 from allauth.core.exceptions import ImmediateHttpResponse
 from allauth.socialaccount.models import SocialAccount, SocialLogin
 from core.authn.allauth_adapter import SocialAccountLoggingAdapter
+from core.const.account import MERGE_SOURCE_SESSION_KEY
 from django.urls import reverse
 from shop.order.models import Order
+from user.account_views.utils import HEADLESS_PROVIDER_REDIRECT_URL
 from user.models import UserExt
 from user.models.merge import UserMergeHistory
-from user.views import HEADLESS_PROVIDER_REDIRECT_URL, MERGE_SOURCE_SESSION_KEY
 
 
 @pytest.fixture

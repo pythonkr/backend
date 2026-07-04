@@ -43,6 +43,52 @@ MERGE_MESSAGES = {
         "en": "We couldn't find the account to merge. Please try again.",
     },
 }
+EMAIL_MESSAGES = {
+    "verification_sent": {
+        "ko": "확인 이메일을 보냈습니다. 메일함을 확인해 주세요.",
+        "en": "A verification email has been sent. Please check your inbox.",
+    },
+    "resent": {
+        "ko": "확인 이메일을 다시 보냈습니다.",
+        "en": "The verification email has been resent.",
+    },
+    "verified": {
+        "ko": "이메일이 인증되었습니다.",
+        "en": "Your email has been verified.",
+    },
+    "already_verified": {
+        "ko": "이미 인증된 이메일입니다.",
+        "en": "This email is already verified.",
+    },
+    "invalid_link": {
+        "ko": "확인 링크가 유효하지 않거나 만료되었습니다.",
+        "en": "The verification link is invalid or has expired.",
+    },
+    "deleted": {
+        "ko": "이메일을 삭제했습니다.",
+        "en": "The email has been removed.",
+    },
+    "cannot_delete": {
+        "ko": "이 이메일은 삭제할 수 없습니다.",
+        "en": "This email can't be removed.",
+    },
+    "primary_set": {
+        "ko": "대표 이메일을 변경했습니다.",
+        "en": "Your primary email has been updated.",
+    },
+    "cannot_set_primary": {
+        "ko": "인증된 이메일만 대표로 지정할 수 있습니다.",
+        "en": "Only a verified email can be set as your primary email.",
+    },
+    "add_failed": {
+        "ko": "이 이메일은 추가할 수 없습니다. 형식이 올바르지 않거나 이미 사용 중일 수 있습니다.",
+        "en": "This email can't be added. It may be invalid or already in use.",
+    },
+    "not_found": {
+        "ko": "이메일을 찾을 수 없습니다.",
+        "en": "Email not found.",
+    },
+}
 
 
 def generate_random_password(length: int = 16) -> str:
