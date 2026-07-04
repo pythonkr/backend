@@ -1,5 +1,6 @@
 import os
 import pathlib
+import re
 import types
 import typing
 
@@ -154,8 +155,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    # Django default middlewares
     "django.middleware.security.SecurityMiddleware",
+    "core.middleware.host_urlconf.HostUrlconfMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -178,9 +179,13 @@ MIDDLEWARE = [
     "core.middleware.thread_middleware.ThreadLocalMiddleware",
     # Request Response Logger
     "core.middleware.request_response_logger.RequestResponseLogger",
+    "core.middleware.response_exception.ResponseExceptionMiddleware",
 ]
 
 ROOT_URLCONF = "core.urls"
+HOST_URLCONFS = [
+    (re.compile(r"^accounts"), "core.account_urls"),
+]
 
 TEMPLATES = [
     {
@@ -195,7 +200,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "django.template.context_processors.request",
             ],
-            "builtins": ["core.templatetags.data_uri"],
+            "builtins": ["core.templatetags.data_uri", "core.templatetags.i18n_extras"],
         },
     },
 ]

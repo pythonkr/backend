@@ -1,0 +1,12 @@
+{% extends "user/account_base.html" %}
+{% block title %}{% if en %}Merge account · PyCon Korea{% else %}계정 병합 · PyCon Korea{% endif %}{% endblock %}
+{% block body %}
+  <h1>{% if en %}Merge another account{% else %}다른 계정 병합{% endif %}</h1>
+  {% if en %}
+    <p>Sign in with the social account you want to merge, and its data will move to your current account (<b>{{ user.email }}</b>).</p>
+  {% else %}
+    <p>합칠 계정의 소셜 로그인으로 인증하면, 그 계정의 데이터가 현재 로그인한 계정(<b>{{ user.email }}</b>)으로 이동합니다.</p>
+  {% endif %}
+  {% include "user/_provider_forms.html" %}
+  <p><a href="{% url 'account-home' %}"><em>{% if en %}Back to account{% else %}계정으로 돌아가기{% endif %}</em></a></p>
+{% endblock %}

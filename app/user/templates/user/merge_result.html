@@ -1,0 +1,16 @@
+{% extends "user/account_base.html" %}
+{% block title %}{% if en %}Account merge · PyCon Korea{% else %}계정 병합 · PyCon Korea{% endif %}{% endblock %}
+{% block body %}
+  {% if error %}
+    <h1>{% if en %}Can't merge{% else %}병합할 수 없습니다{% endif %}</h1>
+    <div class="error">{{ error }}</div>
+  {% else %}
+    <h1>{% if en %}Merge complete{% else %}병합 완료{% endif %}</h1>
+    {% if en %}
+      <p>Your accounts have been merged into <b>{{ target.email|default:target.username }}</b>.</p>
+    {% else %}
+      <p>계정이 <b>{{ target.email|default:target.username }}</b>(으)로 병합되었습니다.</p>
+    {% endif %}
+  {% endif %}
+  <p><a href="{% url 'account-home' %}"><em>{% if en %}Back to account{% else %}계정으로 돌아가기{% endif %}</em></a></p>
+{% endblock %}

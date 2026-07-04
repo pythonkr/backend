@@ -52,6 +52,8 @@ urlpatterns = [
     # Django-Allauth
     path("accounts/", include("allauth.urls")),
     path("authn/social/", include("allauth.headless.urls")),
+    # accounts.pycon.kr
+    path("account/", include("user.urls")),
     # V1 API
     re_path("^v1/", include((v1_apis, "v1"), namespace="v1")),
     # API Docs

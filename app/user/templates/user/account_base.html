@@ -1,0 +1,33 @@
+{% is_english as en %}<!DOCTYPE html>
+<html lang="{% if en %}en{% else %}ko-kr{% endif %}">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}{% if en %}Account · PyCon Korea{% else %}계정 · PyCon Korea{% endif %}{% endblock %}</title>
+  <link rel="stylesheet" href="https://unpkg.com/mvp.css" />
+  <style>
+    section aside { width: 100%; max-width: 520px; margin: 2rem auto; text-align: left; }
+    form { border: 0; box-shadow: none; padding: 0; margin: 0; }
+    button { padding: .55rem 1.2rem; }
+    button.provider { display: flex; align-items: center; justify-content: center; gap: .5rem; width: 100%; }
+    .provider svg { flex-shrink: 0; }
+    .provider-google { background: #fff; color: #1f1f1f; border-color: #dadce0; }
+    .provider-google:hover { background: #f7f8f8; border-color: #dadce0; color: #1f1f1f; }
+    .provider-naver { background: #03C75A; color: #fff; border-color: #03C75A; }
+    .provider-kakao { background: #FEE500; color: #000; border-color: #FEE500; }
+    .kv { margin: .3rem 0; }
+    .kv small { color: #888; }
+    .error { margin: 1rem 0; padding: .8rem 1rem; border-left: 4px solid #b23b3b;
+      background: #fdecec; color: #b23b3b; border-radius: .3rem; }
+    .muted { color: #888; }
+    .or { text-align: center; color: #aaa; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+  <main>
+    <section><aside>
+      {% block body %}{% endblock %}
+    </aside></section>
+  </main>
+</body>
+</html>

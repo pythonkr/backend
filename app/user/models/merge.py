@@ -5,6 +5,7 @@ from functools import lru_cache
 from itertools import chain
 
 from allauth.account.models import EmailAddress
+from core.const.account import MERGE_MESSAGES
 from core.models import BaseAbstractModel
 from core.util.dateutil import now_aware
 from django.apps import apps
@@ -24,6 +25,15 @@ from simple_history.models import registered_models
 from simple_history.utils import bulk_update_with_history, get_history_model_for_model
 
 from .user import UserExt
+
+
+class MergeError(ValueError):
+    def __init__(self, code: str) -> None:
+        self.code = code
+        super().__init__(MERGE_MESSAGES[code]["ko"])
+
+    def localized(self, *, en: bool) -> str:
+        return MERGE_MESSAGES[self.code]["en" if en else "ko"]
 
 
 @lru_cache(maxsize=1)
@@ -62,14 +72,11 @@ class UserMergeHistory(BaseAbstractModel):
     @staticmethod
     def assert_self_mergeable(source: UserExt, target: UserExt) -> None:
         if not EmailAddress.objects.filter(user=target).exists():
-            msg = "남길 계정에 인증된 이메일이 필요합니다. 이메일을 추가하고 인증한 뒤 다시 시도해 주세요."
-            raise ValueError(msg)
+            raise MergeError("target_no_verified_email")
         if EmailAddress.objects.filter(user=target, verified=False).exists():
-            msg = "남길 계정에 인증되지 않은 이메일이 있습니다. 인증을 완료하거나 해당 이메일을 삭제한 뒤 다시 시도해 주세요."
-            raise ValueError(msg)
+            raise MergeError("target_unverified_email")
         if EmailAddress.objects.filter(user=source, verified=False).exists():
-            msg = "합칠 계정에 인증되지 않은 이메일이 있습니다. 해당 계정으로 로그인해 인증을 완료하거나 삭제한 뒤 다시 시도해 주세요."
-            raise ValueError(msg)
+            raise MergeError("source_unverified_email")
 
     def _create_merge_objects(
         self, model: type[Model], fields: Iterable[ForeignKey]
@@ -109,11 +116,11 @@ class UserMergeHistory(BaseAbstractModel):
     @atomic
     def merge(self) -> None:
         if self.source.pk == self.target.pk:
-            raise ValueError("같은 계정끼리는 병합할 수 없습니다.")
+            raise MergeError("same_account")
         if self.target.merged_to_id is not None:
-            raise ValueError("남길 계정이 이미 다른 계정에 병합되어 있습니다.")
+            raise MergeError("target_already_merged")
         if self.source.merged_to_id is not None:
-            raise ValueError("합칠 계정이 이미 다른 계정에 병합되어 있습니다.")
+            raise MergeError("source_already_merged")
 
         merge_objects = chain.from_iterable(self._create_merge_objects(m, fs) for m, fs in _movable_relations())
         for merge_object in UserMergeObject.objects.bulk_create(merge_objects):
@@ -126,7 +133,7 @@ class UserMergeHistory(BaseAbstractModel):
     @atomic
     def unmerge(self) -> None:
         if self.reverted_at is not None:
-            raise ValueError("이미 되돌린 병합입니다.")
+            raise MergeError("already_reverted")
 
         for merge_object in self.merged_objects.select_related("target_type"):
             merge_object.history = self

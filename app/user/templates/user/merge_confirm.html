@@ -1,0 +1,22 @@
+{% extends "user/account_base.html" %}
+{% block title %}{% if en %}Confirm merge · PyCon Korea{% else %}계정 병합 확인 · PyCon Korea{% endif %}{% endblock %}
+{% block body %}
+  <h1>{% if en %}Confirm account merge{% else %}계정 병합 확인{% endif %}</h1>
+  <p class="kv"><small>{% if en %}Account to merge{% else %}합칠 계정{% endif %}</small><br>{{ source.email|default:source.username }}</p>
+  <p class="kv"><small>{% if en %}Account to keep{% else %}남길 계정{% endif %}</small><br>{{ target.email|default:target.username }}</p>
+  {% if error %}
+    <div class="error">{{ error }}</div>
+    <p><a href="{% url 'account-merge-start' %}"><em>{% if en %}Go back{% else %}돌아가기{% endif %}</em></a></p>
+  {% else %}
+    {% if en %}
+      <p>The orders, talks, and other data of the account to merge will move to the account to keep, and the merged account will be deactivated. This is hard to undo.</p>
+    {% else %}
+      <p>합칠 계정의 주문·발표 등 데이터가 남길 계정으로 이동하며, 합칠 계정은 비활성화됩니다. 이 작업은 되돌리기 어렵습니다.</p>
+    {% endif %}
+    <form method="post">
+      {% csrf_token %}
+      <button>{% if en %}Merge{% else %}병합하기{% endif %}</button>
+    </form>
+    <p><a href="{% url 'account-merge-start' %}"><em>{% if en %}Cancel{% else %}취소{% endif %}</em></a></p>
+  {% endif %}
+{% endblock %}

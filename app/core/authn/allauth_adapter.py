@@ -4,13 +4,18 @@ from typing import Any, Literal
 from urllib.parse import urlparse
 
 from allauth.account.adapter import DefaultAccountAdapter
+from allauth.core.exceptions import ImmediateHttpResponse
 from allauth.headless.adapter import DefaultHeadlessAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from allauth.socialaccount.models import SocialLogin
 from allauth.socialaccount.providers.base import Provider
+from allauth.socialaccount.providers.base.constants import AuthProcess
+from core.const.account import MERGE_SOURCE_SESSION_KEY
 from core.logger.util.django_helper import get_request_log_data
 from django.conf import settings
 from django.http.request import HttpRequest
+from django.shortcuts import redirect
+from django.urls import reverse
 
 # allauth.socialaccount.providers.base.AuthError 상수의 가능한 값 (UNKNOWN / CANCELLED / DENIED)
 SocialAuthError = Literal["unknown", "cancelled", "denied"]
@@ -26,6 +31,17 @@ class NoNewUsersAccountAdapter(DefaultAccountAdapter):
 class SocialAccountLoggingAdapter(DefaultSocialAccountAdapter):
     def is_open_for_signup(self, request: HttpRequest, sociallogin: SocialLogin) -> bool:
         return True
+
+    def pre_social_login(self, request: HttpRequest, sociallogin: SocialLogin) -> None:
+        # 로그인 상태에서 계정 병합으로 다른 기존 계정의 소셜 로그인을 인증 시 병합 확인 페이지로.
+        if (
+            sociallogin.state.get("process") == AuthProcess.CONNECT
+            and request.user.is_authenticated
+            and sociallogin.is_existing
+            and sociallogin.user.pk != request.user.pk
+        ):
+            request.session[MERGE_SOURCE_SESSION_KEY] = sociallogin.user.pk
+            raise ImmediateHttpResponse(redirect(reverse("account-merge-confirm")))
 
     def on_authentication_error(
         self,

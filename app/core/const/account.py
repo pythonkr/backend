@@ -1,6 +1,49 @@
 import secrets
 import string
 
+MERGE_SOURCE_SESSION_KEY = "account_merge_source_user_id"
+MERGE_MESSAGES = {
+    "wrong_account_or_password": {
+        "ko": "이메일(또는 아이디)이나 비밀번호가 올바르지 않습니다.",
+        "en": "Your email/username or password is incorrect.",
+    },
+    "target_no_verified_email": {
+        "ko": "남길 계정에 인증된 이메일이 필요합니다. 이메일을 추가하고 인증한 뒤 다시 시도해 주세요.",
+        "en": "The account you keep needs a verified email. Add and verify an email, then try again.",
+    },
+    "target_unverified_email": {
+        "ko": "남길 계정에 인증되지 않은 이메일이 있습니다. 인증을 완료하거나 해당 이메일을 삭제한 뒤 다시 시도해 주세요.",
+        "en": "The account you keep has an unverified email. Verify it or delete that email, then try again.",
+    },
+    "source_unverified_email": {
+        "ko": "합칠 계정에 인증되지 않은 이메일이 있습니다. 해당 계정으로 로그인해 인증을 완료하거나 삭제한 뒤 다시 시도해 주세요.",
+        "en": (
+            "The account to merge has an unverified email. "
+            "Sign in to that account to verify or delete it, then try again."
+        ),
+    },
+    "same_account": {
+        "ko": "같은 계정끼리는 병합할 수 없습니다.",
+        "en": "You can't merge an account with itself.",
+    },
+    "target_already_merged": {
+        "ko": "남길 계정이 이미 다른 계정에 병합되어 있습니다.",
+        "en": "The account you keep has already been merged into another account.",
+    },
+    "source_already_merged": {
+        "ko": "합칠 계정이 이미 다른 계정에 병합되어 있습니다.",
+        "en": "The account to merge has already been merged into another account.",
+    },
+    "already_reverted": {
+        "ko": "이미 되돌린 병합입니다.",
+        "en": "This merge has already been reverted.",
+    },
+    "no_source": {
+        "ko": "병합할 계정 정보를 찾을 수 없습니다. 다시 시도해 주세요.",
+        "en": "We couldn't find the account to merge. Please try again.",
+    },
+}
+
 
 def generate_random_password(length: int = 16) -> str:
     alphabet = string.ascii_letters + string.digits + string.punctuation
