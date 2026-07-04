@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Generator, Iterable
-from functools import lru_cache
+from functools import cached_property, lru_cache
 from itertools import chain
 
 from allauth.account.models import EmailAddress
 from core.const.account import MERGE_MESSAGES
 from core.models import BaseAbstractModel
+from core.openapi.ui_hints import admin_route_for_model
 from core.util.dateutil import now_aware
 from django.apps import apps
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -159,6 +160,18 @@ class UserMergeObject(BaseAbstractModel):
 
     def __str__(self) -> str:
         return f"{self.target_type.model}#{self.target_id} {self.field_names}"
+
+    @cached_property
+    def target_type_model_info(self) -> dict[str, str]:
+        return admin_route_for_model(self.target_type.model_class())
+
+    @property
+    def target_type_app(self) -> str:
+        return self.target_type_model_info["app"]
+
+    @property
+    def target_type_resource(self) -> str:
+        return self.target_type_model_info["resource"]
 
     def apply(self) -> None:
         self._repoint(self.history.target_id, f"account_merge:{self.history_id}")

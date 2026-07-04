@@ -5,14 +5,16 @@ from django.db.models.fields.related import ForeignKey, ManyToManyField
 from modeltranslation.fields import TranslationField
 
 
+def admin_route_for_model(model: type) -> dict:
+    return {"app": model._meta.app_config.name.split(".")[0], "resource": model._meta.model_name}
+
+
 def ui_hints_for_model_field(model_field: object) -> dict:
     hints: dict = {}
 
     if isinstance(model_field, (ForeignKey, ManyToManyField)):
-        hints["ui:options"] = {
-            "choiceApp": model_field.related_model._meta.app_config.name.split(".")[0],
-            "choiceResource": model_field.related_model._meta.model_name,
-        }
+        route = admin_route_for_model(model_field.related_model)
+        hints["ui:options"] = {"choiceApp": route["app"], "choiceResource": route["resource"]}
 
     if isinstance(model_field, ManyToManyField):
         return hints | {"ui:field": "m2m_select"}

@@ -14,6 +14,7 @@ from admin_api.views.event.sponsor import SponsorAdminViewSet, SponsorTagAdminVi
 from admin_api.views.external_api.google_oauth2 import GoogleOAuth2AdminViewSet
 from admin_api.views.file import PublicFileAdminViewSet
 from admin_api.views.mcp_token import McpTokenAdminViewSet
+from admin_api.views.merge import UserMergeAdminViewSet
 from admin_api.views.modification_audit import ModificationAuditAdminViewSet
 from admin_api.views.notification import (
     EmailNotificationHistoryAdminViewSet,
@@ -49,6 +50,7 @@ admin_user_router = routers.SimpleRouter()
 admin_user_router.register("userext", UserAdminViewSet, basename="admin-user")
 admin_user_router.register("organization", OrganizationAdminViewSet, basename="admin-organization")
 admin_user_router.register("mcptoken", McpTokenAdminViewSet, basename="admin-mcp-token")
+admin_user_router.register("usermergehistory", UserMergeAdminViewSet, basename="admin-user-merge")
 
 admin_cms_router = routers.SimpleRouter()
 admin_cms_router.register("domaingroup", DomainGroupAdminViewSet, basename="admin-domain-group")
