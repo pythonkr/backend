@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import typing
+from functools import cached_property
 from uuid import uuid4
 
 from core.const.system import SYSTEM_EMAIL, SYSTEM_USERNAME
+from core.fields import EncryptedTextField
 from core.scancode_mixin import ScanCodeMixin
 from django.contrib.auth.models import AbstractUser
 from django.db import models
@@ -26,6 +28,8 @@ class UserExt(ScanCodeMixin, AbstractUser):
 
     merged_to = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="merged_from")
 
+    dooray_api_key = EncryptedTextField(key_setting_name="DOORAY_CRED_ENC_KEY", null=True, blank=True, editable=False)
+
     class Meta(AbstractUser.Meta):
         ordering = ["-date_joined"]
         indexes = [models.Index(fields=["unique_id"], name="userext_unique_id_idx")]
@@ -44,3 +48,11 @@ class UserExt(ScanCodeMixin, AbstractUser):
     @classmethod
     def get_system_user(cls) -> UserExt:
         return cls.objects.get_or_create(username=SYSTEM_USERNAME, email=SYSTEM_EMAIL)[0]
+
+    @cached_property
+    def emails(self) -> set[str]:
+        emails = set(self.emailaddress_set.filter(verified=True).values_list("email", flat=True))
+        if self.email:
+            emails.add(self.email)
+
+        return {e.lower() for e in emails}

@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Any, TypedDict
+from typing import Any, Literal, TypedDict
+
+HttpMethod = Literal["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "QUERY"]
 
 
 class SendParameters(TypedDict):

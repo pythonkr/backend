@@ -2,9 +2,14 @@ import collections.abc
 import contextlib
 import typing
 import uuid
+from functools import lru_cache
 
+from cryptography.fernet import Fernet, MultiFernet
+from django.conf import settings
+from django.core.checks import Error
+from django.core.exceptions import ImproperlyConfigured
 from django.db.backends.base.operations import BaseDatabaseOperations
-from django.db.models import AutoField, UUIDField, expressions, fields
+from django.db.models import AutoField, TextField, UUIDField, expressions, fields
 from django.db.models.fields.reverse_related import ForeignObjectRel
 
 BaseDatabaseOperations.integer_field_ranges["UUIDField"] = (0, 0)
@@ -68,3 +73,43 @@ class UUIDAutoField(UUIDField, AutoField):
         with contextlib.suppress(ValueError):
             return uuid.UUID(value)
         return self.to_python(value)
+
+
+@lru_cache(maxsize=None)
+def _build_fernet(key_setting_name: str) -> MultiFernet:
+    raw = getattr(settings, key_setting_name, "") or ""
+    if not (keys := [k.strip() for k in raw.split(",") if k.strip()]):
+        raise ImproperlyConfigured(f"{key_setting_name} 미설정 (Fernet 키 필수).")
+    return MultiFernet([Fernet(k) for k in keys])
+
+
+class EncryptedTextField(TextField):
+    def __init__(self, *args: typing.Any, key_setting_name: str, **kwargs: typing.Any) -> None:
+        self.key_setting_name = key_setting_name
+        super().__init__(*args, **kwargs)
+
+    def deconstruct(self) -> tuple:
+        name, path, args, kwargs = super().deconstruct()
+        kwargs["key_setting_name"] = self.key_setting_name
+        return name, path, args, kwargs
+
+    def _fernet(self) -> MultiFernet:
+        return _build_fernet(self.key_setting_name)
+
+    def check(self, **kwargs: typing.Any) -> list:
+        errors = super().check(**kwargs)
+        if not (getattr(settings, self.key_setting_name, "") or ""):
+            errors.append(
+                Error(f"{self.key_setting_name} 미설정 — 암호화 키 필수", obj=self, id="core.E_encrypted_key")
+            )
+        return errors
+
+    def get_prep_value(self, value: str | None) -> str | None:
+        if not value:
+            return None
+        return self._fernet().encrypt(str(value).encode()).decode()
+
+    def from_db_value(self, value: str | None, expression: typing.Any, connection: typing.Any) -> str | None:
+        if not value:
+            return None
+        return self._fernet().decrypt(value.encode()).decode()

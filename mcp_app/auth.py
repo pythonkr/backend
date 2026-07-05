@@ -14,6 +14,7 @@ from fastmcp.server.middleware import Middleware, MiddlewareContext
 from mcp_app import config
 
 ADMIN_TAG = "admin"  # 이 태그가 붙은 도구는 인증된 어드민(슈퍼유저)에게만 노출
+DOORAY_TAG = "dooray"  # 이 태그가 붙은 도구는 어드민 + Dooray 개인 토큰 등록자에게만 노출
 AUTH_KEY = "auth_state"
 
 
@@ -28,10 +29,15 @@ class AuthState:
     status: AuthStatus
     username: str | None = None
     jwt: str | None = None
+    dooray_account_info: dict | None = None
 
     @property
     def is_admin(self) -> bool:
         return self.status is AuthStatus.AUTHENTICATED
+
+    @property
+    def dooray_connected(self) -> bool:
+        return self.dooray_account_info is not None
 
     @property
     def status_message(self) -> str:
@@ -53,7 +59,12 @@ class AuthState:
         data = resp.json()
         if not data.get("is_superuser"):
             return cls(AuthStatus.ANONYMOUS, jwt=jwt)
-        return cls(AuthStatus.AUTHENTICATED, username=data.get("username"), jwt=jwt)
+        return cls(
+            AuthStatus.AUTHENTICATED,
+            username=data.get("username"),
+            jwt=jwt,
+            dooray_account_info=data.get("dooray_account_info"),
+        )
 
 
 def CurrentAuth() -> AuthState:
@@ -63,8 +74,28 @@ def CurrentAuth() -> AuthState:
     return cast(AuthState, Depends(current_auth))
 
 
-def _is_admin_tool(tool) -> bool:
-    return ADMIN_TAG in (tool.tags or set())
+def _tags(tool) -> set:
+    return tool.tags or set()
+
+
+def _visible(tool, auth: AuthState) -> bool:
+    tags = _tags(tool)
+    if ADMIN_TAG in tags and not auth.is_admin:
+        return False
+    if DOORAY_TAG in tags and not (auth.is_admin and auth.dooray_connected):
+        return False
+    return True
+
+
+def _forbidden_reason(tool, auth: AuthState) -> str | None:
+    tags = _tags(tool)
+    if ADMIN_TAG in tags and not auth.is_admin:
+        return "이 도구는 인증된 어드민(슈퍼유저)만 사용할 수 있습니다. auth_status 로 상태를 확인하세요."
+    if DOORAY_TAG in tags and not auth.is_admin:
+        return "이 도구는 인증된 어드민(슈퍼유저)만 사용할 수 있습니다. auth_status 로 상태를 확인하세요."
+    if DOORAY_TAG in tags and not auth.dooray_connected:
+        return "Dooray 개인 토큰이 등록되어 있지 않습니다. 어드민에서 개인 Dooray API 토큰을 먼저 등록하세요."
+    return None
 
 
 class AuthMiddleware(Middleware):
@@ -78,13 +109,12 @@ class AuthMiddleware(Middleware):
 
     async def on_list_tools(self, context: MiddlewareContext, call_next):
         tools = await call_next(context)
-        if (await context.fastmcp_context.get_state(AUTH_KEY)).is_admin:
-            return tools
-        return [t for t in tools if not _is_admin_tool(t)]
+        auth: AuthState = await context.fastmcp_context.get_state(AUTH_KEY)
+        return [t for t in tools if _visible(t, auth)]
 
     async def on_call_tool(self, context: MiddlewareContext, call_next):
         tool = await context.fastmcp_context.fastmcp.get_tool(context.message.name)
         auth: AuthState = await context.fastmcp_context.get_state(AUTH_KEY)
-        if tool and _is_admin_tool(tool) and not auth.is_admin:
-            raise ToolError("이 도구는 인증된 어드민(슈퍼유저)만 사용할 수 있습니다. auth_status 로 상태를 확인하세요.")
+        if tool and (reason := _forbidden_reason(tool, auth)):
+            raise ToolError(reason)
         return await call_next(context)

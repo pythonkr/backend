@@ -24,6 +24,7 @@ from admin_api.views.notification import (
     NHNCloudSMSNotificationHistoryAdminViewSet,
     NHNCloudSMSNotificationTemplateAdminViewSet,
 )
+from admin_api.views.proxy.dooray import DoorayProxyView
 from admin_api.views.shop.order_notifications import OrderNotificationAdminViewSet
 from admin_api.views.shop.orders import OrderAdminViewSet
 from admin_api.views.shop.products import (
@@ -144,4 +145,12 @@ urlpatterns = [
     path("document/", include(admin_document_router.urls)),
     path("dashboard/", include(admin_dashboard_router.urls)),
     path("allauth/", include(admin_allauth_router.urls)),
+    path(
+        "proxy/",
+        include(
+            [
+                path("dooray/<path:route>", DoorayProxyView.as_view(), name="admin-dooray-proxy"),
+            ]
+        ),
+    ),
 ]

@@ -437,6 +437,14 @@ NHN_CLOUD = types.SimpleNamespace(
     ),
 )
 
+# NHN Dooray!
+DOORAY = types.SimpleNamespace(
+    base_url=env("DOORAY_API_BASE_URL", default="https://api.dooray.com"),
+    timeout=env.float("DOORAY_API_TIMEOUT", default=30.0),
+)
+# Dooray 개인 토큰 암호화용 Fernet 키(urlsafe base64 32B; 콤마로 여러 개=회전).
+DOORAY_CRED_ENC_KEY = env("DOORAY_CRED_ENC_KEY", default="")
+
 # Celery Settings
 CELERY_BROKER_URL = env("CELERY_BROKER_URL")
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND")

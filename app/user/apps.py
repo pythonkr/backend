@@ -13,7 +13,7 @@ class UserConfig(AppConfig):
         from simple_history import register
         from user.models import UserExt
 
-        register(UserExt)
+        register(UserExt, excluded_fields=["dooray_api_key"])
 
         from user.models.organization import Organization
 

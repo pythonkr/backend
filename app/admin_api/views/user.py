@@ -42,6 +42,18 @@ class UserAdminViewSet(
     filterset_class = UserAdminFilterSet
     queryset = UserExt.objects.filter(is_active=True).prefetch_related("emailaddress_set", "socialaccount_set")
 
+    def get_serializer_context(self) -> dict:
+        context = super().get_serializer_context()
+        if self.action == "list":
+            context["skip_dooray_connection_check"] = True
+        elif (
+            self.action == "retrieve"
+            and self.request.user.is_authenticated
+            and str(self.request.user.pk) == self.kwargs.get("pk")
+        ):
+            context["show_dooray_api_key"] = True
+        return context
+
     def create(self, request: request.Request, *args: tuple, **kwargs: dict) -> response.Response:
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)

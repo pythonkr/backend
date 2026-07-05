@@ -1,3 +1,4 @@
+import contextlib
 import functools
 import typing
 
@@ -7,19 +8,27 @@ from allauth.account.models import EmailAddress
 from allauth.socialaccount.models import SocialAccount
 from core.const.account import generate_random_password
 from core.const.serializer import COMMON_ADMIN_FIELDS
+from core.external_apis.nhn_cloud.dooray import DoorayError, DoorayMember, nhn_cloud_dooray_client
 from core.serializer.base_abstract_serializer import BaseAbstractSerializer
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
 from core.serializer.nested_model_serializer import NestedFieldModelSerializer, NestedFieldSpec
 from core.serializer.read_only_serializer import ReadOnlyModelSerializer
+from core.util.thread_local import get_current_user
 from rest_framework import serializers
+from rest_framework.fields import empty
 from user.models import UserExt
 from user.models.organization import Organization
+
+_DOORAY_KEY_MASK = "************"
 
 
 class UserAdminSerializer(JsonSchemaSerializer, NestedFieldModelSerializer):
     str_repr = serializers.CharField(source="__str__", read_only=True)
     email_addresses = EmailAddressNestedAdminSerializer(many=True, required=False, source="emailaddress_set")
     social_accounts = SocialAccountNestedAdminSerializer(many=True, required=False, source="socialaccount_set")
+
+    dooray_api_key = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    dooray_account_info = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = UserExt
@@ -37,6 +46,8 @@ class UserAdminSerializer(JsonSchemaSerializer, NestedFieldModelSerializer):
             "last_login",
             "email_addresses",
             "social_accounts",
+            "dooray_api_key",
+            "dooray_account_info",
         )
         extra_kwargs = {
             "id": {"read_only": True},
@@ -55,6 +66,19 @@ class UserAdminSerializer(JsonSchemaSerializer, NestedFieldModelSerializer):
                 parent_fk_name="user",
             ),
         }
+
+    def _dooray_me(self, token: str) -> DoorayMember | None:
+        cache = self.__dict__.setdefault("_dooray_me_cache", {})
+        if token not in cache:
+            cache[token] = None
+            with contextlib.suppress(DoorayError):
+                cache[token] = nhn_cloud_dooray_client.members_me(token)
+        return cache[token]
+
+    def get_dooray_account_info(self, obj: UserExt) -> DoorayMember | None:
+        if not obj.dooray_api_key or self.context.get("skip_dooray_connection_check"):
+            return None
+        return self._dooray_me(obj.dooray_api_key)
 
     def validate(self, attrs: dict) -> dict:
         # social_accounts=[] 는 마지막 SA cascade 를 트리거해 같은 user 의 EA 전체를 삭제함.
@@ -83,6 +107,19 @@ class UserAdminSerializer(JsonSchemaSerializer, NestedFieldModelSerializer):
             raise serializers.ValidationError(msg)
         return value
 
+    def validate_dooray_api_key(self, value: str | None) -> str | None:
+        if not value or value == _DOORAY_KEY_MASK:
+            return value
+        if not self.instance:
+            return None
+        if not ((current := get_current_user()) and self.instance.pk == current.pk):
+            raise serializers.ValidationError("본인 계정에만 Dooray 토큰을 등록할 수 있습니다.")
+        if not (me := self._dooray_me(value)):
+            raise serializers.ValidationError("유효하지 않거나 폐기된 Dooray 토큰입니다.")
+        if (me.get("externalEmailAddress") or "").lower() not in self.instance.emails:
+            raise serializers.ValidationError("Dooray 토큰의 이메일이 본인 계정 이메일과 일치하지 않습니다.")
+        return value
+
     def create(self, validated_data: dict[str, typing.Any]) -> UserExt:
         password = generate_random_password()
         self._generated_password = password
@@ -90,6 +127,19 @@ class UserAdminSerializer(JsonSchemaSerializer, NestedFieldModelSerializer):
         instance = UserExt.objects.create_user(**validated_data, password=password)
         self._apply_nested_sync(instance, nested_data)
         return instance
+
+    def update(self, instance: UserExt, validated_data: dict[str, typing.Any]) -> UserExt:
+        dooray_api_key = validated_data.pop("dooray_api_key", empty)
+        if dooray_api_key not in {empty, _DOORAY_KEY_MASK}:
+            instance.dooray_api_key = dooray_api_key or None
+
+        return super().update(instance, validated_data)
+
+    def to_representation(self, instance: UserExt) -> dict:
+        data = super().to_representation(instance)
+        if data["dooray_api_key"] and not self.context.get("show_dooray_api_key"):
+            data["dooray_api_key"] = _DOORAY_KEY_MASK
+        return data
 
     def _apply_nested_sync(self, instance: UserExt, nested_data: dict[str, list[dict] | None]) -> None:
         # SocialAccount는 delete-only — 기존 set 에서 input 에 없는 것만 삭제.

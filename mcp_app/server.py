@@ -12,7 +12,7 @@ from fastmcp.utilities.openapi import HTTPRoute
 from fastmcp.utilities.types import Image
 from mcp.types import TextContent
 
-from mcp_app import config
+from mcp_app import config, dooray
 from mcp_app import mdx_components as mdx
 from mcp_app import mdx_preview as preview
 from mcp_app.auth import ADMIN_TAG, AUTH_KEY, AuthMiddleware, AuthState, CurrentAuth
@@ -76,12 +76,24 @@ def build() -> FastMCP:
 
     @mcp.tool(title="인증 상태 확인", description="현재 인증 상태와 사용 가능한 기능·사용법을 확인한다.")
     async def auth_status(auth: AuthState = CurrentAuth()) -> dict:  # noqa: B008
-        return {
+        result = {
             "status": auth.status.value,
             "username": auth.username,
             "message": auth.status_message,
             "guidance": _GUIDANCE_ADMIN if auth.is_admin else _GUIDANCE_PUBLIC,
         }
+        if auth.is_admin:
+            dooray_block: dict = {"connected": auth.dooray_connected}
+            if info := auth.dooray_account_info:
+                dooray_block |= {
+                    "member_id": info.get("id"),
+                    "name": info.get("name"),
+                    "email": info.get("externalEmailAddress"),
+                }
+            elif not auth.dooray_connected:
+                dooray_block["note"] = "개인 Dooray API 토큰을 어드민에서 등록하면 Dooray 업무 도구가 노출됩니다."
+            result["dooray"] = dooray_block
+        return result
 
     @mcp.tool(
         title="응답 언어 설정",
@@ -150,5 +162,7 @@ def build() -> FastMCP:
             content=blocks,
             structured_content={"url": result["url"], "scope": html_scope},
         )
+
+    dooray.register(mcp)
 
     return mcp
