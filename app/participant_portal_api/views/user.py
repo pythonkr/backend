@@ -8,7 +8,7 @@ from participant_portal_api.serializers.user import (
     UserPortalSerializer,
     UserPortalSignInSerializer,
 )
-from rest_framework import decorators, request, response, status, viewsets
+from rest_framework import decorators, permissions, request, response, status, viewsets
 from user.models import UserExt
 
 
@@ -21,7 +21,7 @@ class UserPortalViewSet(viewsets.GenericViewSet):
         tags=[OpenAPITag.PARTICIPANT_PORTAL_USER],
         responses={status.HTTP_200_OK: UserPortalSerializer},
     )
-    @decorators.action(detail=False, methods=["get"], url_path="me")
+    @decorators.action(detail=False, methods=["get"], url_path="me", permission_classes=[permissions.IsAuthenticated])
     def retrieve_profile(self, request: request.Request, *args: tuple, **kwargs: dict) -> response.Response:
         if not request.user.is_authenticated:
             return response.Response(status=status.HTTP_401_UNAUTHORIZED)
