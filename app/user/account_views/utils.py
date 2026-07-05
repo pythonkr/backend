@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from core.middleware.response_exception import ResponseException
-from django.contrib.auth import get_user_model
+from django.contrib.auth import SESSION_KEY, get_user_model, logout
 from django.http import HttpRequest
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
@@ -16,13 +16,23 @@ PROVIDERS = [
 User = get_user_model()
 
 
+def _reject_merged(request: HttpRequest) -> None:
+    uid = request.session.get(SESSION_KEY)
+    if uid and not request.user.is_authenticated and User.objects.filter(pk=uid, merged_to__isnull=False).exists():
+        logout(request)
+        request.session["login_error"] = "account_merged"
+        raise ResponseException(redirect(reverse("account-login")))
+
+
 def check_login(request: HttpRequest) -> None:
+    _reject_merged(request)
     if not request.user.is_authenticated:
         login_url = f"{reverse('account-login')}?{urlencode({'next': request.get_full_path()})}"
         raise ResponseException(redirect(login_url))
 
 
 def redirect_if_authenticated(request: HttpRequest, target: str) -> None:
+    _reject_merged(request)
     if request.user.is_authenticated:
         raise ResponseException(redirect(target))
 

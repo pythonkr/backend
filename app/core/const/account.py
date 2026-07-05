@@ -46,6 +46,14 @@ MERGE_MESSAGES = {
         "ko": "병합할 계정 정보를 찾을 수 없습니다. 다시 시도해 주세요.",
         "en": "We couldn't find the account to merge. Please try again.",
     },
+    "account_merged": {
+        "ko": "해당 계정은 다른 계정으로 병합되었습니다. 남기신 계정으로 로그인해 주세요.",
+        "en": "That account was merged into another. Please sign in with the account you kept.",
+    },
+    "social_login_failed": {
+        "ko": "소셜 로그인에 실패했습니다. 다시 시도해 주세요.",
+        "en": "Social sign-in failed. Please try again.",
+    },
 }
 EMAIL_MESSAGES = {
     "verification_sent": {

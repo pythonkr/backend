@@ -1,8 +1,9 @@
 import pytest
 from allauth.account.models import EmailAddress
+from allauth.core.context import request_context
 from allauth.core.exceptions import ImmediateHttpResponse
 from allauth.socialaccount.models import SocialAccount, SocialLogin
-from core.authn.allauth_adapter import SocialAccountLoggingAdapter
+from core.authn.allauth_adapter import PyConKRHeadlessAdapter, SocialAccountLoggingAdapter
 from core.const.account import MERGE_SOURCE_SESSION_KEY
 from django.urls import reverse
 from shop.order.models import Order
@@ -107,22 +108,15 @@ def test_start_lists_provider_forms(client, target_user):
     assert b'name="process" value="connect"' in response.content
 
 
-def test_merged_account_session_is_logged_out(client, source_user, target_user):
+def test_merged_account_session_logs_out_and_shows_notice(client, source_user, target_user):
     UserMergeHistory.objects.create(source=source_user, target=target_user).merge()
     client.force_login(source_user)  # 병합된(dead) 계정으로 남은 세션
 
-    response = client.get(reverse("account-home"))
+    response = client.get(reverse("account-home"), follow=True)
 
-    assert response.status_code == 302
-    assert "merged=1" in response["Location"]
+    assert response.redirect_chain[-1][0] == reverse("account-login")
     assert "_auth_user_id" not in client.session
-
-
-def test_login_shows_merged_notice(client, db):
-    response = client.get(reverse("account-login") + "?merged=1")
-
-    assert response.status_code == 200
-    assert "병합".encode() in response.content
+    assert "병합".encode() in response.content  # login_error 플래시가 error 로 렌더
 
 
 # ---- AccountLoginView ---------------------------------------------------------
@@ -339,6 +333,18 @@ def test_pre_social_login_ignores_plain_login(rf, source_user, target_user):
     SocialAccountLoggingAdapter().pre_social_login(request, sociallogin)  # no raise
 
     assert MERGE_SOURCE_SESSION_KEY not in request.session
+
+
+def test_social_login_error_on_accounts_host_routes_to_login(rf):
+    request = rf.get("/")
+    request.urlconf = "core.account_urls"  # accounts 호스트 = HostUrlconfMiddleware 가 세팅
+    request.session = {}
+
+    with request_context(request):
+        url = PyConKRHeadlessAdapter().get_frontend_url("socialaccount_login_error")
+
+    assert url == reverse("account-login", urlconf="core.account_urls")
+    assert request.session["login_error"] == "social_login_failed"
 
 
 # ---- 다국어 (en) --------------------------------------------------------------

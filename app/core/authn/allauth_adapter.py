@@ -95,6 +95,10 @@ class PyConKRHeadlessAdapter(DefaultHeadlessAdapter):
         if urlname != "socialaccount_login_error":
             return super().get_frontend_url(urlname, **kwargs)
 
+        if getattr(self.request, "urlconf", None) == "core.account_urls":
+            self.request.session["login_error"] = "social_login_failed"
+            return reverse("account-login", urlconf=self.request.urlconf)
+
         allowed = _allowed_frontend_origins()
         origin: str | None = None
         for header in ("HTTP_X_FRONTEND_DOMAIN", "HTTP_ORIGIN", "HTTP_REFERER"):

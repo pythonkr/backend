@@ -2,6 +2,7 @@
 {% block title %}{% if en %}Sign in · PyCon Korea{% else %}로그인 · PyCon Korea{% endif %}{% endblock %}
 {% block body %}
   <h1>{% if en %}Sign in to PyCon Korea{% else %}PyCon Korea 계정 로그인{% endif %}</h1>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
   <p>{% if en %}Sign in with a social account.{% else %}소셜 계정으로 로그인하세요.{% endif %}</p>
   {% include "user/_provider_forms.html" %}
   <p class="or">{% if en %}or{% else %}또는{% endif %}</p>

@@ -27,6 +27,7 @@ def account_home(request: HttpRequest) -> HttpResponse:
 def account_login(request: HttpRequest) -> HttpResponse:
     target = login_target(request)
     redirect_if_authenticated(request, target)
+    code = request.session.pop("login_error", None)
     return render(
         request,
         "user/account_login.html",
@@ -35,6 +36,7 @@ def account_login(request: HttpRequest) -> HttpResponse:
             "redirect_url": HEADLESS_PROVIDER_REDIRECT_URL,
             "callback_url": target,
             "process": "login",
+            "error": MERGE_MESSAGES[code]["en" if is_english() else "ko"] if code in MERGE_MESSAGES else None,
         },
     )
 
