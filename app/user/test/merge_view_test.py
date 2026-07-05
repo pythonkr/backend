@@ -13,16 +13,12 @@ from user.models.merge import UserMergeHistory
 
 @pytest.fixture
 def source_user(db) -> UserExt:
-    user = UserExt.objects.create_user(username="source", email="source@example.com")
-    EmailAddress.objects.create(user=user, email="source@example.com", verified=True, primary=True)
-    return user
+    return UserExt.objects.create_user(username="source", email="source@example.com")
 
 
 @pytest.fixture
 def target_user(db) -> UserExt:
-    user = UserExt.objects.create_user(username="target", email="target@example.com")
-    EmailAddress.objects.create(user=user, email="target@example.com", verified=True, primary=True)
-    return user
+    return UserExt.objects.create_user(username="target", email="target@example.com")
 
 
 def _stash_source(client, source):
@@ -111,6 +107,24 @@ def test_start_lists_provider_forms(client, target_user):
     assert b'name="process" value="connect"' in response.content
 
 
+def test_merged_account_session_is_logged_out(client, source_user, target_user):
+    UserMergeHistory.objects.create(source=source_user, target=target_user).merge()
+    client.force_login(source_user)  # 병합된(dead) 계정으로 남은 세션
+
+    response = client.get(reverse("account-home"))
+
+    assert response.status_code == 302
+    assert "merged=1" in response["Location"]
+    assert "_auth_user_id" not in client.session
+
+
+def test_login_shows_merged_notice(client, db):
+    response = client.get(reverse("account-login") + "?merged=1")
+
+    assert response.status_code == 200
+    assert "병합".encode() in response.content
+
+
 # ---- AccountLoginView ---------------------------------------------------------
 
 
@@ -152,9 +166,7 @@ def test_home_links_to_merge(client, target_user):
 
 @pytest.fixture
 def password_user(db) -> UserExt:
-    user = UserExt.objects.create_user(username="pw", email="pw@example.com", password="s3cret-pw-123")  # nosec B106
-    EmailAddress.objects.create(user=user, email="pw@example.com", verified=True, primary=True)
-    return user
+    return UserExt.objects.create_user(username="pw", email="pw@example.com", password="s3cret-pw-123")  # nosec B106
 
 
 def test_password_login_page_renders_form(client, db):

@@ -9,7 +9,6 @@ from user.models import UserExt
 @pytest.fixture
 def user(db) -> UserExt:
     u = UserExt.objects.create_user(username="u", email="u@example.com")
-    EmailAddress.objects.create(user=u, email="u@example.com", verified=True, primary=True)
     return u
 
 
@@ -139,7 +138,7 @@ def test_set_primary_unverified_rejected(client, user):
 
 def test_action_on_other_users_email_rejected(client, user):
     other_user = UserExt.objects.create_user(username="o", email="o@example.com")
-    other_email = EmailAddress.objects.create(user=other_user, email="o@example.com", verified=True)
+    other_email = EmailAddress.objects.get(user=other_user)
     client.force_login(user)
     response = client.post(reverse("account-email-delete"), {"email_id": other_email.pk})
     assert response.status_code == http.HTTPStatus.BAD_REQUEST  # request.user 로 스코프 → 못 찾음

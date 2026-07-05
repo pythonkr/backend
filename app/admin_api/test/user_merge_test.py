@@ -16,16 +16,12 @@ REVERT = "v1:admin-user-merge-revert"
 
 @pytest.fixture
 def source_user(db) -> UserExt:
-    user = UserExt.objects.create_user(username="source", email="source@example.com")
-    EmailAddress.objects.create(user=user, email="source@example.com", verified=True, primary=True)
-    return user
+    return UserExt.objects.create_user(username="source", email="source@example.com")
 
 
 @pytest.fixture
 def target_user(db) -> UserExt:
-    user = UserExt.objects.create_user(username="target", email="target@example.com")
-    EmailAddress.objects.create(user=user, email="target@example.com", verified=True, primary=True)
-    return user
+    return UserExt.objects.create_user(username="target", email="target@example.com")
 
 
 # ---- Auth -------------------------------------------------------------------

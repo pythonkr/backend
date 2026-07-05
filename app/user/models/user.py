@@ -7,8 +7,22 @@ from uuid import uuid4
 from core.const.system import SYSTEM_EMAIL, SYSTEM_USERNAME
 from core.fields import EncryptedTextField
 from core.scancode_mixin import ScanCodeMixin
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models
+
+
+class UserExtManager(UserManager):
+    def _create_user(self, username, email, password, **extra_fields):
+        user = super()._create_user(username, email, password, **extra_fields)
+        if email:
+            from allauth.account.models import EmailAddress
+
+            EmailAddress.objects.get_or_create(
+                user=user,
+                email=email.lower(),
+                defaults={"verified": True, "primary": True},
+            )
+        return user
 
 
 class UserExt(ScanCodeMixin, AbstractUser):
@@ -29,6 +43,8 @@ class UserExt(ScanCodeMixin, AbstractUser):
     merged_to = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="merged_from")
 
     dooray_api_key = EncryptedTextField(key_setting_name="DOORAY_CRED_ENC_KEY", null=True, blank=True, editable=False)
+
+    objects = UserExtManager()
 
     class Meta(AbstractUser.Meta):
         ordering = ["-date_joined"]

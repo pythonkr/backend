@@ -5,6 +5,7 @@ import pytest
 from allauth.account.models import EmailAddress
 from allauth.socialaccount.models import SocialAccount
 from core.util.thread_local import thread_local
+from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
 from shop.order.models import Order
 from user.models import UserExt
@@ -45,6 +46,26 @@ def _merge(source, target, actor=None) -> UserMergeHistory:
         history = UserMergeHistory.objects.create(source=source, target=target)  # created_by=actor
     history.merge()
     return history
+
+
+def test_no_unhandled_user_m2m_relations(db):
+    """merge 는 M2M 를 이관하지 않는다 — user 를 건드리는 새 M2M 가 추가되면 조용히 누락되므로 여기서 잡는다."""
+    allowed = {(UserExt._meta.label, "groups"), (UserExt._meta.label, "user_permissions")}
+    found = {
+        (model._meta.label, field.name)
+        for model in apps.get_models()
+        for field in model._meta.local_many_to_many
+        if field.related_model is UserExt or model is UserExt
+    }
+    assert found <= allowed, f"merge 가 이관하지 않는 user M2M: {found - allowed}"
+
+
+def test_create_user_creates_verified_email(db):
+    user = UserExt.objects.create_user(username="u", email="U@Example.com")
+
+    ea = EmailAddress.objects.get(user=user)
+    assert ea.email == "u@example.com"
+    assert ea.verified is True and ea.primary is True
 
 
 def test_merge_repoints_owned_business_fk(source_user, target_user):
@@ -99,7 +120,6 @@ def test_untracked_model_is_repointed(source_user, target_user):
 
 def test_allauth_accounts_are_moved(source_user, target_user):
     SocialAccount.objects.create(user=source_user, provider="google", uid="src-google", extra_data={})
-    EmailAddress.objects.create(user=source_user, email="source@example.com", verified=True, primary=True)
 
     _merge(source_user, target_user)
 
@@ -130,9 +150,6 @@ def test_audit_fields_are_not_moved(source_user, target_user):
 def test_source_email_moves_and_demotes_when_target_has_primary(source_user, target_user):
     """target 이 이미 primary 를 가지면, source 의 (중복 아닌) 이메일은 source 에 남기지 않고 target 으로
     옮기며 primary 를 강등한다 — 죽은 계정에 주소가 갇히지 않게."""
-    EmailAddress.objects.create(user=source_user, email="source@example.com", verified=True, primary=True)
-    EmailAddress.objects.create(user=target_user, email="target@example.com", verified=True, primary=True)
-
     _merge(source_user, target_user)
 
     assert not EmailAddress.objects.filter(user=source_user).exists()
@@ -143,9 +160,8 @@ def test_source_email_moves_and_demotes_when_target_has_primary(source_user, tar
 
 def test_duplicate_email_consolidates_verification_and_demotes_source(source_user, target_user):
     """양쪽이 같은 주소를 가지면 삭제 없이: target 사본을 verified 로 승격하고 source 사본은 미검증으로 강등해 남긴다."""
-    EmailAddress.objects.create(user=source_user, email="dup@example.com", verified=True, primary=True)
+    EmailAddress.objects.filter(user=source_user).update(email="dup@example.com")  # source 의 유일 이메일을 dup 으로
     EmailAddress.objects.create(user=target_user, email="dup@example.com", verified=False, primary=False)
-    EmailAddress.objects.create(user=target_user, email="target@example.com", verified=True, primary=True)
 
     _merge(source_user, target_user)
 
@@ -156,7 +172,8 @@ def test_duplicate_email_consolidates_verification_and_demotes_source(source_use
 
 def test_target_primary_assigned_when_missing(source_user, target_user):
     """규칙3: 병합 후 target 에 primary 가 없으면 하나(verified 우선)를 지정한다."""
-    EmailAddress.objects.create(user=target_user, email="target@example.com", verified=True, primary=False)
+    EmailAddress.objects.filter(user=source_user).delete()  # source 이메일 없음
+    EmailAddress.objects.filter(user=target_user).update(primary=False)  # target 은 primary 없는 verified 이메일만
 
     _merge(source_user, target_user)
 
@@ -167,10 +184,8 @@ def test_target_primary_assigned_when_missing(source_user, target_user):
 
 def test_unmerge_restores_email_state(source_user, target_user):
     """규칙1(옮김+강등)·규칙2(검증통합) 모두 before-image replay 로 정확히 복원된다."""
-    EmailAddress.objects.create(user=source_user, email="source@example.com", verified=True, primary=True)
     EmailAddress.objects.create(user=source_user, email="dup@example.com", verified=True, primary=False)
     EmailAddress.objects.create(user=target_user, email="dup@example.com", verified=False, primary=False)
-    EmailAddress.objects.create(user=target_user, email="target@example.com", verified=True, primary=True)
 
     merge = _merge(source_user, target_user)
     merge.unmerge()
@@ -282,33 +297,24 @@ def test_double_unmerge_rejected(source_user, target_user):
 # ---- assert_self_mergeable (본인 병합 사전검증) --------------------------------
 
 
-def _verified_email(user, email):
-    return EmailAddress.objects.create(user=user, email=email, verified=True, primary=True)
-
-
 def test_self_mergeable_passes_when_both_verified(source_user, target_user):
-    _verified_email(source_user, "source@example.com")
-    _verified_email(target_user, "target@example.com")
-
-    UserMergeHistory.assert_self_mergeable(source_user, target_user)  # no raise
+    UserMergeHistory.assert_self_mergeable(source_user, target_user)  # 둘 다 fixture 로 verified 이메일 보유 → no raise
 
 
 def test_self_mergeable_allows_email_less_source(source_user, target_user):
-    _verified_email(target_user, "target@example.com")  # source 는 이메일 없음 → 허용
+    EmailAddress.objects.filter(user=source_user).delete()  # source 는 이메일 없음 → 허용
 
     UserMergeHistory.assert_self_mergeable(source_user, target_user)  # no raise
 
 
 def test_self_mergeable_rejects_email_less_target(source_user, target_user):
-    _verified_email(source_user, "source@example.com")
+    EmailAddress.objects.filter(user=target_user).delete()  # target 에 인증 이메일 없음 → 거부
 
     with pytest.raises(ValueError):
         UserMergeHistory.assert_self_mergeable(source_user, target_user)
 
 
 def test_self_mergeable_rejects_unverified_target_email(source_user, target_user):
-    _verified_email(source_user, "source@example.com")
-    _verified_email(target_user, "target@example.com")
     EmailAddress.objects.create(user=target_user, email="extra@example.com", verified=False)
 
     with pytest.raises(ValueError):
@@ -316,8 +322,7 @@ def test_self_mergeable_rejects_unverified_target_email(source_user, target_user
 
 
 def test_self_mergeable_rejects_unverified_source_email(source_user, target_user):
-    _verified_email(target_user, "target@example.com")
-    EmailAddress.objects.create(user=source_user, email="source@example.com", verified=False)
+    EmailAddress.objects.create(user=source_user, email="extra@example.com", verified=False)
 
     with pytest.raises(ValueError):
         UserMergeHistory.assert_self_mergeable(source_user, target_user)

@@ -22,7 +22,6 @@ def regular_user(db) -> UserExt:
     SocialAccount.objects.create(
         user=user, provider="google", uid="alice-google-1", extra_data={"email": "alice@example.com"}
     )
-    EmailAddress.objects.create(user=user, email="alice@example.com", verified=True, primary=True)
     return user
 
 
@@ -31,7 +30,6 @@ def multi_social_user(db) -> UserExt:
     user = UserExt.objects.create_user(username="bob", email="bob@example.com", password="x")  # nosec: B106
     SocialAccount.objects.create(user=user, provider="google", uid="bob-google-1", extra_data={})
     SocialAccount.objects.create(user=user, provider="kakao", uid="bob-kakao-1", extra_data={})
-    EmailAddress.objects.create(user=user, email="bob@example.com", verified=True, primary=True)
     return user
 
 
@@ -280,7 +278,7 @@ def test_email_address_list_filter_by_verified_and_primary(api_client, regular_u
     assert response.status_code == http.HTTPStatus.OK
     assert {row["email"] for row in response.json()["results"]} == {"alt@example.com"}
     # primary=true
-    response = api_client.get(reverse("v1:admin-email-address-list"), {"primary": "true"})
+    response = api_client.get(reverse("v1:admin-email-address-list"), {"primary": "true", "user": str(regular_user.id)})
     assert response.status_code == http.HTTPStatus.OK
     assert {row["email"] for row in response.json()["results"]} == {"alice@example.com"}
 

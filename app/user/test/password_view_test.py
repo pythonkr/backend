@@ -3,7 +3,6 @@ import re
 
 import pytest
 from allauth.account.forms import default_token_generator
-from allauth.account.models import EmailAddress
 from allauth.account.utils import user_pk_to_url_str
 from django.urls import reverse
 from user.models import UserExt
@@ -15,9 +14,7 @@ KEY_URL_RE = re.compile(r"/password/reset/key/([^/\"]+)/")
 
 @pytest.fixture
 def user(db) -> UserExt:
-    u = UserExt.objects.create_user(username="u", email="u@example.com", password=PASSWORD)
-    EmailAddress.objects.create(user=u, email="u@example.com", verified=True, primary=True)
-    return u
+    return UserExt.objects.create_user(username="u", email="u@example.com", password=PASSWORD)
 
 
 @pytest.fixture
@@ -26,7 +23,6 @@ def social_user(db) -> UserExt:
     u = UserExt.objects.create_user(username="s", email="s@example.com")
     u.set_unusable_password()
     u.save()
-    EmailAddress.objects.create(user=u, email="s@example.com", verified=True, primary=True)
     return u
 
 
