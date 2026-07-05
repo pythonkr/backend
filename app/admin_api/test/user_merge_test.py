@@ -16,12 +16,16 @@ REVERT = "v1:admin-user-merge-revert"
 
 @pytest.fixture
 def source_user(db) -> UserExt:
-    return UserExt.objects.create_user(username="source", email="source@example.com")
+    user = UserExt.objects.create_user(username="source", email="source@example.com")
+    EmailAddress.objects.create(user=user, email="source@example.com", verified=True, primary=True)
+    return user
 
 
 @pytest.fixture
 def target_user(db) -> UserExt:
-    return UserExt.objects.create_user(username="target", email="target@example.com")
+    user = UserExt.objects.create_user(username="target", email="target@example.com")
+    EmailAddress.objects.create(user=user, email="target@example.com", verified=True, primary=True)
+    return user
 
 
 # ---- Auth -------------------------------------------------------------------
@@ -123,6 +127,7 @@ def test_create_same_account_rejected(api_client, source_user):
 def test_create_into_already_merged_target_rejected(api_client, source_user, target_user):
     other = UserExt.objects.create_user(username="other", email="other@example.com")
     UserMergeHistory.objects.create(source=target_user, target=other).merge()  # target 이 이미 병합됨
+    EmailAddress.objects.create(user=target_user, email="again@example.com", verified=True, primary=True)  # 검증 통과용
 
     response = api_client.post(reverse(LIST), {"source": source_user.id, "target": target_user.id}, format="json")
     assert response.status_code == http.HTTPStatus.BAD_REQUEST
@@ -131,11 +136,12 @@ def test_create_into_already_merged_target_rejected(api_client, source_user, tar
 
 
 @pytest.mark.django_db
-def test_create_ignores_self_mergeable_constraints(api_client, source_user, target_user):
-    # 운영자 병합은 assert_self_mergeable 미적용 — 인증 이메일이 없어도 성공.
-    assert not EmailAddress.objects.filter(user=target_user).exists()
+def test_create_enforces_self_mergeable(api_client, source_user, target_user):
+    # 운영자 병합도 assert_self_mergeable 적용 — target 에 인증 이메일이 없으면 거부(운영자가 보고 설정 가능).
+    EmailAddress.objects.filter(user=target_user).delete()
     response = api_client.post(reverse(LIST), {"source": source_user.id, "target": target_user.id}, format="json")
-    assert response.status_code == http.HTTPStatus.CREATED, response.json()
+    assert response.status_code == http.HTTPStatus.BAD_REQUEST
+    assert not UserMergeHistory.objects.filter(source=source_user).exists()
 
 
 # ---- List / Retrieve --------------------------------------------------------

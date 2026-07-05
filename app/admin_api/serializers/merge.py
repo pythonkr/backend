@@ -29,6 +29,10 @@ class UserMergeHistoryListAdminSerializer(BaseAbstractSerializer, JsonSchemaSeri
     def validate(self, attrs: dict) -> dict:
         if attrs["source"] == attrs["target"]:
             raise serializers.ValidationError({"target": MergeError("same_account").localized(en=False)})
+        try:
+            UserMergeHistory.assert_self_mergeable(attrs["source"], attrs["target"])
+        except MergeError as e:
+            raise serializers.ValidationError({"detail": e.localized(en=False)}) from e
         return attrs
 
     def create(self, validated_data: dict) -> UserMergeHistory:
