@@ -30,6 +30,9 @@ class NoNewUsersAccountAdapter(DefaultAccountAdapter):
     def get_email_confirmation_url(self, request: HttpRequest, emailconfirmation: Any) -> str:
         return request.build_absolute_uri(reverse("account-email-confirm", kwargs={"key": emailconfirmation.key}))
 
+    def get_reset_password_from_key_url(self, key: str) -> str:
+        return self.request.build_absolute_uri(reverse("account-password-reset-from-key", kwargs={"key": key}))
+
 
 class SocialAccountLoggingAdapter(DefaultSocialAccountAdapter):
     def is_open_for_signup(self, request: HttpRequest, sociallogin: SocialLogin) -> bool:

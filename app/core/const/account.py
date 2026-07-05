@@ -89,6 +89,16 @@ EMAIL_MESSAGES = {
         "en": "Email not found.",
     },
 }
+PASSWORD_MESSAGES = {
+    "changed": {
+        "ko": "비밀번호를 변경했습니다.",
+        "en": "Your password has been changed.",
+    },
+    "reset_done": {
+        "ko": "비밀번호를 재설정했습니다. 이제 새 비밀번호로 로그인할 수 있습니다.",
+        "en": "Your password has been reset. You can now sign in with your new password.",
+    },
+}
 
 
 def generate_random_password(length: int = 16) -> str:

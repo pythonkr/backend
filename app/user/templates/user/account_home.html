@@ -5,7 +5,5 @@
   <p class="muted">{{ user.email }}</p>
   <p><a href="{% url 'account-email' %}"><b>{% if en %}Manage email addresses{% else %}이메일 관리{% endif %}</b></a></p>
   <p><a href="{% url 'account-merge-start' %}"><b>{% if en %}Merge another account{% else %}다른 계정 병합{% endif %}</b></a></p>
-  <p class="muted">
-    {% if en %}Password change is coming soon.{% else %}비밀번호 변경은 준비 중입니다.{% endif %}
-  </p>
+  <p><a href="{% url 'account-password-change' %}"><b>{% if en %}Change password{% else %}비밀번호 변경{% endif %}</b></a></p>
 {% endblock %}
