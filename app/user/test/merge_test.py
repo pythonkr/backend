@@ -127,15 +127,69 @@ def test_audit_fields_are_not_moved(source_user, target_user):
     assert org.created_by_id == source_user.id
 
 
-def test_primary_email_conflict_stays_on_source(source_user, target_user):
-    """target 이 이미 primary 를 가지면 source 의 primary 이메일은 (user,primary) 조건부 제약 때문에 옮기지 않고 source 에 남긴다."""
+def test_source_email_moves_and_demotes_when_target_has_primary(source_user, target_user):
+    """target 이 이미 primary 를 가지면, source 의 (중복 아닌) 이메일은 source 에 남기지 않고 target 으로
+    옮기며 primary 를 강등한다 — 죽은 계정에 주소가 갇히지 않게."""
     EmailAddress.objects.create(user=source_user, email="source@example.com", verified=True, primary=True)
     EmailAddress.objects.create(user=target_user, email="target@example.com", verified=True, primary=True)
 
     _merge(source_user, target_user)
 
+    assert not EmailAddress.objects.filter(user=source_user).exists()
     assert EmailAddress.objects.filter(user=target_user, primary=True).count() == 1
-    assert EmailAddress.objects.filter(user=source_user, email="source@example.com").exists()
+    moved = EmailAddress.objects.get(user=target_user, email="source@example.com")
+    assert moved.primary is False and moved.verified is True
+
+
+def test_duplicate_email_consolidates_verification_and_demotes_source(source_user, target_user):
+    """양쪽이 같은 주소를 가지면 삭제 없이: target 사본을 verified 로 승격하고 source 사본은 미검증으로 강등해 남긴다."""
+    EmailAddress.objects.create(user=source_user, email="dup@example.com", verified=True, primary=True)
+    EmailAddress.objects.create(user=target_user, email="dup@example.com", verified=False, primary=False)
+    EmailAddress.objects.create(user=target_user, email="target@example.com", verified=True, primary=True)
+
+    _merge(source_user, target_user)
+
+    assert EmailAddress.objects.get(user=target_user, email="dup@example.com").verified is True
+    source_dup = EmailAddress.objects.get(user=source_user, email="dup@example.com")
+    assert source_dup.verified is False  # 삭제 아님, 강등돼 잔류
+
+
+def test_target_primary_assigned_when_missing(source_user, target_user):
+    """규칙3: 병합 후 target 에 primary 가 없으면 하나(verified 우선)를 지정한다."""
+    EmailAddress.objects.create(user=target_user, email="target@example.com", verified=True, primary=False)
+
+    _merge(source_user, target_user)
+
+    assert EmailAddress.objects.filter(user=target_user, primary=True).count() == 1
+    target_user.refresh_from_db()
+    assert target_user.email == "target@example.com"  # set_as_primary 가 UserExt.email 동기화
+
+
+def test_unmerge_restores_email_state(source_user, target_user):
+    """규칙1(옮김+강등)·규칙2(검증통합) 모두 before-image replay 로 정확히 복원된다."""
+    EmailAddress.objects.create(user=source_user, email="source@example.com", verified=True, primary=True)
+    EmailAddress.objects.create(user=source_user, email="dup@example.com", verified=True, primary=False)
+    EmailAddress.objects.create(user=target_user, email="dup@example.com", verified=False, primary=False)
+    EmailAddress.objects.create(user=target_user, email="target@example.com", verified=True, primary=True)
+
+    merge = _merge(source_user, target_user)
+    merge.unmerge()
+
+    src_primary = EmailAddress.objects.get(user=source_user, email="source@example.com")
+    assert src_primary.primary is True and src_primary.verified is True
+    assert EmailAddress.objects.get(user=source_user, email="dup@example.com").verified is True
+    assert EmailAddress.objects.get(user=target_user, email="dup@example.com").verified is False
+    assert not EmailAddress.objects.filter(user=target_user, email="source@example.com").exists()
+
+
+def test_unmerge_rejected_when_target_later_merged(source_user, target_user):
+    """forward chain: A→B 후 B→C 이면, B.merged_to 가 채워져 A→B 를 먼저 되돌릴 수 없다(LIFO)."""
+    c = UserExt.objects.create_user(username="c2", email="c2@example.com")
+    first = _merge(source_user, target_user)
+    _merge(target_user, c)
+
+    with pytest.raises(ValueError):
+        first.unmerge()
 
 
 def test_chain_is_flattened_to_depth_one(target_user):

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Generator, Iterable
 from functools import cached_property, lru_cache
 from itertools import chain
@@ -16,7 +17,8 @@ from django.contrib.postgres.fields import ArrayField
 from django.db.models.base import Model
 from django.db.models.constraints import UniqueConstraint
 from django.db.models.deletion import PROTECT
-from django.db.models.fields import CharField, DateTimeField
+from django.db.models.fields import BigIntegerField, CharField, DateTimeField
+from django.db.models.fields.json import JSONField
 from django.db.models.fields.related import ForeignKey
 from django.db.models.indexes import Index
 from django.db.models.query_utils import Q
@@ -26,6 +28,8 @@ from simple_history.models import registered_models
 from simple_history.utils import bulk_update_with_history, get_history_model_for_model
 
 from .user import UserExt
+
+logger = logging.getLogger(__name__)
 
 
 class MergeError(ValueError):
@@ -43,9 +47,10 @@ def _movable_relations() -> Iterable[tuple[type[Model], Iterable[ForeignKey]]]:
         f.name for f in BaseAbstractModel._meta.get_fields() if getattr(f, "related_model", None) is UserExt
     ) | {"revoked_by"}
     snapshots = {get_history_model_for_model(m) for m in registered_models.values()}
+    excluded = snapshots | {UserMergeHistory, EmailAddress}
     by_model: dict[type[Model], list[ForeignKey]] = {}
     for model in apps.get_models():
-        if model._meta.proxy or model is UserMergeHistory or model in snapshots:
+        if model._meta.proxy or model in excluded:
             continue
         if model._meta.app_label == "admin":  # LogEntry
             continue
@@ -127,6 +132,13 @@ class UserMergeHistory(BaseAbstractModel):
         for merge_object in UserMergeObject.objects.bulk_create(merge_objects):
             merge_object.apply()
 
+        for snapshot in UserMergeEmailSnapshot.objects.bulk_create(UserMergeEmailSnapshot.plan(self)):
+            snapshot.apply()
+        emails = EmailAddress.objects.filter(user_id=self.target_id)
+        if not emails.filter(primary=True).exists():
+            if primary := emails.filter(verified=True).first() or emails.first():
+                primary.set_as_primary()
+
         self.source.is_active = False
         self.source.merged_to = self.target
         self.source.save(update_fields=["is_active", "merged_to"])
@@ -135,10 +147,15 @@ class UserMergeHistory(BaseAbstractModel):
     def unmerge(self) -> None:
         if self.reverted_at is not None:
             raise MergeError("already_reverted")
+        if self.target.merged_to_id is not None:
+            raise MergeError("later_merge_first")
 
         for merge_object in self.merged_objects.select_related("target_type"):
             merge_object.history = self
             merge_object.undo()
+
+        for snapshot in sorted(self.email_snapshots.all(), key=lambda s: s.before.get("verified", False)):
+            snapshot.undo()
 
         self.source.is_active = True
         self.source.merged_to = None
@@ -182,7 +199,9 @@ class UserMergeObject(BaseAbstractModel):
     def _repoint(self, user_id: object, change_reason: str) -> None:
         model = self.target_type.model_class()
         if isinstance(getattr(model, "history", None), HistoryManager):
-            obj = model._base_manager.get(pk=self.target_id)
+            if not (obj := model._base_manager.filter(pk=self.target_id).first()):
+                logger.warning("account merge repoint skipped: %s#%s missing", self.target_type.model, self.target_id)
+                return
             for name in self.field_names:
                 setattr(obj, model._meta.get_field(name).attname, user_id)
             bulk_update_with_history(
@@ -195,3 +214,39 @@ class UserMergeObject(BaseAbstractModel):
         else:
             attnames = {model._meta.get_field(name).attname: user_id for name in self.field_names}
             model._base_manager.filter(pk=self.target_id).update(**attnames)
+
+
+class UserMergeEmailSnapshot(BaseAbstractModel):
+    history = ForeignKey(UserMergeHistory, on_delete=PROTECT, related_name="email_snapshots")
+    email_id = BigIntegerField()
+    before = JSONField()
+    after = JSONField()
+
+    class Meta:
+        indexes = [Index(fields=["history", "email_id"])]
+
+    def __str__(self) -> str:
+        return f"EmailSnapshot #{self.email_id} {self.before}→{self.after}"
+
+    @classmethod
+    def plan(cls, history: UserMergeHistory) -> Iterable[UserMergeEmailSnapshot]:
+        target_emails = {e.email: e for e in EmailAddress.objects.filter(user_id=history.target_id)}
+        target_has_primary = any(e.primary for e in target_emails.values())
+        for src in EmailAddress.objects.filter(user_id=history.source_id):
+            if not (dup := target_emails.get(src.email)):
+                before: dict = {"user_id": history.source_id}
+                after: dict = {"user_id": history.target_id}
+                if target_has_primary and src.primary:
+                    before["primary"], after["primary"] = True, False
+                yield cls(history=history, email_id=src.pk, before=before, after=after)
+                target_has_primary = target_has_primary or src.primary
+            elif src.verified and not dup.verified:
+                # 소스 강등을 타깃 승격보다 먼저 — unique_verified_email 순간 위반 방지
+                yield cls(history=history, email_id=src.pk, before={"verified": True}, after={"verified": False})
+                yield cls(history=history, email_id=dup.pk, before={"verified": False}, after={"verified": True})
+
+    def apply(self) -> None:
+        EmailAddress.objects.filter(pk=self.email_id).update(**self.after)
+
+    def undo(self) -> None:
+        EmailAddress.objects.filter(pk=self.email_id).update(**self.before)

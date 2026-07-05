@@ -38,6 +38,10 @@ MERGE_MESSAGES = {
         "ko": "이미 되돌린 병합입니다.",
         "en": "This merge has already been reverted.",
     },
+    "later_merge_first": {
+        "ko": "이 병합의 남긴 계정이 이후 다른 계정에 다시 병합되었습니다. 나중 병합부터 되돌려 주세요.",
+        "en": "The kept account was later merged again. Revert the more recent merge first.",
+    },
     "no_source": {
         "ko": "병합할 계정 정보를 찾을 수 없습니다. 다시 시도해 주세요.",
         "en": "We couldn't find the account to merge. Please try again.",
