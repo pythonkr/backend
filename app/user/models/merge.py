@@ -76,7 +76,7 @@ class UserMergeHistory(BaseAbstractModel):
         return self.created_by_id is not None and self.created_by_id == self.target_id
 
     @staticmethod
-    def assert_self_mergeable(source: UserExt, target: UserExt) -> None:
+    def assert_emails_mergeable(source: UserExt, target: UserExt) -> None:
         if not EmailAddress.objects.filter(user=target).exists():
             raise MergeError("target_no_verified_email")
         if EmailAddress.objects.filter(user=target, verified=False).exists():

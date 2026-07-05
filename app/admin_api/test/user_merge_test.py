@@ -132,8 +132,8 @@ def test_create_into_already_merged_target_rejected(api_client, source_user, tar
 
 
 @pytest.mark.django_db
-def test_create_enforces_self_mergeable(api_client, source_user, target_user):
-    # 운영자 병합도 assert_self_mergeable 적용 — target 에 인증 이메일이 없으면 거부(운영자가 보고 설정 가능).
+def test_create_enforces_emails_mergeable(api_client, source_user, target_user):
+    # 운영자 병합도 assert_emails_mergeable 적용 — target 에 인증 이메일이 없으면 거부(운영자가 보고 설정 가능).
     EmailAddress.objects.filter(user=target_user).delete()
     response = api_client.post(reverse(LIST), {"source": source_user.id, "target": target_user.id}, format="json")
     assert response.status_code == http.HTTPStatus.BAD_REQUEST

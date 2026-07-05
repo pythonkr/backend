@@ -294,35 +294,37 @@ def test_double_unmerge_rejected(source_user, target_user):
         merge.unmerge()
 
 
-# ---- assert_self_mergeable (본인 병합 사전검증) --------------------------------
+# ---- assert_emails_mergeable (이메일 병합 사전검증 — self/admin 공통) -----------------
 
 
-def test_self_mergeable_passes_when_both_verified(source_user, target_user):
-    UserMergeHistory.assert_self_mergeable(source_user, target_user)  # 둘 다 fixture 로 verified 이메일 보유 → no raise
+def test_emails_mergeable_passes_when_both_verified(source_user, target_user):
+    UserMergeHistory.assert_emails_mergeable(
+        source_user, target_user
+    )  # 둘 다 fixture 로 verified 이메일 보유 → no raise
 
 
-def test_self_mergeable_allows_email_less_source(source_user, target_user):
+def test_emails_mergeable_allows_email_less_source(source_user, target_user):
     EmailAddress.objects.filter(user=source_user).delete()  # source 는 이메일 없음 → 허용
 
-    UserMergeHistory.assert_self_mergeable(source_user, target_user)  # no raise
+    UserMergeHistory.assert_emails_mergeable(source_user, target_user)  # no raise
 
 
-def test_self_mergeable_rejects_email_less_target(source_user, target_user):
+def test_emails_mergeable_rejects_email_less_target(source_user, target_user):
     EmailAddress.objects.filter(user=target_user).delete()  # target 에 인증 이메일 없음 → 거부
 
     with pytest.raises(ValueError):
-        UserMergeHistory.assert_self_mergeable(source_user, target_user)
+        UserMergeHistory.assert_emails_mergeable(source_user, target_user)
 
 
-def test_self_mergeable_rejects_unverified_target_email(source_user, target_user):
+def test_emails_mergeable_rejects_unverified_target_email(source_user, target_user):
     EmailAddress.objects.create(user=target_user, email="extra@example.com", verified=False)
 
     with pytest.raises(ValueError):
-        UserMergeHistory.assert_self_mergeable(source_user, target_user)
+        UserMergeHistory.assert_emails_mergeable(source_user, target_user)
 
 
-def test_self_mergeable_rejects_unverified_source_email(source_user, target_user):
+def test_emails_mergeable_rejects_unverified_source_email(source_user, target_user):
     EmailAddress.objects.create(user=source_user, email="extra@example.com", verified=False)
 
     with pytest.raises(ValueError):
-        UserMergeHistory.assert_self_mergeable(source_user, target_user)
+        UserMergeHistory.assert_emails_mergeable(source_user, target_user)

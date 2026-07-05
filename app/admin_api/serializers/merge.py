@@ -30,7 +30,7 @@ class UserMergeHistoryListAdminSerializer(BaseAbstractSerializer, JsonSchemaSeri
         if attrs["source"] == attrs["target"]:
             raise serializers.ValidationError({"target": MergeError("same_account").localized(en=False)})
         try:
-            UserMergeHistory.assert_self_mergeable(attrs["source"], attrs["target"])
+            UserMergeHistory.assert_emails_mergeable(attrs["source"], attrs["target"])
         except MergeError as e:
             raise serializers.ValidationError({"detail": e.localized(en=False)}) from e
         return attrs

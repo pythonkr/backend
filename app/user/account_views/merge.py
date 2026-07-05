@@ -69,7 +69,7 @@ def merge_confirm(request: HttpRequest) -> HttpResponse:
 
     try:
         with atomic():
-            UserMergeHistory.assert_self_mergeable(source, request.user)
+            UserMergeHistory.assert_emails_mergeable(source, request.user)
             UserMergeHistory.objects.create(source=source, target=request.user).merge()
     except MergeError as e:
         context = _confirm_context(source, request.user, error=e.localized(en=is_english()))
@@ -96,7 +96,7 @@ def _merge_source(request: HttpRequest) -> User:
 def _confirm_context(source: User, target: User, *, error: str | None = None) -> dict:
     if error is None:
         try:
-            UserMergeHistory.assert_self_mergeable(source, target)
+            UserMergeHistory.assert_emails_mergeable(source, target)
         except MergeError as e:
             error = e.localized(en=is_english())
     return {"source": source, "target": target, "error": error}
