@@ -8,7 +8,6 @@ from drf_standardized_errors.openapi_serializers import (
 )
 from event.presentation.models import Presentation
 from participant_portal_api.models import ModificationAudit, ModificationAuditComment
-from participant_portal_api.permissions import IsSessionSpeaker
 from participant_portal_api.serializers.modification_audit import (
     ModificationAuditCancelPortalSerializer,
     ModificationAuditResponsePortalSerializer,
@@ -32,7 +31,6 @@ MODEL_SERIALIZER_MAP: dict[models.Model, type[serializers.Serializer]] = {
 )
 class ModificationAuditPortalViewSet(mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = ModificationAuditResponsePortalSerializer
-    permission_classes = [IsSessionSpeaker]
     queryset = (
         ModificationAudit.objects.filter_active()
         .prefetch_related(

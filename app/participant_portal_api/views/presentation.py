@@ -2,7 +2,6 @@ from core.const.tag import OpenAPITag
 from drf_spectacular import utils
 from event.presentation.models import Presentation, PresentationSpeaker
 from participant_portal_api.models import ModificationAudit
-from participant_portal_api.permissions import IsSessionSpeaker
 from participant_portal_api.serializers.presentation import PresentationPortalSerializer
 from rest_framework import mixins, response, viewsets
 
@@ -20,7 +19,6 @@ class PresentationPortalViewSet(
 ):
     serializer_class = PresentationPortalSerializer
     queryset = Presentation.objects.filter_active().get_all_nested_data().order_by("-created_at")
-    permission_classes = [IsSessionSpeaker]
     http_method_names = ["get", "patch"]
 
     def get_queryset(self):
@@ -33,10 +31,7 @@ class PresentationPortalViewSet(
             .get_queryset()
             .filter(
                 id__in=PresentationSpeaker.objects.filter_active()
-                .filter(
-                    user=self.request.user,
-                    presentation__deleted_at__isnull=True,
-                )
+                .filter(user=self.request.user, presentation__deleted_at__isnull=True)
                 .values_list("presentation_id", flat=True),
             )
         )

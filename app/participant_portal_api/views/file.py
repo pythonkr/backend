@@ -2,7 +2,6 @@ from core.const.tag import OpenAPITag
 from django.db import models
 from drf_spectacular import utils
 from file.models import PublicFile
-from participant_portal_api.permissions import IsSessionSpeaker
 from participant_portal_api.serializers.file import PublicFilePortalSerializer, PublicFilePortalUploadSerializer
 from rest_framework import decorators, mixins, parsers, request, response, serializers, status, viewsets
 
@@ -11,7 +10,6 @@ from rest_framework import decorators, mixins, parsers, request, response, seria
 class PublicFilePortalViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = PublicFilePortalSerializer
     queryset = PublicFile.objects.filter_active().select_related_with_user()
-    permission_classes = [IsSessionSpeaker]
 
     def get_queryset(self) -> models.QuerySet[PublicFile]:
         """본인이 업로드한 파일만 조회 가능하도록 필터링"""
