@@ -45,6 +45,18 @@
     .add-email { display: flex; gap: .5rem; align-items: stretch; }
     .add-email input { flex: 1; margin: 0; }
     .add-email button { margin: 0; }
+    .home-actions { display: flex; flex-direction: column; gap: .75rem; margin-top: 1.5rem; }
+    .home-actions form { margin: 0; }
+    .btn-outline {
+      display: block; width: 100%; box-sizing: border-box; margin: 0;
+      padding: 1rem 2rem; border: 2px solid var(--color-link); border-radius: var(--border-radius);
+      background: transparent; color: var(--color-link);
+      font-family: inherit; font-size: medium; font-weight: bold; font-style: italic; line-height: var(--line-height);
+      text-align: center; text-decoration: none; cursor: pointer;
+    }
+    .btn-outline:hover { background: var(--color-link); color: var(--color-bg); filter: none; }
+    .btn-outline.danger { background: transparent; border-color: #b23b3b; color: #b23b3b; }
+    .btn-outline.danger:hover { background: #b23b3b; color: var(--color-bg); }
   </style>
 </head>
 <body>

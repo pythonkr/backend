@@ -3,7 +3,13 @@
 {% block body %}
   <h1>{% if en %}Account{% else %}계정 관리{% endif %}</h1>
   <p class="muted">{{ user.email }}</p>
-  <p><a href="{% url 'account-email' %}"><b>{% if en %}Manage email addresses{% else %}이메일 관리{% endif %}</b></a></p>
-  <p><a href="{% url 'account-merge-start' %}"><b>{% if en %}Merge another account{% else %}다른 계정 병합{% endif %}</b></a></p>
-  <p><a href="{% url 'account-password-change' %}"><b>{% if en %}Change password{% else %}비밀번호 변경{% endif %}</b></a></p>
+  <div class="home-actions">
+    <a class="btn-outline" href="{% url 'account-email' %}">{% if en %}Manage email addresses{% else %}이메일 관리{% endif %}</a>
+    <a class="btn-outline" href="{% url 'account-merge-start' %}">{% if en %}Merge another account{% else %}다른 계정 병합{% endif %}</a>
+    <a class="btn-outline" href="{% url 'account-password-change' %}">{% if en %}Change password{% else %}비밀번호 변경{% endif %}</a>
+    <form method="post" action="{% url 'account-logout' %}">
+      {% csrf_token %}
+      <button type="submit" class="btn-outline danger">{% if en %}Log out{% else %}로그아웃{% endif %}</button>
+    </form>
+  </div>
 {% endblock %}

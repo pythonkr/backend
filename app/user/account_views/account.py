@@ -5,9 +5,10 @@ from http import HTTPStatus
 from allauth.account.forms import LoginForm
 from core.const.account import MERGE_MESSAGES
 from core.templatetags.i18n_extras import is_english
+from django.contrib.auth import logout
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import render
-from django.views.decorators.http import require_GET, require_http_methods
+from django.shortcuts import redirect, render
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 from user.account_views.utils import (
     HEADLESS_PROVIDER_REDIRECT_URL,
     PROVIDERS,
@@ -21,6 +22,12 @@ from user.account_views.utils import (
 def account_home(request: HttpRequest) -> HttpResponse:
     check_login(request)
     return render(request, "user/account_home.html", {"user": request.user})
+
+
+@require_POST
+def account_logout(request: HttpRequest) -> HttpResponse:
+    logout(request)
+    return redirect("account-login")
 
 
 @require_GET

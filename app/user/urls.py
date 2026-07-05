@@ -1,5 +1,5 @@
 from django.urls import path
-from user.account_views.account import account_home, account_login, password_login
+from user.account_views.account import account_home, account_login, account_logout, password_login
 from user.account_views.email import (
     add_email,
     confirm_email,
@@ -15,6 +15,7 @@ urlpatterns = [
     path("", account_home, name="account-home"),
     path("login/", account_login, name="account-login"),
     path("login/password/", password_login, name="account-password-login"),
+    path("logout/", account_logout, name="account-logout"),
     path("password/", password_change, name="account-password-change"),
     path("password/reset/", password_reset, name="account-password-reset"),
     path("password/reset/key/<str:key>/", password_reset_from_key, name="account-password-reset-from-key"),
