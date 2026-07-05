@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from http import HTTPStatus
 
+from allauth.account.forms import LoginForm
 from core.const.account import MERGE_MESSAGES, MERGE_SOURCE_SESSION_KEY
 from core.middleware.response_exception import ResponseException
 from core.templatetags.i18n_extras import is_english
 from django.db.transaction import atomic
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods
 from user.account_views.utils import HEADLESS_PROVIDER_REDIRECT_URL, PROVIDERS, User, check_login
@@ -27,6 +28,34 @@ def merge_start(request: HttpRequest) -> HttpResponse:
             "process": "connect",
             "user": request.user,
         },
+    )
+
+
+@require_http_methods(["GET", "POST"])
+def merge_password(request: HttpRequest) -> HttpResponse:
+    check_login(request)
+    if request.method == "GET":
+        return render(
+            request=request,
+            template_name="user/merge_password.html",
+            context={"user": request.user},
+        )
+
+    lang = "en" if is_english() else "ko"
+    form = LoginForm(data=request.POST, request=request)
+    if form.is_valid():
+        if form.user.pk != request.user.pk:
+            request.session[MERGE_SOURCE_SESSION_KEY] = form.user.pk
+            return redirect(reverse("account-merge-confirm"))
+        error = MERGE_MESSAGES["same_account"][lang]
+    else:
+        error = MERGE_MESSAGES["wrong_account_or_password"][lang]
+
+    return render(
+        request=request,
+        template_name="user/merge_password.html",
+        context={"user": request.user, "error": error},
+        status=HTTPStatus.BAD_REQUEST,
     )
 
 

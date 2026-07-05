@@ -5,5 +5,6 @@
   <p>{% if en %}Sign in with a social account.{% else %}소셜 계정으로 로그인하세요.{% endif %}</p>
   {% include "user/_provider_forms.html" %}
   <p class="or">{% if en %}or{% else %}또는{% endif %}</p>
-  <p><a href="{% url 'account-password-login' %}"><em>{% if en %}Sign in with email{% else %}이메일로 로그인{% endif %}</em></a></p>
+  {% url 'account-password-login' as pw_url %}
+  {% include "user/_email_button.html" with email_action=pw_url label_ko="이메일로 로그인" label_en="Sign in with email" %}
 {% endblock %}

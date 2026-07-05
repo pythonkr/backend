@@ -194,6 +194,82 @@ def test_password_login_redirects_authenticated_user(client, target_user):
     assert response["Location"] == reverse("account-home")
 
 
+# ---- MergePasswordView --------------------------------------------------------
+
+
+def test_merge_password_page_renders_form(client, target_user):
+    client.force_login(target_user)
+
+    response = client.get(reverse("account-merge-password"))
+
+    assert response.status_code == 200
+    assert b'name="login"' in response.content
+    assert b'name="password"' in response.content
+
+
+def test_merge_password_valid_stashes_source_and_redirects(client, target_user, password_user):
+    client.force_login(target_user)
+
+    response = client.post(
+        reverse("account-merge-password"),
+        {"login": "pw@example.com", "password": "s3cret-pw-123"},  # nosec B106
+    )
+
+    assert response.status_code == 302
+    assert response["Location"] == reverse("account-merge-confirm")
+    assert client.session[MERGE_SOURCE_SESSION_KEY] == password_user.pk
+    assert client.session.get("_auth_user_id") == str(target_user.pk)  # 세션 유저는 target 그대로(login 안 함)
+
+
+def test_merge_password_wrong_password_shows_error(client, target_user, password_user):
+    client.force_login(target_user)
+
+    response = client.post(reverse("account-merge-password"), {"login": "pw@example.com", "password": "wrong"})
+
+    assert response.status_code == 400
+    assert MERGE_SOURCE_SESSION_KEY not in client.session
+
+
+def test_merge_password_own_account_rejected(client, password_user):
+    client.force_login(password_user)
+
+    response = client.post(
+        reverse("account-merge-password"),
+        {"login": "pw@example.com", "password": "s3cret-pw-123"},  # nosec B106
+    )
+
+    assert response.status_code == 400
+    assert MERGE_SOURCE_SESSION_KEY not in client.session
+
+
+def test_merge_password_rejects_passwordless_source(client, target_user, source_user):
+    # source_user 는 비밀번호 없음(SNS 전용) → 비번 경로로는 소스 지정 불가, SNS 재인증을 써야 함.
+    client.force_login(target_user)
+
+    response = client.post(
+        reverse("account-merge-password"),
+        {"login": "source@example.com", "password": "anything"},  # nosec B106
+    )
+
+    assert response.status_code == 400
+    assert MERGE_SOURCE_SESSION_KEY not in client.session
+
+
+def test_merge_password_requires_authentication(client, password_user):
+    response = client.get(reverse("account-merge-password"))
+
+    assert response.status_code == 302
+    assert reverse("account-login") in response["Location"]
+
+
+def test_start_links_to_password_merge(client, target_user):
+    client.force_login(target_user)
+
+    response = client.get(reverse("account-merge-start"))
+
+    assert reverse("account-merge-password").encode() in response.content
+
+
 # ---- 호스트 스코프 라우팅 (accounts.*) ----------------------------------------
 
 

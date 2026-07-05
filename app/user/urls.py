@@ -8,7 +8,7 @@ from user.account_views.email import (
     resend_email,
     set_primary_email,
 )
-from user.account_views.merge import merge_confirm, merge_start
+from user.account_views.merge import merge_confirm, merge_password, merge_start
 from user.account_views.password import password_change, password_reset, password_reset_from_key
 
 urlpatterns = [
@@ -19,6 +19,7 @@ urlpatterns = [
     path("password/reset/", password_reset, name="account-password-reset"),
     path("password/reset/key/<str:key>/", password_reset_from_key, name="account-password-reset-from-key"),
     path("merge/", merge_start, name="account-merge-start"),
+    path("merge/password/", merge_password, name="account-merge-password"),
     path("merge/confirm/", merge_confirm, name="account-merge-confirm"),
     path("email/", manage_emails, name="account-email"),
     path("email/add/", add_email, name="account-email-add"),
