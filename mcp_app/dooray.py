@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from asyncio import gather
+from asyncio import Semaphore, gather
 from collections.abc import Iterable
 
 from fastmcp import FastMCP
@@ -49,6 +49,24 @@ def _members(ids: Iterable[str] | None) -> list[dict] | None:
     return [{"type": "member", "member": {"organizationMemberId": m}} for m in ids] if ids else None
 
 
+async def _with_member_names(rows: list[dict]) -> list[dict]:
+    sem = Semaphore(8)
+
+    async def _one(member_id: str) -> tuple[str, dict]:
+        async with sem:
+            try:
+                detail = await _proxy(method="GET", dooray_path=f"/common/v1/members/{member_id}")
+            except ToolError:
+                return member_id, {}
+        return member_id, detail.get("result") or {}
+
+    resolved = dict(await gather(*(_one(r["organizationMemberId"]) for r in rows)))
+    return [
+        {**r, "name": (d := resolved.get(r["organizationMemberId"]) or {}).get("name"), "userCode": d.get("userCode")}
+        for r in rows
+    ]
+
+
 def register(mcp: FastMCP) -> None:
     tag = {DOORAY_TAG}
 
@@ -71,7 +89,7 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool(
         title="Dooray 프로젝트 선택지",
         description=(
-            "프로젝트의 workflow(업무상태)·member·milestone·tag 를 한 번에 조회. "
+            "프로젝트의 workflow(업무상태)·member(이름 포함)·milestone·tag 를 한 번에 조회. "
             "쓰기 전 유효 id(workflowId/organizationMemberId/milestoneId/tagId) 확보용. "
             "본인 organizationMemberId 는 `auth_status` 의 dooray.member_id 로 확인."
         ),
@@ -86,7 +104,7 @@ def register(mcp: FastMCP) -> None:
         )
         return {
             "workflows": workflows.get("result"),
-            "members": members.get("result"),
+            "members": await _with_member_names(members.get("result") or []),
             "milestones": milestones.get("result"),
             "tags": tags.get("result"),
         }
@@ -96,8 +114,9 @@ def register(mcp: FastMCP) -> None:
         description=(
             "프로젝트 업무(Post) 목록. 필터는 콤마구분 문자열 또는 리스트. "
             "post_workflow_classes=backlog|registered|working|closed, "
+            "to_member_ids/from_member_ids=담당자/작성자(organizationMemberId), subjects=제목 필터, "
             "date 필터(due_at/created_at/updated_at)=today|thisweek|prev-Nd|next-Nd|ISO8601범위, "
-            "order=±postDueAt|postUpdatedAt|createdAt."
+            "order=±postDueAt|postUpdatedAt|createdAt. 본문 body 는 미포함(상세는 `dooray_post`)."
         ),
         tags=tag,
     )
@@ -137,7 +156,7 @@ def register(mcp: FastMCP) -> None:
             },
         )
 
-    @mcp.tool(title="Dooray 업무 상세", description="특정 업무(Post) 상세 조회.", tags=tag)
+    @mcp.tool(title="Dooray 업무 상세", description="특정 업무(Post) 상세 조회(목록과 달리 본문 body 포함).", tags=tag)
     async def dooray_post(project_id: str, post_id: str) -> dict:
         return await _proxy(
             method="GET",

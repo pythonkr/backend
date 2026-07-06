@@ -26,7 +26,9 @@ _GUIDANCE_ADMIN = (
     "관계 필드는 choices 도구로 유효 id 를 채우세요. "
     "CMS 섹션 body 는 MDX — 컴포넌트·props 는 `mdx_components`, 미리보기는 `mdx_preview` "
     "(둘 다 domain 인자: `도메인 그룹 목록`의 실제 호스트, 예 2026.pycon.kr). "
-    "MDX 작성 시 JSX 는 최대한 지양하고 순수 마크다운을 우선해, 최소한의 코드 길이로 구현하세요."
+    "MDX 작성 시 JSX 는 최대한 지양하고 순수 마크다운을 우선해, 최소한의 코드 길이로 구현하세요. "
+    "Dooray 개인 토큰이 등록돼 있으면(dooray.connected) 업무(Post) 읽기·생성·수정·댓글 도구도 쓸 수 있습니다 "
+    "(project_id 는 `dooray_projects`, 담당자·태그 등 id 는 `dooray_project_choices`)."
 )
 _GUIDANCE_PUBLIC = (
     "공개 도구(후원사·발표·이벤트 조회)를 사용할 수 있습니다. 더 많은 기능이 필요하면 유효한 토큰으로 다시 연결하세요."
