@@ -27,12 +27,21 @@ def _csv(value: str | Iterable[str] | None) -> str | None:
     return ",".join(str(v) for v in value)
 
 
-async def _proxy(method: str, dooray_path: str, *, params: dict | None = None, data: dict | None = None) -> dict:
+async def _proxy(
+    method: str,
+    dooray_path: str,
+    *,
+    params: dict | None = None,
+    data: dict | None = None,
+    keep_data_nulls: Iterable[str] = (),
+) -> dict:
+    keep = set(keep_data_nulls)
+    body = {k: v for k, v in (data or {}).items() if v is not None or k in keep}
     resp = await _client.request(
         method,
         f"/v1/admin-api/proxy/dooray/{dooray_path.lstrip('/')}",
         params={k: v for k, v in (params or {}).items() if v is not None},
-        json={k: v for k, v in (data or {}).items() if v is not None} or None,
+        json=body or None,
         headers={"Authorization": f"Bearer {(await get_context().get_state(AUTH_KEY)).jwt}"},
     )
     if message := _PROXY_ERRORS.get(resp.status_code):
@@ -47,6 +56,15 @@ async def _proxy(method: str, dooray_path: str, *, params: dict | None = None, d
 
 def _members(ids: Iterable[str] | None) -> list[dict] | None:
     return [{"type": "member", "member": {"organizationMemberId": m}} for m in ids] if ids else None
+
+
+def _users(to_member_ids: Iterable[str] | None, cc_member_ids: Iterable[str] | None) -> dict | None:
+    users = {}
+    if to := _members(to_member_ids):
+        users["to"] = to
+    if cc := _members(cc_member_ids):
+        users["cc"] = cc
+    return users or None
 
 
 async def _with_member_names(rows: list[dict]) -> list[dict]:
@@ -175,7 +193,8 @@ def register(mcp: FastMCP) -> None:
         description=(
             "⚠️ Dooray 에 즉시 반영. 새 업무(Post)를 생성한다. 본문은 마크다운. "
             "담당자/참조자 id 는 `dooray_project_choices`(프로젝트 멤버)·`auth_status`의 dooray.member_id(본인)에서 확보. "
-            "priority=highest|high|normal|low|lowest|none."
+            "priority=highest|high|normal|low|lowest|none. "
+            "workflow_id 지정 시 생성 직후 해당 상태로 이동(미지정이면 프로젝트 기본 상태=보통 보류/등록)."
         ),
         tags=tag,
     )
@@ -190,20 +209,15 @@ def register(mcp: FastMCP) -> None:
         tag_ids: list[str] | None = None,
         priority: str | None = None,
         parent_post_id: str | None = None,
+        workflow_id: str | None = None,
     ) -> dict:
-        users = {}
-        if to_member_ids:
-            users["to"] = _members(to_member_ids)
-        if cc_member_ids:
-            users["cc"] = _members(cc_member_ids)
-
-        return await _proxy(
+        created = await _proxy(
             method="POST",
             dooray_path=f"/project/v1/projects/{project_id}/posts",
             data={
                 "subject": subject,
                 "body": {"mimeType": "text/x-markdown", "content": body_markdown},
-                "users": users or None,
+                "users": _users(to_member_ids, cc_member_ids),
                 "dueDate": due_date,
                 "milestoneId": milestone_id,
                 "tagIds": tag_ids,
@@ -211,6 +225,13 @@ def register(mcp: FastMCP) -> None:
                 "parentPostId": parent_post_id,
             },
         )
+        if workflow_id and (post_id := (created.get("result") or {}).get("id")):
+            await _proxy(
+                method="POST",
+                dooray_path=f"/project/v1/projects/{project_id}/posts/{post_id}/set-workflow",
+                data={"workflowId": workflow_id},
+            )
+        return created
 
     @mcp.tool(
         title="Dooray 업무 수정",
@@ -229,12 +250,6 @@ def register(mcp: FastMCP) -> None:
         tag_ids: list[str] | None = None,
         priority: str | None = None,
     ) -> dict:
-        users = {}
-        if to_member_ids:
-            users["to"] = _members(to_member_ids)
-        if cc_member_ids:
-            users["cc"] = _members(cc_member_ids)
-
         return await _proxy(
             method="PUT",
             dooray_path=f"/project/v1/projects/{project_id}/posts/{post_id}",
@@ -243,7 +258,7 @@ def register(mcp: FastMCP) -> None:
                 "body": (
                     {"mimeType": "text/x-markdown", "content": body_markdown} if body_markdown is not None else None
                 ),
-                "users": users or None,
+                "users": _users(to_member_ids, cc_member_ids),
                 "dueDate": due_date,
                 "milestoneId": milestone_id,
                 "tagIds": tag_ids,
@@ -265,13 +280,71 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool(
         title="Dooray 업무 완료 처리",
-        description="⚠️ Dooray 에 즉시 반영. 업무를 완료(closed) 상태로 변경.",
+        description=(
+            "⚠️ Dooray 에 즉시 반영. 업무를 완료(closed) 상태로 변경. "
+            "‼️ 업무 삭제(휴지통)는 이 도구(및 Dooray API)로 불가 — 완료 처리가 최대치다. "
+            "정말 지우려면 Dooray 웹 UI에서 수동으로만 가능."
+        ),
         tags=tag,
     )
     async def dooray_set_post_done(project_id: str, post_id: str) -> dict:
         return await _proxy(
             method="POST",
             dooray_path=f"/project/v1/projects/{project_id}/posts/{post_id}/set-done",
+        )
+
+    @mcp.tool(
+        title="Dooray 업무 상위(에픽) 설정/해제",
+        description=(
+            "⚠️ Dooray 에 즉시 반영. 기존 업무의 상위 업무(에픽 등)를 설정하거나 해제한다. "
+            "parent_post_id 지정=그 업무의 하위로 묶기, 미지정(None)=상위 해제(최상위로). "
+            "제약: 이미 하위 업무를 가진 업무는 다른 업무의 하위로 설정할 수 없다(2단계 계층 불가). "
+            "상위-하위 관계는 같은 프로젝트 안에서만 가능."
+        ),
+        tags=tag,
+    )
+    async def dooray_set_parent_post(project_id: str, post_id: str, parent_post_id: str | None = None) -> dict:
+        return await _proxy(
+            method="POST",
+            dooray_path=f"/project/v1/projects/{project_id}/posts/{post_id}/set-parent-post",
+            data={"parentPostId": parent_post_id},
+            keep_data_nulls=("parentPostId",),
+        )
+
+    @mcp.tool(
+        title="Dooray 업무 이동",
+        description=(
+            "⚠️ Dooray 에 즉시 반영·비가역. 업무를 다른 프로젝트로 이동한다. "
+            "주의: 이동하면 그 업무의 워크플로(단계)·태그 정보는 사라진다. "
+            "include_sub_posts=True 면 하위 업무도 함께 이동. target_project_id 는 `dooray_projects` 로 확보."
+        ),
+        tags=tag,
+    )
+    async def dooray_move_post(
+        project_id: str, post_id: str, target_project_id: str, include_sub_posts: bool = True
+    ) -> dict:
+        return await _proxy(
+            method="POST",
+            dooray_path=f"/project/v1/projects/{project_id}/posts/{post_id}/move",
+            data={"targetProjectId": target_project_id, "includeSubPosts": include_sub_posts},
+        )
+
+    @mcp.tool(
+        title="Dooray 태그 정의 생성",
+        description=(
+            "⚠️ Dooray 에 즉시 반영. 프로젝트에 새 태그(정의)를 생성한다. "
+            "name 이 `그룹명:태그명` 형식이면 그룹 태그, 그냥 `태그명`이면 개별 태그. color 는 6자리 hex(예: ffffff). "
+            "생성된 태그 id 는 이후 업무의 tag_ids 로 사용. "
+            "‼️ 주의: 한 번 만든 태그 정의는 이 도구(및 Dooray API)로는 수정·삭제할 수 없다 — "
+            "오타/불필요 태그 정리는 오직 Dooray 웹 UI에서 수동으로만 가능하니, 생성 전 name·color 를 신중히 확정할 것."
+        ),
+        tags=tag,
+    )
+    async def dooray_add_tag(project_id: str, name: str, color: str = "ffffff") -> dict:
+        return await _proxy(
+            method="POST",
+            dooray_path=f"/project/v1/projects/{project_id}/tags",
+            data={"name": name, "color": color},
         )
 
     @mcp.tool(
