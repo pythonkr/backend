@@ -11,7 +11,8 @@ import threading
 
 import pytest
 from django.db import connections
-from shop.order.models import Order, SingleProductCart
+from shop.conftest import VALID_TICKET_INFO
+from shop.order.models import Order, SingleProductCart, TicketInfo
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
 from shop.payment_history.serializers import PortOneV1WebhookRequestSerializer
 from shop.test.helpers import make_portone_payment_info, make_webhook_payload
@@ -23,6 +24,7 @@ def test_concurrent_webhooks_for_same_cart_create_exactly_one_payment_history(
 ):
     cart_id = single_product_cart.id
     expected_price = single_product_cart.first_paid_price
+    TicketInfo.objects.create(order_product_relation=single_product_cart.order_product_relation, **VALID_TICKET_INFO)
     single_product_cart.prepare_payment()
     merchant_uid = single_product_cart.merchant_uid
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=single_product_cart)

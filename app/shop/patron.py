@@ -70,6 +70,7 @@ class PatronViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
                 OrderProductRelation.objects.filter_active().filter(
                     order_id=OuterRef("id"),
                     product__donation_allowed=True,
+                    donation_price__gt=0,
                     status__in=OrderProductRelation.PURCHASED_STOCK_STATUS,
                 )
             ),

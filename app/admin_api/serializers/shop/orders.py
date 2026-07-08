@@ -85,7 +85,7 @@ class OrderAdminSerializer(
     current_paid_price = serializers.IntegerField(read_only=True)
     current_status = serializers.CharField(read_only=True)
     first_paid_at = serializers.DateTimeField(read_only=True)
-    latest_imp_id = serializers.CharField(read_only=True)
+    latest_imp_id = serializers.ReadOnlyField()
 
     class Meta:
         model = Order

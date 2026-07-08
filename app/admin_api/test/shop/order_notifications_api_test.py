@@ -51,6 +51,36 @@ def test_notification_preview_returns_recipients_for_completed_order(api_client,
 
 
 @pytest.mark.django_db
+def test_notification_preview_includes_free_completed_order(api_client, order_email_template, order_factory):
+    order = order_factory(status="completed", product_price=0, imp_id=None)
+    scancode_url = urljoin(settings.BACKEND_DOMAIN, order.scancode_path)
+
+    response = OrderNotificationsAdminApi(http_client=api_client).preview(
+        {"channel": "email", "template_id": str(order_email_template.id)}
+    )
+
+    assert response.status_code == HTTP_200_OK
+    assert response.json() == {
+        "template_variables": ["customer_email", "customer_name", "first_paid_price", "order_name"],
+        "recipients": [
+            {
+                "recipient": order.customer_info.email,
+                "context": {
+                    "scancode_url": scancode_url,
+                    "order_name": order.name,
+                    "first_paid_at": order.first_paid_at.isoformat(),
+                    "first_paid_price": 0,
+                    "customer_name": order.customer_info.name,
+                    "customer_phone": order.customer_info.phone,
+                    "customer_email": order.customer_info.email,
+                },
+                "missing_variables": [],
+            }
+        ],
+    }
+
+
+@pytest.mark.django_db
 def test_notification_preview_rejects_unknown_template_id(api_client, order_factory):
     order_factory(status="completed")
     response = OrderNotificationsAdminApi(http_client=api_client).preview(

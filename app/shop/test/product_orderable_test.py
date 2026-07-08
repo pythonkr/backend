@@ -198,12 +198,6 @@ def test_product_rejects_when_option_does_not_belong_to_product(
             lambda _product: ProductNotOrderableErrorMessages.PRICE_TOO_HIGH,
             id="total_price_too_high",
         ),
-        pytest.param(
-            {"price": 0},
-            0,
-            lambda _product: ProductNotOrderableErrorMessages.PRICE_TOO_LOW,
-            id="total_price_is_zero",
-        ),
     ],
 )
 @pytest.mark.django_db
@@ -230,6 +224,30 @@ def test_product_passes_happy_path(customer_user, non_ticket_product):
         data={"product": str(non_ticket_product.id), "options": []}, context=make_serializer_context(customer_user)
     )
     assert serializer.is_valid()
+
+
+@pytest.mark.django_db
+def test_product_allows_zero_price_without_donation(customer_user, non_ticket_product):
+    non_ticket_product.price = 0
+    non_ticket_product.save(update_fields=["price"])
+
+    serializer = ProductOrderableCheckSerializer(
+        data={"product": str(non_ticket_product.id), "options": []},
+        context=make_serializer_context(customer_user),
+    )
+
+    assert serializer.is_valid() is True
+
+
+@pytest.mark.django_db
+def test_product_rejects_when_total_price_is_negative(customer_user, non_ticket_product):
+    non_ticket_product.price = -1
+    serializer = ProductOrderableCheckSerializer(context=make_serializer_context(customer_user))
+
+    with pytest.raises(ValidationError) as exc_info:
+        serializer.validate({"product": non_ticket_product, "options": [], "donation_price": 0})
+
+    assert exc_info.value.detail[0] == ProductNotOrderableErrorMessages.PRICE_TOO_LOW
 
 
 @pytest.mark.django_db

@@ -116,6 +116,21 @@ def test_creates_email_history_when_template_exists(order_with_customer, email_t
     assert sent_to.status == NotificationStatus.CREATED
 
 
+@pytest.mark.django_db
+def test_send_payment_completed_notifications_uses_zero_price_context(
+    order_factory, email_template, override_email_setting
+):
+    order = order_factory(status="completed", product_price=0, imp_id=None)
+
+    send_payment_completed_notifications(str(order.id))
+
+    history = EmailNotificationHistory.objects.filter_active().get()
+    sent_to = history.sent_to_list.get()
+    assert sent_to.context["first_paid_price"] == 0
+    assert sent_to.context["first_paid_at"] == order.first_paid_at.isoformat()
+    assert sent_to.context["customer_email"] == order.customer_info.email
+
+
 # ---------------------------------------------------------------------------
 # Happy path — 알림톡
 # ---------------------------------------------------------------------------

@@ -3,9 +3,11 @@ from io import BytesIO
 
 import pandas
 import pytest
+import yaml
 from admin_api.serializers.shop.orders import OrderAdminSerializer
 from admin_api.test.helpers import OrdersAdminApi
 from admin_api.views.shop.orders import OrderAdminViewSet
+from core.const.shop_error_messages import NotRefundableErrorMessages
 from freezegun import freeze_time
 from model_bakery import baker
 from rest_framework.fields import DateTimeField
@@ -17,6 +19,7 @@ from rest_framework.status import (
     HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
 )
+from rest_framework.test import APIClient
 from shop.order.models import CustomerInfo, Order, OrderProductRelation
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
 
@@ -40,6 +43,22 @@ def test_admin_list_returns_only_orders_with_payment_history_and_products(api_cl
         "previous": None,
         "results": [OrderAdminSerializer(instance=OrderAdminViewSet.queryset.get(id=completed_order.id)).data],
     }
+
+
+@pytest.mark.django_db
+def test_admin_list_includes_free_completed_order(api_client, order_factory):
+    order = order_factory(status="completed", product_price=0, imp_id=None)
+
+    response = OrdersAdminApi(http_client=api_client).list()
+
+    assert response.status_code == HTTP_200_OK
+    row = response.json()["results"][0]
+    assert row["id"] == str(order.id)
+    assert row["current_status"] == PaymentHistoryStatus.completed
+    assert row["current_paid_price"] == 0
+    assert row["latest_imp_id"] is None
+    assert row["payment_histories"][0]["price"] == 0
+    assert row["payment_histories"][0]["imp_id"] is None
 
 
 @pytest.mark.django_db
@@ -137,6 +156,19 @@ def test_admin_refund_action_refunds_order(api_client, mock_portone_req_cancel_p
 
 
 @pytest.mark.django_db
+def test_admin_refund_action_rejects_free_completed_order_without_portone_cancel(
+    api_client, mock_portone_req_cancel_payment, order_factory
+):
+    order = order_factory(status="completed", product_price=0, imp_id=None)
+
+    response = OrdersAdminApi(http_client=api_client).refund(order.id)
+
+    assert response.status_code == HTTP_400_BAD_REQUEST
+    assert NotRefundableErrorMessages.ORDER_IMP_ID_NOT_EXIST in str(response.json())
+    mock_portone_req_cancel_payment.assert_not_called()
+
+
+@pytest.mark.django_db
 def test_admin_refund_product_action_does_partial_refund(
     api_client, ticket_product, mock_portone_req_cancel_payment, order_factory
 ):
@@ -163,6 +195,39 @@ def test_admin_refund_product_action_returns_404_for_unknown_rel(api_client, ord
         completed_order.id, "00000000-0000-0000-0000-000000000000"
     )
     assert response.status_code == HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_admin_refund_product_action_rejects_free_completed_opr_without_portone_cancel(
+    api_client, mock_portone_req_cancel_payment, order_factory
+):
+    order = order_factory(status="completed", product_price=0, imp_id=None)
+    opr = order.products.get()
+
+    response = OrdersAdminApi(http_client=api_client).refund_product(order.id, opr.id)
+
+    assert response.status_code == HTTP_400_BAD_REQUEST
+    assert NotRefundableErrorMessages.ORDER_NOT_REFUNDABLE in str(response.json())
+    mock_portone_req_cancel_payment.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_admin_refund_actions_document_validation_error_responses():
+    response = APIClient().get("/api/schema/v1/")
+    assert response.status_code == HTTP_200_OK
+
+    schema = yaml.safe_load(response.content)
+    total_refund_path = next(path for path in schema["paths"] if path.endswith("/admin-api/shop/order/{id}/refund/"))
+    product_refund_path = next(
+        path for path in schema["paths"] if path.endswith("/admin-api/shop/order/{id}/products/{rel_id}/refund/")
+    )
+
+    for path in (total_refund_path, product_refund_path):
+        responses = schema["paths"][path]["post"]["responses"]
+        assert "204" in responses
+        assert responses["400"]["content"]["application/json"]["schema"] == {
+            "$ref": "#/components/schemas/ValidationErrorResponse",
+        }
 
 
 @pytest.mark.django_db

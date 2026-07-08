@@ -6,7 +6,8 @@ from core.const.shop_error_messages import PortOneWebhookFailureCode
 from core.external_apis.portone.client import PortOneException
 from core.util.testutil import errors_payload
 from rest_framework import serializers as drf_serializers
-from shop.order.models import Order, OrderProductRelation, SingleProductCart
+from shop.conftest import VALID_TICKET_INFO
+from shop.order.models import Order, OrderProductRelation, SingleProductCart, TicketInfo
 from shop.payment_history.models import PaymentHistoryStatus, PaymentWebhookEvent
 from shop.payment_history.serializers import PortOneV1WebhookRequestSerializer, PortOneV1WebhookRequestStatus
 from shop.test.helpers import make_portone_payment_info, make_webhook_payload
@@ -168,6 +169,42 @@ def test_validate_rejects_when_paid_amount_does_not_match_order_price(
 
 
 @pytest.mark.django_db
+def test_validate_rejects_zero_amount_webhook_without_cancel(
+    mock_portone_find_payment_info, mock_portone_req_cancel_payment, order_factory
+):
+    pending_order = order_factory(status="prepared")
+    mock_portone_find_payment_info.return_value = make_portone_payment_info(order=pending_order, amount=0)
+    serializer = PortOneV1WebhookRequestSerializer(data=make_webhook_payload(merchant_uid=pending_order.merchant_uid))
+
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {
+        "non_field_errors": [
+            {"detail": PortOneWebhookFailureCode.UNEXPECTED_PAID_PRICE.label, "code": "UNEXPECTED_PAID_PRICE"}
+        ],
+    }
+    mock_portone_req_cancel_payment.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_validate_rejects_zero_prepared_order_webhook_without_free_checkout_bypass(
+    mock_portone_find_payment_info, mock_portone_req_cancel_payment, order_factory
+):
+    pending_order = order_factory(status="prepared", product_price=0)
+    assert pending_order.prepared_price == 0
+    mock_portone_find_payment_info.return_value = make_portone_payment_info(order=pending_order, amount=0)
+    serializer = PortOneV1WebhookRequestSerializer(data=make_webhook_payload(merchant_uid=pending_order.merchant_uid))
+
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {
+        "non_field_errors": [
+            {"detail": PortOneWebhookFailureCode.UNEXPECTED_PAID_PRICE.label, "code": "UNEXPECTED_PAID_PRICE"}
+        ],
+    }
+    assert pending_order.payment_histories.count() == 0
+    mock_portone_req_cancel_payment.assert_not_called()
+
+
+@pytest.mark.django_db
 def test_validate_rejects_fractional_paid_amount(
     mock_portone_find_payment_info, mock_portone_req_cancel_payment, order_factory
 ):
@@ -277,7 +314,7 @@ def test_validate_passes_happy_path_for_single_product_cart(single_product_cart,
 
 @pytest.mark.django_db
 def test_create_completes_pending_order(mock_portone_find_payment_info, order_factory):
-    pending_order = order_factory(status="prepared")
+    pending_order = order_factory(status="prepared", is_ticket=False)
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=pending_order, imp_uid="imp_done")
     serializer = PortOneV1WebhookRequestSerializer(
         data=make_webhook_payload(merchant_uid=pending_order.merchant_uid, imp_uid="imp_done")
@@ -294,7 +331,40 @@ def test_create_completes_pending_order(mock_portone_find_payment_info, order_fa
 
 
 @pytest.mark.django_db
+def test_create_revalidates_allocation_after_validate_before_marking_paid(
+    mock_portone_find_payment_info,
+    mock_portone_req_cancel_payment,
+    order_factory,
+    non_ticket_product,
+):
+    non_ticket_product.stock = 1
+    non_ticket_product.save(update_fields=["stock"])
+    pending_order = order_factory(status="prepared", is_ticket=False)
+    mock_portone_find_payment_info.return_value = make_portone_payment_info(order=pending_order)
+    serializer = PortOneV1WebhookRequestSerializer(data=make_webhook_payload(merchant_uid=pending_order.merchant_uid))
+    assert serializer.is_valid()
+
+    order_factory(status="completed", is_ticket=False)
+
+    with pytest.raises(drf_serializers.ValidationError):
+        serializer.save()
+
+    pending_order.refresh_from_db()
+    assert pending_order.payment_histories.count() == 0
+    assert list(pending_order.products.values_list("status", flat=True)) == [
+        OrderProductRelation.OrderProductStatus.pending,
+    ]
+    mock_portone_req_cancel_payment.assert_called_once_with(
+        imp_id="imp_test",
+        refund_request_price=pending_order.first_paid_price,
+        current_leftover_price=pending_order.first_paid_price,
+        reason=PortOneWebhookFailureCode.ORDER_NOT_ORDERABLE.label,
+    )
+
+
+@pytest.mark.django_db
 def test_create_promotes_single_product_cart_to_order(single_product_cart, mock_portone_find_payment_info):
+    TicketInfo.objects.create(order_product_relation=single_product_cart.order_product_relation, **VALID_TICKET_INFO)
     single_product_cart.prepare_payment()
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=single_product_cart)
     serializer = PortOneV1WebhookRequestSerializer(
@@ -330,7 +400,7 @@ def test_create_rejects_webhook_when_state_machine_blocks(
 
 @pytest.mark.django_db
 def test_create_registers_notification_task_on_commit(mock_portone_find_payment_info, mocked_on_commit, order_factory):
-    pending_order = order_factory(status="prepared")
+    pending_order = order_factory(status="prepared", is_ticket=False)
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=pending_order)
     serializer = PortOneV1WebhookRequestSerializer(data=make_webhook_payload(merchant_uid=pending_order.merchant_uid))
     assert serializer.is_valid()

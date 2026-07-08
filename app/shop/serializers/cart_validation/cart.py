@@ -34,24 +34,28 @@ class CartOrderableCheckSerializer(serializers.Serializer):
 
     def validate(self, data: dict) -> dict:
         cart: Order = data["cart"]
+        active_products = cart.products.filter_active()
 
         # 이미 결제한 장바구니인 경우 주문 불가능
         # `current_status` 는 active PH 기준이라 != pending 이면 곧 active PH 가 존재 — 별도 exists() 불필요.
         if cart.current_status != PaymentHistoryStatus.pending:
             raise serializers.ValidationError(CartNotOrderableErrorMessages.ALREADY_ORDERED)
 
+        if not active_products.exists():
+            raise serializers.ValidationError(CartNotOrderableErrorMessages.EMPTY)
+
         # 장바구니 내에 이미 결제한 상품이 있는 경우 주문 불가능
-        if cart.products.filter_active().exclude(status=OrderProductRelation.OrderProductStatus.pending).exists():
+        if active_products.exclude(status=OrderProductRelation.OrderProductStatus.pending).exists():
             raise serializers.ValidationError(CartNotOrderableErrorMessages.CONTAINS_PAID_PRODUCT)
 
-        # 장바구니 내의 상품들 주문 금액 합계가 0원 이하거나 100만원 이상인 경우 주문 불가능
-        if cart.first_paid_price <= 0:
+        # 장바구니 내의 상품들 주문 금액 합계가 음수이거나 100만원 이상인 경우 주문 불가능
+        if cart.first_paid_price < 0:
             raise serializers.ValidationError(CartNotOrderableErrorMessages.CART_PRICE_TOO_LOW)
         if cart.first_paid_price >= 1_000_000:
             raise serializers.ValidationError(CartNotOrderableErrorMessages.CART_PRICE_TOO_HIGH)
 
         # 티켓 상품은 결제 전 참가자 정보(TicketInfo)가 반드시 있어야 함
-        if cart.products.filter_active().filter(product__category__is_ticket=True, ticket_info__isnull=True).exists():
+        if active_products.filter(product__category__is_ticket=True, ticket_info__isnull=True).exists():
             raise serializers.ValidationError(CartNotOrderableErrorMessages.TICKET_INFO_REQUIRED)
 
         return data

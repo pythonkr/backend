@@ -16,12 +16,18 @@ from drf_standardized_errors.openapi_serializers import ErrorResponse403Serializ
 from rest_framework import mixins, renderers, request, response, serializers, status, viewsets
 from rest_framework.decorators import action
 from shop.order.models import CustomerInfo, Order, OrderProductRelation, OrderQuerySet
-from shop.order.serializers.dto import CertificateIssueResponseDto, OrderDto, SingleProductCartDto
+from shop.order.serializers.dto import (
+    CertificateIssueResponseDto,
+    CreateSingleProductOrderResponseDto,
+    OrderDto,
+    SingleProductCartDto,
+)
 from shop.order.serializers.validator import (
     OptionProductOptionCustomResponseModifyRequestSerializer,
     OrderProductUpdateSerializer,
 )
 from shop.payment_history.models import PaymentHistory
+from shop.payment_history.services import complete_free_checkout
 from shop.serializers.cart_validation import (
     CartOrderableCheckSerializer,
     CustomerInfoCheckSerializer,
@@ -93,7 +99,7 @@ class OrderViewSet(
         tags=[OpenAPITag.SHOP_ORDER],
         request=SingleProductCartOrderableCheckSerializer,
         responses={
-            status.HTTP_201_CREATED: SingleProductCartDto,
+            status.HTTP_201_CREATED: CreateSingleProductOrderResponseDto,
             status.HTTP_400_BAD_REQUEST: ValidationErrorResponseSerializer,
             status.HTTP_403_FORBIDDEN: ErrorResponse403Serializer,
         },
@@ -111,6 +117,11 @@ class OrderViewSet(
         assert order_product_rel.single_product_cart  # nosec: B101
         cart = order_product_rel.single_product_cart
         cart.prepare_payment()
+
+        if cart.prepared_price == 0:
+            completed_order = complete_free_checkout(cart)
+            dto_order = Order.objects.for_dto_response().get(id=completed_order.id)
+            return response.Response(data=OrderDto(instance=dto_order).data, status=status.HTTP_201_CREATED)
 
         portone_client.register_or_update_prepared_payment(merchant_id=cart.merchant_uid, price=cart.prepared_price)
 
@@ -145,6 +156,7 @@ class OrderViewSet(
             data=[
                 {
                     "product": product_rel.product_id,
+                    "donation_price": product_rel.donation_price,
                     "options": [
                         {
                             "product_option_group": product_option_rel.product_option_group_id,
@@ -170,6 +182,11 @@ class OrderViewSet(
             cart.name_en += f" and {len(cart_product_rels) - 1} more"
         cart.save()
         cart.prepare_payment()
+
+        if cart.prepared_price == 0:
+            completed_order = complete_free_checkout(cart)
+            dto_cart = Order.objects.for_dto_response().get(id=completed_order.id)
+            return response.Response(data=OrderDto(instance=dto_cart).data, status=status.HTTP_201_CREATED)
 
         # idempotent + forward-only — DB commit 후 비동기 호출. 실패 시 클라이언트 retry 가 자연 보상.
         transaction.on_commit(

@@ -42,16 +42,40 @@ def test_cart_rejects_when_contains_paid_product(customer_user, order_factory):
 
 
 @pytest.mark.django_db
-def test_cart_rejects_when_price_is_zero_or_negative(customer_user):
-    # OPR 없이 빈 cart — first_paid_price=0 → CART_PRICE_TOO_LOW.
+def test_cart_rejects_when_empty(customer_user):
     empty_cart = Order.objects.create(user=customer_user, name="empty")
     serializer = CartOrderableCheckSerializer(
         data={"cart": str(empty_cart.id)}, context=make_serializer_context(customer_user)
     )
     assert serializer.is_valid() is False
     assert errors_payload(serializer.errors) == {
-        "non_field_errors": [{"detail": CartNotOrderableErrorMessages.CART_PRICE_TOO_LOW, "code": "invalid"}],
+        "non_field_errors": [{"detail": CartNotOrderableErrorMessages.EMPTY, "code": "invalid"}],
     }
+
+
+@pytest.mark.django_db
+def test_cart_allows_zero_price_active_product(customer_user, non_ticket_product):
+    cart = Order.objects.create(user=customer_user, name="free")
+    OrderProductRelation.objects.create(order=cart, product=non_ticket_product, price=0)
+
+    serializer = CartOrderableCheckSerializer(
+        data={"cart": str(cart.id)}, context=make_serializer_context(customer_user)
+    )
+
+    assert serializer.is_valid() is True
+
+
+@pytest.mark.django_db
+def test_cart_rejects_when_price_is_negative(customer_user, non_ticket_product):
+    cart = Order.objects.create(user=customer_user, name="negative")
+    OrderProductRelation.objects.create(order=cart, product=non_ticket_product, price=0)
+    cart.__dict__["first_paid_price"] = -1
+    serializer = CartOrderableCheckSerializer(context=make_serializer_context(customer_user))
+
+    with pytest.raises(ValidationError) as exc_info:
+        serializer.validate({"cart": cart})
+
+    assert exc_info.value.detail[0] == CartNotOrderableErrorMessages.CART_PRICE_TOO_LOW
 
 
 @pytest.mark.django_db
