@@ -4,10 +4,16 @@ from unittest.mock import patch
 import pytest
 from core.const.shop_error_messages import CartNotOrderableErrorMessages, ProductNotOrderableErrorMessages
 from core.util.testutil import errors_payload
+from django.db import transaction
 from rest_framework.exceptions import ValidationError
 from shop.order.models import Order, OrderProductOptionRelation, OrderProductRelation, SingleProductCart, TicketInfo
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
-from shop.payment_history.services import complete_free_checkout
+from shop.payment_history.services import (
+    _build_product_validation_payload,
+    _lock_order_allocation_rows,
+    complete_free_checkout,
+)
+from shop.serializers.cart_validation import OrderableCheckSerializerMode
 
 
 @pytest.mark.django_db
@@ -93,6 +99,85 @@ def test_complete_free_checkout_promotes_single_product_cart(single_product_cart
         imp_id=None,
     ).exists()
     mock_delay.assert_called_once_with(str(cart_id))
+
+
+@pytest.mark.django_db
+def test_lock_order_allocation_rows_attaches_payload_relations_without_extra_queries(
+    customer_user, ticket_product, option, django_assert_num_queries
+):
+    order = Order.objects.create(user=customer_user, name="free")
+    product_rel = OrderProductRelation.objects.create(order=order, product=ticket_product, price=0)
+    option_rel = OrderProductOptionRelation.objects.create(
+        order_product_relation=product_rel,
+        product_option_group=option.group,
+        product_option=option,
+        custom_response=None,
+    )
+    TicketInfo.objects.create(
+        order_product_relation=product_rel,
+        name="김참가",
+        phone="010-9999-8888",
+        email="attendee@example.com",
+        organization="PSK",
+        contribution_message="응원합니다",
+    )
+
+    with transaction.atomic():
+        locked_product_rel = _lock_order_allocation_rows(order)[0]
+
+        with django_assert_num_queries(0):
+            payload = _build_product_validation_payload(
+                locked_product_rel, OrderableCheckSerializerMode.CHECKOUT_SINGLE_PRODUCT
+            )
+
+    assert payload == {
+        "product": ticket_product.id,
+        "donation_price": 0,
+        "options": [
+            {
+                "product_option_group": option.group_id,
+                "product_option": option.id,
+                "custom_response": option_rel.custom_response,
+            }
+        ],
+        "ticket_info": {
+            "name": "김참가",
+            "phone": "010-9999-8888",
+            "email": "attendee@example.com",
+            "organization": "PSK",
+            "contribution_message": "응원합니다",
+        },
+    }
+
+
+@pytest.mark.django_db
+def test_build_product_validation_payload_falls_back_to_related_rows(customer_user, ticket_product, option):
+    order = Order.objects.create(user=customer_user, name="free")
+    product_rel = OrderProductRelation.objects.create(order=order, product=ticket_product, price=0)
+    OrderProductOptionRelation.objects.create(
+        order_product_relation=product_rel,
+        product_option_group=option.group,
+        product_option=option,
+        custom_response="L",
+    )
+    TicketInfo.objects.create(
+        order_product_relation=product_rel,
+        name="김참가",
+        phone="010-9999-8888",
+        email="attendee@example.com",
+        organization="PSK",
+    )
+
+    payload = _build_product_validation_payload(product_rel, OrderableCheckSerializerMode.CHECKOUT_SINGLE_PRODUCT)
+
+    assert payload["options"] == [
+        {
+            "product_option_group": option.group_id,
+            "product_option": option.id,
+            "custom_response": "L",
+        }
+    ]
+    assert payload["ticket_info"]["email"] == "attendee@example.com"
 
 
 @pytest.mark.django_db

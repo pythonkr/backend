@@ -7,7 +7,7 @@ from rest_framework import serializers
 from shop.order.models import Order, OrderProductOptionRelation, OrderProductRelation, SingleProductCart, TicketInfo
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus, is_legal_payment_status_transition
 from shop.payment_history.tasks import send_payment_completed_notifications
-from shop.product.models import Option, OptionGroup, Product, Tag
+from shop.product.models import Option, OptionGroup, Product, ProductTagRelation, Tag
 from shop.serializers.cart_validation import (
     CartOrderableCheckSerializer,
     OrderableCheckSerializerMode,
@@ -17,6 +17,9 @@ from shop.serializers.cart_validation import (
 FREE_CHECKOUT_PRICE_ERROR = "무료 주문은 결제 준비 금액이 0원이어야 합니다."
 FREE_CHECKOUT_TARGET_ERROR = "무료 주문 대상을 찾을 수 없습니다."
 FREE_CHECKOUT_TRANSITION_ERROR = "이미 처리된 주문이거나 무료 완료로 전환할 수 없습니다."
+_LOCKED_OPTIONS_ATTR = "_locked_checkout_options"
+_LOCKED_TICKET_INFO_ATTR = "_locked_checkout_ticket_info"
+_MISSING = object()
 
 
 def complete_free_checkout(cart_or_order: Order | SingleProductCart) -> Order:
@@ -95,7 +98,10 @@ def _lock_order_allocation_rows(order: Order) -> list[OrderProductRelation]:
         return product_rels
 
     list(Product.objects.select_for_update().filter_active().filter(id__in=product_ids).order_by("id"))
-    list(Tag.objects.select_for_update().filter_active().filter(products__product_id__in=product_ids).order_by("id"))
+    active_tag_ids = (
+        ProductTagRelation.objects.filter_active().filter(product_id__in=product_ids).order_by().values("tag_id")
+    )
+    list(Tag.objects.select_for_update().filter_active().filter(id__in=active_tag_ids).order_by("id"))
 
     option_groups = list(
         OptionGroup.objects.select_for_update().filter_active().filter(product_id__in=product_ids).order_by("id")
@@ -105,13 +111,26 @@ def _lock_order_allocation_rows(order: Order) -> list[OrderProductRelation]:
     if option_group_ids:
         list(Option.objects.select_for_update().filter_active().filter(group_id__in=option_group_ids).order_by("id"))
 
-    list(
+    option_rels = list(
         OrderProductOptionRelation.objects.select_for_update()
         .filter_active()
         .filter(order_product_relation_id__in=product_rel_ids)
         .order_by("id")
     )
-    list(TicketInfo.objects.select_for_update().filter_active().filter(order_product_relation_id__in=product_rel_ids))
+    ticket_infos = list(
+        TicketInfo.objects.select_for_update().filter_active().filter(order_product_relation_id__in=product_rel_ids)
+    )
+
+    option_rels_by_product_rel_id: dict[int, list[OrderProductOptionRelation]] = {}
+    for option_rel in option_rels:
+        option_rels_by_product_rel_id.setdefault(option_rel.order_product_relation_id, []).append(option_rel)
+
+    ticket_infos_by_product_rel_id = {
+        ticket_info.order_product_relation_id: ticket_info for ticket_info in ticket_infos
+    }
+    for product_rel in product_rels:
+        setattr(product_rel, _LOCKED_OPTIONS_ATTR, option_rels_by_product_rel_id.get(product_rel.id, []))
+        setattr(product_rel, _LOCKED_TICKET_INFO_ATTR, ticket_infos_by_product_rel_id.get(product_rel.id))
 
     return product_rels
 
@@ -119,6 +138,10 @@ def _lock_order_allocation_rows(order: Order) -> list[OrderProductRelation]:
 def _build_product_validation_payload(
     product_rel: OrderProductRelation, validation_mode: OrderableCheckSerializerMode
 ) -> dict:
+    option_rels = getattr(product_rel, _LOCKED_OPTIONS_ATTR, _MISSING)
+    if option_rels is _MISSING:
+        option_rels = product_rel.options.filter_active().order_by("id")
+
     payload = {
         "product": product_rel.product_id,
         "donation_price": product_rel.donation_price,
@@ -128,7 +151,7 @@ def _build_product_validation_payload(
                 "product_option": option_rel.product_option_id,
                 "custom_response": option_rel.custom_response,
             }
-            for option_rel in product_rel.options.filter_active().order_by("id")
+            for option_rel in option_rels
         ],
     }
 
@@ -136,7 +159,9 @@ def _build_product_validation_payload(
         validation_mode == OrderableCheckSerializerMode.CHECKOUT_SINGLE_PRODUCT
         and product_rel.product.category.is_ticket
     ):
-        ticket_info = getattr(product_rel, "ticket_info", None)
+        ticket_info = getattr(product_rel, _LOCKED_TICKET_INFO_ATTR, _MISSING)
+        if ticket_info is _MISSING:
+            ticket_info = getattr(product_rel, "ticket_info", None)
         if ticket_info:
             payload["ticket_info"] = {
                 "name": ticket_info.name,
