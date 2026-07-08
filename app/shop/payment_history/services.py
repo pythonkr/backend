@@ -132,7 +132,10 @@ def _build_product_validation_payload(
         ],
     }
 
-    if validation_mode == OrderableCheckSerializerMode.CHECKOUT_SINGLE_PRODUCT and product_rel.product.category.is_ticket:
+    if (
+        validation_mode == OrderableCheckSerializerMode.CHECKOUT_SINGLE_PRODUCT
+        and product_rel.product.category.is_ticket
+    ):
         ticket_info = getattr(product_rel, "ticket_info", None)
         if ticket_info:
             payload["ticket_info"] = {

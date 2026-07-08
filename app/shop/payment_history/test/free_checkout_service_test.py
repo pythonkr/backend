@@ -114,9 +114,7 @@ def test_complete_free_checkout_rejects_empty_zero_price_order(customer_user):
 
 
 @pytest.mark.django_db
-def test_complete_free_checkout_rechecks_stock_after_single_cart_preparation(
-    single_product_cart, other_user
-):
+def test_complete_free_checkout_rechecks_stock_after_single_cart_preparation(single_product_cart, other_user):
     product = single_product_cart.order_product_relation.product
     product.price = 0
     product.stock = 1
@@ -204,4 +202,6 @@ def test_complete_free_checkout_rejects_missing_single_cart_target():
     with pytest.raises(ValidationError) as exc_info:
         complete_free_checkout(ghost_cart)
 
-    assert errors_payload(exc_info.value.detail) == [{"detail": "무료 주문 대상을 찾을 수 없습니다.", "code": "invalid"}]
+    assert errors_payload(exc_info.value.detail) == [
+        {"detail": "무료 주문 대상을 찾을 수 없습니다.", "code": "invalid"}
+    ]
