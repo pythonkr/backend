@@ -97,7 +97,9 @@ class RoomAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet)
     serializer_class = RoomAdminSerializer
     permission_classes = [IsSuperUser]
     filterset_class = RoomAdminFilterSet
-    queryset = Room.objects.filter_active().select_related_with_user("event").order_by("-event__event_end_at", "pk")
+    queryset = (
+        Room.objects.filter_active().select_related_with_user("event").order_by("-event__event_end_at", "order", "pk")
+    )
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_EVENT_PRESENTATION]) for m in ADMIN_METHODS})

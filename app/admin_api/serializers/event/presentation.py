@@ -102,4 +102,4 @@ class RoomScheduleAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, 
 class RoomAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
     class Meta:
         model = Room
-        fields = COMMON_ADMIN_FIELDS + ("event", "name_ko", "name_en")
+        fields = COMMON_ADMIN_FIELDS + ("event", "name_ko", "name_en", "order")

@@ -174,16 +174,18 @@ class Room(BaseAbstractModel):
     choices_select_related = ("event",)
     choices_meta_schema: ClassVar[dict] = {
         "event": {"label": "이벤트", "type": "string", "filter": "select"},
+        "order": {"label": "순서", "type": "number"},
     }
 
     event = models.ForeignKey(Event, on_delete=models.PROTECT)
     name = models.CharField(max_length=256)
+    order = models.IntegerField(default=0)
 
     def __str__(self) -> str:
         return f"[{self.event.name}] {self.name}"
 
     def _choice_meta_fields(self) -> dict:
-        return {"event": self.event.name}
+        return {"event": self.event.name, "order": self.order}
 
 
 class RoomScheduleQuerySet(BaseAbstractModelQuerySet):
