@@ -17,6 +17,7 @@ class PresentationCategoryAdminFilterSet(filters.FilterSet):
 
 class PresentationAdminFilterSet(filters.FilterSet):
     type = filters.UUIDFilter(field_name="type_id")
+    event = filters.UUIDFilter(field_name="type__event_id")
 
 
 class PresentationSpeakerAdminFilterSet(filters.FilterSet):
@@ -26,3 +27,4 @@ class PresentationSpeakerAdminFilterSet(filters.FilterSet):
 class RoomScheduleAdminFilterSet(filters.FilterSet):
     room = filters.UUIDFilter(field_name="room_id")
     presentation = filters.UUIDFilter(field_name="presentation_id")
+    event = filters.UUIDFilter(field_name="room__event_id")
