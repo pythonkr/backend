@@ -88,10 +88,11 @@ def test_breakdown_subtracts_cart_and_purchased_for_logged_in_user(
 
 
 @pytest.mark.django_db
-def test_product_level_limit_can_be_binding_constraint(
+def test_product_level_limit_does_not_cap_option_leftover(
     customer_client, customer_user, ticket_product, group_with_options
 ):
-    # Product.max_quantity_per_user 가 group / option 한도 보다 작아서 binding 이 되는 경우 — 명시적 케이스.
+    # Product.max_quantity_per_user 는 "티켓 몇 장" 축이라 옵션/그룹 인스턴스 개수(max_quantity_per_product 축)를
+    # 제한하지 않는다. breakdown 엔 잔여값을 남기되 leftover_stock_per_user 엔 반영되지 않아야 한다.
     ticket_product.max_quantity_per_user = 2
     ticket_product.save()
     group, a, _b = group_with_options
@@ -101,11 +102,16 @@ def test_product_level_limit_can_be_binding_constraint(
     a.save()
 
     data = _serialize_via_api(customer_client, ticket_product)
-    option_a = next(o for o in data["option_groups"][0]["options"] if o["id"] == str(a.id))
+    grp = data["option_groups"][0]
+    # 그룹 레벨: product 한도(2)가 breakdown 엔 남지만 leftover 는 group 한도(10)가 결정.
+    assert grp["leftover_stock_info"]["product_max_quantity_per_user"] == 2
+    assert grp["leftover_stock_per_user"] == 10
+
+    option_a = next(o for o in grp["options"] if o["id"] == str(a.id))
     assert option_a["leftover_stock_info"]["product_max_quantity_per_user"] == 2
     assert option_a["leftover_stock_info"]["option_group_max_quantity_per_user"] == 10
     assert option_a["leftover_stock_info"]["option_max_quantity_per_user"] == 10
-    assert option_a["leftover_stock_per_user"] == 2  # ticket_product 한도가 binding
+    assert option_a["leftover_stock_per_user"] == 10  # product 한도(2)는 binding 아님
 
 
 @pytest.mark.django_db

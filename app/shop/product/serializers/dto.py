@@ -7,9 +7,18 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from shop.product.models import Option, OptionGroup, Product
 
+# product 인당 한도(product_max_quantity_per_user)는 "이 유저가 이 상품(티켓)을 몇 개 살 수 있나" 축이라,
+# 옵션/그룹 인스턴스 개수(max_quantity_per_product 축, 1 OPR 아래 다수 OPOR)를 제한하지 않는다.
+# breakdown 에는 참고용으로 남기되 leftover_stock_per_user(= binding min) 계산에서는 제외한다.
+_LEFTOVER_PER_USER_EXCLUDED_KEYS = frozenset({"product_max_quantity_per_user"})
+
 
 def _min_ignoring_none(values: Iterable[int | None]) -> int | None:
     return min(finite) if (finite := [v for v in values if v is not None]) else None
+
+
+def _leftover_stock_per_user(info: dict[str, int | None]) -> int | None:
+    return _min_ignoring_none(v for k, v in info.items() if k not in _LEFTOVER_PER_USER_EXCLUDED_KEYS)
 
 
 @dataclass(frozen=True)
@@ -115,7 +124,7 @@ class OptionDto(serializers.ModelSerializer):
         return self.context.get("stock_context", _EMPTY_STOCK_CONTEXT).option_leftover_info(option)
 
     def get_leftover_stock_per_user(self, option: Option) -> int | None:
-        return _min_ignoring_none(self.get_leftover_stock_info(option).values())
+        return _leftover_stock_per_user(self.get_leftover_stock_info(option))
 
 
 class OptionGroupDto(serializers.ModelSerializer):
@@ -148,7 +157,7 @@ class OptionGroupDto(serializers.ModelSerializer):
         return self.context.get("stock_context", _EMPTY_STOCK_CONTEXT).option_group_leftover_info(group)
 
     def get_leftover_stock_per_user(self, group: OptionGroup) -> int | None:
-        return _min_ignoring_none(self.get_leftover_stock_info(group).values())
+        return _leftover_stock_per_user(self.get_leftover_stock_info(group))
 
 
 class ProductDto(serializers.ModelSerializer):
