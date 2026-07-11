@@ -210,3 +210,21 @@ class RoomSchedule(BaseAbstractModel):
 
     def __str__(self) -> str:
         return f"[{self.room}] {self.start_at} - {self.end_at} ({self.presentation})"
+
+
+class PresentationBookmark(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="presentation_bookmarks")
+    presentation = models.ForeignKey(Presentation, on_delete=models.CASCADE, related_name="bookmarks")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "presentation"],
+                name="uq__prst_bkmk__user__presentation",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"[Bookmark] {self.user} - {self.presentation}"

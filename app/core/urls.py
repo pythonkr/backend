@@ -23,6 +23,7 @@ from django.contrib import admin
 from django.urls import include, path, re_path, resolvers
 from django.views.decorators.cache import cache_page
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from event.presentation.urls import bookmark_urlpatterns
 
 # type: ignore[assignment]
 v1_apis: list[resolvers.URLPattern | resolvers.URLResolver] = [
@@ -30,6 +31,7 @@ v1_apis: list[resolvers.URLPattern | resolvers.URLResolver] = [
     path("admin-api/", include("admin_api.urls")),
     path("participant-portal/", include("participant_portal_api.urls")),
     path("event/presentation/", include("event.presentation.urls")),
+    path("events/<uuid:event_id>/presentation-bookmarks/", include(bookmark_urlpatterns)),
     path("event/sponsor/", include("event.sponsor.urls")),
     path("event/", include("event.urls")),
     path("external-api/", include("external_api.urls")),
