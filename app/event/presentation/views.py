@@ -1,5 +1,6 @@
 from core.const.tag import OpenAPITag
-from django.db.models import Q
+from django.db.models.query import QuerySet
+from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from drf_spectacular.utils import extend_schema
 from drf_standardized_errors.openapi_serializers import (
@@ -16,11 +17,7 @@ from event.presentation.serializers import (
     PresentationCategorySerializer,
     PresentationSerializer,
 )
-from rest_framework import mixins, status, viewsets
-from rest_framework.exceptions import NotFound
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.request import Request
-from rest_framework.response import Response
+from rest_framework import exceptions, mixins, permissions, request, response, status, viewsets
 
 
 @method_decorator(name="list", decorator=extend_schema(tags=[OpenAPITag.EVENT_PRESENTATION]))
@@ -39,21 +36,26 @@ class PresentationViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, view
 
 @extend_schema(tags=[OpenAPITag.EVENT_PRESENTATION_BOOKMARK])
 class PresentationBookmarkViewSet(viewsets.GenericViewSet):
-    permission_classes = [IsAuthenticated]
+    queryset = PresentationBookmark.objects.all()
+    permission_classes = [permissions.IsAuthenticated]
     serializer_class = PresentationBookmarkRequestSerializer
+    lookup_field = "presentation_id"
 
-    def _resolve_event(self, request: Request) -> Event:
-        event_name = request.query_params.get("event")
-        if not event_name:
-            event = Event.objects.filter_active().first()
-            if not event:
-                raise NotFound("해당 행사 정보가 없습니다.")
-            return event
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        get_object_or_404(Event, id=self.kwargs["event_id"])
 
-        event = Event.objects.filter_active().filter(Q(name_ko=event_name) | Q(name_en=event_name)).first()
-        if not event:
-            raise NotFound("해당 행사 정보가 없습니다.")
-        return event
+    def get_queryset(self) -> QuerySet:
+        return (
+            super().get_queryset().filter(user=self.request.user, presentation__type__event_id=self.kwargs["event_id"])
+        )
+
+    def destroy(self, request: request.Request, **kwargs) -> response.Response:
+        presentation_id = self.kwargs["presentation_id"]
+        if not Presentation.objects.filter(id=presentation_id, deleted_at__isnull=True).exists():
+            raise exceptions.NotFound("해당 세션 정보가 없습니다.")
+        self.get_queryset().filter(presentation_id=presentation_id).delete()
+        return response.Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
         summary="북마크 목록 조회",
@@ -64,14 +66,10 @@ class PresentationBookmarkViewSet(viewsets.GenericViewSet):
             status.HTTP_404_NOT_FOUND: ErrorResponse404Serializer,
         },
     )
-    def list(self, request: Request) -> Response:
-        event = self._resolve_event(request)
-        presentation_ids = list(
-            PresentationBookmark.objects.filter(user=request.user, event=event).values_list(
-                "presentation_id", flat=True
-            )
-        )
-        return Response({"presentation_ids": presentation_ids})
+    def list(self, request: request.Request, **kwargs) -> response.Response:
+        queryset = self.get_queryset()
+        presentation_ids = list(queryset.values_list("presentation_id", flat=True))
+        return response.Response({"presentation_ids": presentation_ids})
 
     @extend_schema(
         summary="북마크 추가",
@@ -83,38 +81,13 @@ class PresentationBookmarkViewSet(viewsets.GenericViewSet):
             status.HTTP_404_NOT_FOUND: ErrorResponse404Serializer,
         },
     )
-    def create(self, request: Request) -> Response:
-        serializer = PresentationBookmarkRequestSerializer(data=request.data)
+    def create(self, request: request.Request, **kwargs) -> response.Response:
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        presentation_id = serializer.validated_data["presentation_id"]
+        instance, created = serializer.create(serializer.validated_data)
+        serializer.save()
 
-        presentation = Presentation.objects.filter_active().filter(id=presentation_id).first()
-        if not presentation:
-            raise NotFound("해당 세션 정보가 없습니다.")
-
-        event = presentation.type.event
-        _, created = PresentationBookmark.objects.get_or_create(
-            user=request.user,
-            presentation=presentation,
-            defaults={"event": event},
-        )
-        return Response(
-            {"presentation_id": str(presentation.id)},
+        return response.Response(
+            {"presentation_id": str(instance.presentation_id)},
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
-
-    @extend_schema(
-        summary="북마크 삭제",
-        responses={
-            status.HTTP_204_NO_CONTENT: None,
-            status.HTTP_401_UNAUTHORIZED: ErrorResponse401Serializer,
-            status.HTTP_404_NOT_FOUND: ErrorResponse404Serializer,
-        },
-    )
-    def destroy(self, request: Request, pk: str = None) -> Response:
-        presentation = Presentation.objects.filter_active().filter(id=pk).first()
-        if not presentation:
-            raise NotFound("해당 세션 정보가 없습니다.")
-
-        PresentationBookmark.objects.filter(user=request.user, presentation=presentation).delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)

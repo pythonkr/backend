@@ -7,9 +7,12 @@ cms_router.register("category", views.PresentationCategoryViewSet, basename="pre
 cms_router.register("", views.PresentationViewSet, basename="presentation")
 
 bookmark_router = routers.SimpleRouter()
-bookmark_router.register("bookmarks", views.PresentationBookmarkViewSet, basename="presentation-bookmark")
+bookmark_router.register("", views.PresentationBookmarkViewSet, basename="presentation-bookmark")
 
 urlpatterns = [
-    path("", include(bookmark_router.urls)),
     path("", include(cms_router.urls)),
+]
+
+bookmark_urlpatterns = [
+    path("", include(bookmark_router.urls)),
 ]

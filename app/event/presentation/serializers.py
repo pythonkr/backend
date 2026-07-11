@@ -1,17 +1,31 @@
+from typing import Any
+
 from event.presentation.models import (
     CallForPresentationSchedule,
     Presentation,
+    PresentationBookmark,
     PresentationCategory,
     PresentationSpeaker,
     PresentationType,
     RoomSchedule,
 )
 from event.serializers import EventSerializer
-from rest_framework import serializers
+from rest_framework import exceptions, serializers
+
+
+class NotFoundPrimaryKeyRelatedField(serializers.PrimaryKeyRelatedField):
+    def fail(self, key, **kwargs):
+        if key == "does_not_exist":
+            raise exceptions.NotFound("해당 세션 정보가 없습니다.")
+        super().fail(key, **kwargs)
 
 
 class PresentationBookmarkRequestSerializer(serializers.Serializer):
-    presentation_id = serializers.UUIDField()
+    presentation = NotFoundPrimaryKeyRelatedField(queryset=Presentation.objects.filter(deleted_at__isnull=True))
+
+    def create(self, validated_data: Any) -> tuple[PresentationBookmark, bool]:
+        validated_data["user"] = self.context["request"].user
+        return PresentationBookmark.objects.get_or_create(**validated_data)
 
 
 class PresentationBookmarkListResponseSerializer(serializers.Serializer):
