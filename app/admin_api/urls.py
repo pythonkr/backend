@@ -11,6 +11,7 @@ from admin_api.views.event.presentation import (
     RoomScheduleAdminViewSet,
 )
 from admin_api.views.event.sponsor import SponsorAdminViewSet, SponsorTagAdminViewSet, SponsorTierAdminViewSet
+from admin_api.views.event.timetable import EventPresentationTimetableAdminViewSet
 from admin_api.views.external_api.google_oauth2 import GoogleOAuth2AdminViewSet
 from admin_api.views.file import PublicFileAdminViewSet
 from admin_api.views.mcp_token import McpTokenAdminViewSet
@@ -72,6 +73,11 @@ admin_event_router.register("presentation", PresentationAdminViewSet)
 admin_event_router.register("presentationspeaker", PresentationSpeakerAdminViewSet)
 admin_event_router.register("room", RoomAdminViewSet)
 admin_event_router.register("roomschedule", RoomScheduleAdminViewSet)
+admin_event_router.register(
+    "presentation/timetable",
+    EventPresentationTimetableAdminViewSet,
+    basename="admin-event-presentation-timetable",
+)
 
 admin_participant_portal_router = routers.SimpleRouter()
 admin_participant_portal_router.register(
