@@ -10,6 +10,18 @@ from event.serializers import EventSerializer
 from rest_framework import serializers
 
 
+class PresentationBookmarkRequestSerializer(serializers.Serializer):
+    presentation_id = serializers.UUIDField()
+
+
+class PresentationBookmarkListResponseSerializer(serializers.Serializer):
+    presentation_ids = serializers.ListField(child=serializers.UUIDField())
+
+
+class PresentationBookmarkResponseSerializer(serializers.Serializer):
+    presentation_id = serializers.UUIDField()
+
+
 class PresentationTypeSerializer(serializers.ModelSerializer):
     event = EventSerializer(read_only=True)
 

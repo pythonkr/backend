@@ -3,6 +3,7 @@ class OpenAPITag:
     EVENT = "Event"
     EVENT_PRESENTATION = "Event > Presentation"
     EVENT_SPONSOR = "Event > Sponsor"
+    EVENT_PRESENTATION_BOOKMARK = "Event > Presentation Bookmark"
 
     SHOP_USER = "Shop > 고객"
     SHOP_PRODUCT = "Shop > 상품"
