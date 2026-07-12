@@ -93,7 +93,14 @@ CORS_ALLOWED_ORIGINS = [
     for port in ("", ":3000", ":5173", ":5174")
 ]
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_HEADERS = [*corsheaders.defaults.default_headers, "accept-encoding", "origin", "x-csrftoken"]
+CORS_ALLOW_HEADERS = [
+    *corsheaders.defaults.default_headers,
+    "accept-encoding",
+    "origin",
+    "x-csrftoken",
+    "if-match",
+]
+CORS_EXPOSE_HEADERS = ["ETag"]
 SECURE_CROSS_ORIGIN_OPENER_POLICY = None if DEBUG else "same-origin"
 
 # Application definition
