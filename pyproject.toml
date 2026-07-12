@@ -51,7 +51,7 @@ dependencies = [
 
 [dependency-groups]
 mcp = [
-    "fastmcp>=3.4.2",
+    "fastmcp>=3.4.4",
     "playwright>=1.49.0",
 ]
 dev = [

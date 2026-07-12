@@ -7,4 +7,5 @@ if __name__ == "__main__":
         host=config.HOST,
         port=config.PORT,
         path=config.PATH,
+        host_origin_protection=False,
     )
