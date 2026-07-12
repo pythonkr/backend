@@ -243,7 +243,14 @@ def order_factory(request, customer_user):
             ``donation>0`` 이면 종류와 무관하게 ``donation_product`` 사용.
     """
 
-    def make(*, status: OrderStatus = "cart", donation: int = 0, is_ticket: bool = True) -> Order:
+    def make(
+        *,
+        status: OrderStatus = "cart",
+        donation: int = 0,
+        is_ticket: bool = True,
+        product_price: int | None = None,
+        imp_id: str | None = _COMPLETED_ORDER_IMP_ID,
+    ) -> Order:
         if status == "empty":
             return Order.objects.create(user=customer_user, name="cart")
 
@@ -256,7 +263,10 @@ def order_factory(request, customer_user):
             name_en=used_product.name_en,
         )
         OrderProductRelation.objects.create(
-            order=order, product=used_product, price=used_product.price, donation_price=donation
+            order=order,
+            product=used_product,
+            price=used_product.price if product_price is None else product_price,
+            donation_price=donation,
         )
         CustomerInfo.objects.create(order=order, name="홍길동", phone="01012345678", email="customer@example.com")
 
@@ -270,7 +280,7 @@ def order_factory(request, customer_user):
         order.products.update(status=OrderProductRelation.OrderProductStatus.paid)
         PaymentHistory.objects.create(
             order=order,
-            imp_id=_COMPLETED_ORDER_IMP_ID,
+            imp_id=imp_id,
             status=PaymentHistoryStatus.completed,
             price=order.first_paid_price,
         )
@@ -287,14 +297,14 @@ def order_factory(request, customer_user):
         if status == "refunded":
             order.products.update(status=OrderProductRelation.OrderProductStatus.refunded)
             second_ph = PaymentHistory.objects.create(
-                order=order, imp_id=_COMPLETED_ORDER_IMP_ID, status=PaymentHistoryStatus.refunded, price=0
+                order=order, imp_id=imp_id, status=PaymentHistoryStatus.refunded, price=0
             )
             PaymentHistory.objects.filter(id=second_ph.id).update(created_at=later_at)
             return order
         if status == "partial_refunded":
             second_ph = PaymentHistory.objects.create(
                 order=order,
-                imp_id=_COMPLETED_ORDER_IMP_ID,
+                imp_id=imp_id,
                 status=PaymentHistoryStatus.partial_refunded,
                 price=order.first_paid_price // 2,
             )

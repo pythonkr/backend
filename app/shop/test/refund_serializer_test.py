@@ -57,6 +57,24 @@ def test_total_refund_rejects_when_order_has_no_imp_id(mock_portone_req_cancel_p
 
 
 @pytest.mark.django_db
+def test_total_refund_rejects_free_completed_order_without_portone_cancel(
+    mock_portone_req_cancel_payment, order_factory
+):
+    order = order_factory(status="completed", product_price=0, imp_id=None)
+    serializer = OrderTotalRefundSerializer(
+        instance=order,
+        data={"id": str(order.id)},
+        context={"check_totp": False},
+    )
+
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {
+        "non_field_errors": [{"detail": NotRefundableErrorMessages.ORDER_IMP_ID_NOT_EXIST, "code": "invalid"}],
+    }
+    mock_portone_req_cancel_payment.assert_not_called()
+
+
+@pytest.mark.django_db
 def test_total_refund_rejects_when_order_already_refunded(mock_portone_req_cancel_payment, order_factory):
     refunded_order = order_factory(status="refunded")
     serializer = OrderTotalRefundSerializer(
@@ -328,6 +346,25 @@ def test_partial_refund_rejects_when_refund_window_expired(mock_portone_req_canc
     assert serializer.is_valid() is False
     assert errors_payload(serializer.errors) == {
         "non_field_errors": [{"detail": NotRefundableErrorMessages.PRODUCT_REFUND_TIME_EXPIRED, "code": "invalid"}],
+    }
+    mock_portone_req_cancel_payment.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_partial_refund_rejects_free_completed_order_without_portone_cancel(
+    mock_portone_req_cancel_payment, order_factory
+):
+    order = order_factory(status="completed", product_price=0, imp_id=None)
+    opr = order.products.get()
+    serializer = OrderProductRefundSerializer(
+        instance=opr,
+        data={"id": str(opr.id)},
+        context={"check_totp": False},
+    )
+
+    assert serializer.is_valid() is False
+    assert errors_payload(serializer.errors) == {
+        "non_field_errors": [{"detail": NotRefundableErrorMessages.ORDER_NOT_REFUNDABLE, "code": "invalid"}],
     }
     mock_portone_req_cancel_payment.assert_not_called()
 

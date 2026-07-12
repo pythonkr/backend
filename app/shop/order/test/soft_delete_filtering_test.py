@@ -10,7 +10,7 @@ import pytest
 from django.urls import reverse
 from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_404_NOT_FOUND
 from rest_framework.test import APIClient
-from shop.conftest import WEBHOOK_WHITELISTED_IP
+from shop.conftest import VALID_TICKET_INFO, WEBHOOK_WHITELISTED_IP
 from shop.order.exports import OrderProductExportSerializer
 from shop.order.models import Order, OrderProductOptionRelation, OrderProductRelation, TicketInfo
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
@@ -160,6 +160,7 @@ def test_webhook_paid_transition_skips_soft_deleted_opr(mock_portone_find_paymen
     """webhook PAID 처리 시 soft-deleted OPR 는 paid 로 전환되지 않고 deleted 상태가 유지된다."""
     order = order_factory(status="cart")
     active_opr = order.products.get()
+    TicketInfo.objects.create(order_product_relation=active_opr, **VALID_TICKET_INFO)
     stale_opr = OrderProductRelation.objects.create(order=order, product=ticket_product, price=ticket_product.price)
     stale_opr.delete()
     order.prepare_payment()

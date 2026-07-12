@@ -17,8 +17,8 @@ from rest_framework.status import (
 from shop.conftest import VALID_TICKET_INFO
 from shop.order.models import CustomerInfo, Order, OrderProductRelation, SingleProductCart, TicketInfo
 from shop.order.serializers.dto import OrderDto, SingleProductCartDto
-from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
-from shop.test.helpers import OrdersApi
+from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus, PaymentWebhookEvent
+from shop.test.helpers import CartProductsApi, OrdersApi
 
 
 @pytest.mark.django_db
@@ -106,6 +106,52 @@ def test_create_single_product_order_creates_cart_and_calls_portone(
 
 
 @pytest.mark.django_db
+def test_create_single_product_order_free_completes_without_portone_or_webhook(
+    customer_client, customer_user, ticket_product, mock_portone_register
+):
+    ticket_product.price = 0
+    ticket_product.save(update_fields=["price"])
+
+    with (
+        patch("shop.payment_history.services.transaction.on_commit") as mock_on_commit,
+        patch("shop.payment_history.services.send_payment_completed_notifications.delay") as mock_delay,
+    ):
+        response = OrdersApi(http_client=customer_client).create_single(
+            {
+                "product": str(ticket_product.id),
+                "options": [],
+                "customer_info": {
+                    "name": "홍길동",
+                    "phone": "010-1234-5678",
+                    "email": "customer@example.com",
+                    "organization": "",
+                },
+                "ticket_info": VALID_TICKET_INFO,
+            }
+        )
+        mock_on_commit.assert_called_once()
+        mock_on_commit.call_args.args[0]()
+
+    assert response.status_code == HTTP_201_CREATED
+    completed = Order.objects.for_dto_response().get(user=customer_user)
+    assert response.json() == to_json(OrderDto(instance=completed).data)
+    assert completed.current_status == PaymentHistoryStatus.completed
+    assert completed.current_paid_price == 0
+    assert completed.latest_imp_id is None
+    assert not SingleProductCart.objects.filter(id=completed.id).exists()
+    assert completed.products.get().status == OrderProductRelation.OrderProductStatus.paid
+    assert PaymentHistory.objects.filter(
+        order=completed,
+        status=PaymentHistoryStatus.completed,
+        price=0,
+        imp_id=None,
+    ).exists()
+    mock_portone_register.assert_not_called()
+    assert not PaymentWebhookEvent.objects.exists()
+    mock_delay.assert_called_once_with(str(completed.id))
+
+
+@pytest.mark.django_db
 def test_create_single_product_order_rejects_invalid_product(customer_client, mock_portone_register):
     response = OrdersApi(http_client=customer_client).create_single(
         {
@@ -158,6 +204,53 @@ def test_create_order_persists_customer_info_and_schedules_portone_call(
 
 
 @pytest.mark.django_db
+def test_create_order_free_cart_completes_without_portone_or_webhook(
+    customer_client, customer_user, ticket_product, mock_portone_register
+):
+    ticket_product.price = 0
+    ticket_product.save(update_fields=["price"])
+    add_response = CartProductsApi(http_client=customer_client).create(
+        {
+            "product": str(ticket_product.id),
+            "options": [],
+            "ticket_info": VALID_TICKET_INFO,
+        }
+    )
+    assert add_response.status_code == HTTP_201_CREATED
+    cart = Order.objects.get(user=customer_user)
+
+    with (
+        patch("shop.payment_history.services.transaction.on_commit") as mock_on_commit,
+        patch("shop.payment_history.services.send_payment_completed_notifications.delay") as mock_delay,
+    ):
+        response = OrdersApi(http_client=customer_client).create(
+            {"name": "홍길동", "phone": "010-1234-5678", "email": "customer@example.com", "organization": ""}
+        )
+        mock_on_commit.assert_called_once()
+        mock_on_commit.call_args.args[0]()
+
+    assert response.status_code == HTTP_201_CREATED
+    completed = Order.objects.for_dto_response().get(id=cart.id)
+    assert response.json() == to_json(OrderDto(instance=completed).data)
+    assert completed.current_status == PaymentHistoryStatus.completed
+    assert completed.current_paid_price == 0
+    assert completed.latest_imp_id is None
+    assert list(completed.products.values_list("status", flat=True)) == [OrderProductRelation.OrderProductStatus.paid]
+    assert (
+        PaymentHistory.objects.filter(
+            order=completed,
+            status=PaymentHistoryStatus.completed,
+            price=0,
+            imp_id=None,
+        ).count()
+        == 1
+    )
+    mock_portone_register.assert_not_called()
+    assert not PaymentWebhookEvent.objects.exists()
+    mock_delay.assert_called_once_with(str(completed.id))
+
+
+@pytest.mark.django_db
 def test_destroy_order_refunds_when_owned_by_request_user(
     customer_client, mock_portone_req_cancel_payment, order_factory
 ):
@@ -182,6 +275,23 @@ def test_destroy_order_rejects_other_users_order(other_client, mock_portone_req_
 
 
 @pytest.mark.django_db
+def test_destroy_order_rejects_free_completed_order_without_portone_cancel(
+    customer_client, mock_portone_req_cancel_payment, order_factory
+):
+    completed_order = order_factory(status="completed", product_price=0, imp_id=None)
+
+    response = OrdersApi(http_client=customer_client).delete(completed_order.id)
+
+    assert response.status_code == HTTP_400_BAD_REQUEST
+    completed_order.refresh_from_db()
+    assert list(completed_order.products.values_list("status", flat=True)) == [
+        OrderProductRelation.OrderProductStatus.paid
+    ]
+    assert completed_order.payment_histories.count() == 1
+    mock_portone_req_cancel_payment.assert_not_called()
+
+
+@pytest.mark.django_db
 def test_retrieve_receipt_returns_kcp_redirect_html_for_owner(customer_client, mock_portone_kcp_receipt, order_factory):
     completed_order = order_factory(status="completed")
     mock_portone_kcp_receipt.return_value.to_search_data.return_value = {"x": "y"}
@@ -199,11 +309,13 @@ def test_retrieve_receipt_returns_404_when_order_has_no_imp_id(customer_client, 
 
 
 @pytest.mark.django_db
-def test_retrieve_receipt_returns_404_when_payment_history_has_no_imp_id(customer_client, order_factory):
-    completed_order = order_factory(status="completed")
-    completed_order.payment_histories.update(imp_id=None)
+def test_retrieve_receipt_returns_404_when_payment_history_has_no_imp_id(
+    customer_client, mock_portone_kcp_receipt, order_factory
+):
+    completed_order = order_factory(status="completed", product_price=0, imp_id=None)
     response = OrdersApi(http_client=customer_client).retrieve_receipt(completed_order.id)
     assert response.status_code == HTTP_404_NOT_FOUND
+    mock_portone_kcp_receipt.assert_not_called()
 
 
 @pytest.mark.django_db

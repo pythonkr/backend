@@ -22,7 +22,7 @@ class ProductNotOrderableErrorMessages:
     SOLDOUT = "{} 상품은 매진되었습니다."
     ALREADY_ORDERED_TOO_MUCH = "{} 상품의 인당 최대 구매 수량 초과로 구매하실 수 없습니다."
     TOO_MUCH_CART_PRODUCT = "{} 상품의 재고 수량을 초과하여 구매하실 수 없습니다. 장바구니에 담은 수량을 확인해주세요."
-    PRICE_TOO_LOW = "결제 금액이 너무 낮습니다, 최소한 1원 이상으로 구매해주세요."
+    PRICE_TOO_LOW = "결제 금액이 너무 낮습니다, 최소한 0원 이상으로 구매해주세요."
     PRICE_TOO_HIGH = "결제 금액이 너무 높습니다, 후원 금액 등을 줄여 100만원 미만으로 구매해주세요."
     DONATION_NOT_ALLOWED = "{} 상품은 후원이 불가능한 상품입니다."
     DONATION_PRICE_OUT_OF_RANGE = "{} 상품의 후원 금액이 범위를 벗어났습니다. {}원 이상 {}원 이하로 입력해주세요."
@@ -57,9 +57,15 @@ class CartNotOrderableErrorMessages:
     ALREADY_ORDERED = "이미 결제한 장바구니입니다."
     CONTAINS_PAID_PRODUCT = "결제한 상품이 포함되어 있습니다. PyCon 한국 준비 위원회에 문의해주세요."
     EMPTY = "장바구니가 비어있습니다, 먼저 상품을 담아주세요."
-    CART_PRICE_TOO_LOW = "장바구니의 금액이 너무 낮습니다. 최소한 1원 이상으로 구매해주세요."
+    CART_PRICE_TOO_LOW = "장바구니의 금액이 너무 낮습니다. 최소한 0원 이상으로 구매해주세요."
     CART_PRICE_TOO_HIGH = "장바구니의 금액이 너무 높습니다. 일부 상품을 제거하여 100만원 미만으로 구매해주세요."
     TICKET_INFO_REQUIRED = "참가자 정보가 입력되지 않은 티켓이 있습니다. 모든 티켓의 참가자 정보를 입력해주세요."
+
+
+class FreeCheckoutErrorMessages:
+    PRICE_NOT_ZERO = "무료 주문은 결제 준비 금액이 0원이어야 합니다."
+    TARGET_NOT_FOUND = "무료 주문 대상을 찾을 수 없습니다."
+    ILLEGAL_STATUS_TRANSITION = "이미 처리된 주문이거나 무료 완료로 전환할 수 없습니다."
 
 
 class NotRefundableErrorMessages:
@@ -99,6 +105,7 @@ class PortOneWebhookFailureCode(models.TextChoices):
     UNEXPECTED_RETRIEVED_ORDER_STATUS = "UNEXPECTED_RETRIEVED_ORDER_STATUS", "예상한 결제 상태가 아닙니다."
     UNEXPECTED_RETRIEVED_ORDER_ID = "UNEXPECTED_RETRIEVED_ORDER_ID", "결제 ID가 일치하지 않습니다."
     UNEXPECTED_PAID_PRICE = "UNEXPECTED_PAID_PRICE", "결제 금액이 일치하지 않습니다."
+    ORDER_NOT_ORDERABLE = "ORDER_NOT_ORDERABLE", "주문 가능한 상태가 아니거나 재고가 부족합니다."
     UNSUPPORTED_CURRENCY = "UNSUPPORTED_CURRENCY", "지원하지 않는 통화입니다."
     ILLEGAL_STATUS_TRANSITION = "ILLEGAL_STATUS_TRANSITION", "이미 처리된 결제이거나 허용되지 않는 상태 전환입니다."
     CANCELLED_NOT_SUPPORTED = (

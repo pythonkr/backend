@@ -150,6 +150,27 @@ def test_admin_product_create_returns_201(api_client, ticket_product):
 
 
 @pytest.mark.django_db
+def test_admin_product_create_allows_zero_price(api_client, ticket_product):
+    response = ProductsAdminApi(http_client=api_client).create(
+        {
+            "name_ko": "무료 튜토리얼",
+            "name_en": "Free Tutorial",
+            "price": 0,
+            "stock": 10,
+            "visible_starts_at": FAR_PAST.isoformat(),
+            "visible_ends_at": FAR_FUTURE.isoformat(),
+            "orderable_starts_at": FAR_PAST.isoformat(),
+            "orderable_ends_at": FAR_FUTURE.isoformat(),
+            "refundable_ends_at": FAR_FUTURE.isoformat(),
+            "category": str(ticket_product.category.id),
+        }
+    )
+    assert response.status_code == HTTP_201_CREATED
+    assert response.json()["price"] == 0
+    assert Product.objects.filter(name_ko="무료 튜토리얼", price=0).exists()
+
+
+@pytest.mark.django_db
 def test_admin_product_partial_update_can_set_refundable_ends_at_null(api_client, ticket_product):
     # null = 환불 불가 상품. 운영자가 어드민에서 직접 지정하는 경로.
     response = ProductsAdminApi(http_client=api_client).update(ticket_product.id, {"refundable_ends_at": None})

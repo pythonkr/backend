@@ -133,6 +133,16 @@ def test_not_fully_refundable_reason_when_price_zero(customer_user, ticket_produ
 
 
 @pytest.mark.django_db
+def test_free_completed_order_without_imp_id_not_refundable_as_no_imp_id(order_factory):
+    order = order_factory(status="completed", product_price=0, imp_id=None)
+
+    assert order.current_status == PaymentHistoryStatus.completed
+    assert order.current_paid_price == 0
+    assert order.latest_imp_id is None
+    assert order.not_fully_refundable_reason == NotRefundableErrorMessages.ORDER_IMP_ID_NOT_EXIST
+
+
+@pytest.mark.django_db
 def test_not_fully_refundable_reason_when_expected_price_mismatch(ticket_product, order_factory):
     completed_order = order_factory(status="completed")
     OrderProductRelation.objects.create(

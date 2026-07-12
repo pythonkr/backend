@@ -64,6 +64,15 @@ def test_opr_not_refundable_reason_when_price_is_zero(customer_user, ticket_prod
 
 
 @pytest.mark.django_db
+def test_free_completed_opr_without_imp_id_not_refundable(order_factory):
+    order = order_factory(status="completed", product_price=0, imp_id=None)
+    opr = order.products.get()
+
+    assert opr.status == OrderProductRelation.OrderProductStatus.paid
+    assert opr.not_refundable_reason == NotRefundableErrorMessages.ORDER_NOT_REFUNDABLE
+
+
+@pytest.mark.django_db
 def test_opr_not_refundable_reason_returns_none_for_refundable_opr(order_factory):
     completed_order = order_factory(status="completed")
     opr = completed_order.products.first()

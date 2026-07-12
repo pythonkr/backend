@@ -52,7 +52,7 @@ class ProductOrderableCheckSerializer(serializers.ModelSerializer):
     - 재고 충분 (mode 별 cart 누적 / +1 / 무시 분기)
     - 인당 최대 구매 수량 안 (mode 별)
     - 후원 금액 정책: donation_allowed + [min, max] 범위
-    - 총 금액 (product + donation + option additional) 이 [1원, 100만원)
+    - 총 금액 (product + donation + option additional) 이 [0원, 100만원)
 
     ==================== 상품군 (Tag) ====================
     - TagOrderableCheckSerializer 위임 (재고 / 인당 한도)
@@ -259,8 +259,8 @@ class ProductOrderableCheckSerializer(serializers.ModelSerializer):
             + donation_price
             + sum(o["product_option"].additional_price for o in options if o["product_option"])
         )
-        # 후원 금액 포함 단일 상품 금액이 0원 이하인 경우 주문 불가능 — PortOne 결제는 0원 금액에서 실패하므로 사전 차단.
-        if total_price <= 0:
+        # 후원 금액 포함 단일 상품 금액이 음수인 경우 주문 불가능.
+        if total_price < 0:
             raise serializers.ValidationError(ProductNotOrderableErrorMessages.PRICE_TOO_LOW)
         # 후원 금액 포함 단일 상품 금액이 100만원 이상인 경우 주문 불가능
         if total_price >= 1_000_000:
@@ -322,7 +322,9 @@ class ProductOrderableCheckSerializer(serializers.ModelSerializer):
         }
 
         if self.validation_mode == OrderableCheckSerializerMode.ADD_SINGLE_PRODUCT_TO_CART:
-            if not (cart := Order.objects.filter(user=self.user).filter_has_no_payment_histories().first()):
+            self._lock_user_for_cart_update()
+            self._revalidate_add_to_cart_after_user_lock(validated_data)
+            if not (cart := self._get_unpaid_cart_for_update()):
                 cart = Order.objects.create(user=self.user)
             order_product_rel_create_kwargs["order"] = cart
         elif self.validation_mode == OrderableCheckSerializerMode.CHECKOUT_SINGLE_PRODUCT:
@@ -351,3 +353,37 @@ class ProductOrderableCheckSerializer(serializers.ModelSerializer):
             TicketInfo.objects.create(**ticket_info_data, order_product_relation=order_product_rel)
 
         return order_product_rel
+
+    def _lock_user_for_cart_update(self) -> None:
+        UserExt.objects.select_for_update().only("id").get(id=self.user.id)
+
+    def _revalidate_add_to_cart_after_user_lock(
+        self, validated_data: ProductOrderableCheckAfterValidationDataType
+    ) -> None:
+        payload: dict[str, object] = {
+            "product": validated_data["product"].id,
+            "donation_price": validated_data.get("donation_price", 0),
+            "options": [
+                {
+                    "product_option_group": option_data["product_option_group"].id,
+                    "product_option": option_data["product_option"].id if option_data["product_option"] else None,
+                    "custom_response": option_data["custom_response"],
+                }
+                for option_data in validated_data["options"]
+            ],
+        }
+        if ticket_info := validated_data.get("ticket_info"):
+            payload["ticket_info"] = ticket_info
+
+        ProductOrderableCheckSerializer(data=payload, context=self.context).is_valid(raise_exception=True)
+
+    def _get_unpaid_cart_for_update(self) -> Order | None:
+        cart = Order.objects.select_for_update().filter(user=self.user).filter_has_no_payment_histories().first()
+        if not cart:
+            return None
+
+        # A concurrent free checkout can create PaymentHistory while this SELECT waits on the cart row.
+        # Recheck in a fresh statement after the lock so stale writers do not mutate a completed order.
+        if Order.objects.filter(id=cart.id).filter_has_no_payment_histories().exists():
+            return cart
+        return None

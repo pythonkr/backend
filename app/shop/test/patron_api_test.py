@@ -16,6 +16,20 @@ def test_patron_list_includes_only_orders_with_donation_product(anon_client, cus
 
 
 @pytest.mark.django_db
+def test_patron_list_includes_zero_won_donation_capable_order(anon_client, order_factory):
+    # 후원 금액이 0원이어도 후원 가능 상품을 구매하기만 하면 후원자 목록에 노출되어야 한다.
+    order = order_factory(status="completed", donation=0, is_ticket=False, product_price=0)
+    product = order.products.get().product
+    product.donation_allowed = True
+    product.save(update_fields=["donation_allowed"])
+
+    response = PatronApi(http_client=anon_client).list()
+
+    assert response.status_code == HTTP_200_OK
+    assert response.json() == [{"name": "홍길동", "contribution_message": ""}]
+
+
+@pytest.mark.django_db
 def test_patron_list_excludes_refunded_orders(anon_client, order_factory):
     order_factory(status="refunded", donation=5000)
     response = PatronApi(http_client=anon_client).list()

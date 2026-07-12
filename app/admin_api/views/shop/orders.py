@@ -16,6 +16,7 @@ from django.core.files import File
 from django.db import models, transaction
 from django.http.response import StreamingHttpResponse
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema, extend_schema_view
+from drf_standardized_errors.openapi_serializers import ValidationErrorResponseSerializer
 from rest_framework import exceptions, mixins, parsers, request, response, status, viewsets
 from rest_framework.decorators import action
 from shop.order import exports, imports
@@ -92,7 +93,10 @@ class OrderAdminViewSet(
     @extend_schema(
         summary="주문 전체 환불",
         tags=[OpenAPITag.ADMIN_SHOP_ORDER_REFUND],
-        responses={status.HTTP_204_NO_CONTENT: None},
+        responses={
+            status.HTTP_204_NO_CONTENT: None,
+            status.HTTP_400_BAD_REQUEST: ValidationErrorResponseSerializer,
+        },
     )
     @action(detail=True, methods=["post"], url_path="refund")
     @transaction.atomic
@@ -109,7 +113,10 @@ class OrderAdminViewSet(
     @extend_schema(
         summary="주문 부분 환불",
         tags=[OpenAPITag.ADMIN_SHOP_ORDER_REFUND],
-        responses={status.HTTP_204_NO_CONTENT: None},
+        responses={
+            status.HTTP_204_NO_CONTENT: None,
+            status.HTTP_400_BAD_REQUEST: ValidationErrorResponseSerializer,
+        },
     )
     @action(detail=True, methods=["post"], url_path=r"products/(?P<rel_id>[^/.]+)/refund")
     @transaction.atomic

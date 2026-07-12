@@ -156,3 +156,21 @@ class SingleProductCartDto(serializers.ModelSerializer):
             "merchant_uid",
         )
         model = SingleProductCart
+
+
+class CreateSingleProductOrderResponseDto(serializers.Serializer):
+    id = serializers.UUIDField()
+    name = serializers.CharField()
+    payment_histories = PaymentHistoryDto(many=True)
+    products = OrderProductRelationDto(many=True)
+    first_paid_price = serializers.IntegerField()
+    current_paid_price = serializers.IntegerField()
+    current_status = serializers.ChoiceField(choices=PaymentHistoryStatus.choices)
+    created_at = serializers.DateTimeField()
+    customer_info = CustomerInfoDto(allow_null=True)
+    merchant_uid = serializers.CharField(allow_null=True)
+
+    # 0원 즉시 완료 응답(OrderDto)에만 존재하는 필드. 유료 SingleProductCart 응답에는 없음.
+    scancode_url = serializers.URLField(required=False, allow_null=True)
+    first_paid_at = serializers.DateTimeField(required=False, allow_null=True)
+    not_fully_refundable_reason = serializers.CharField(required=False, allow_null=True)

@@ -14,7 +14,9 @@ from shop.payment_history.models import (
     PaymentWebhookEvent,
     is_legal_payment_status_transition,
 )
+from shop.payment_history.services import lock_and_revalidate_checkout_order
 from shop.payment_history.tasks import send_payment_completed_notifications
+from shop.serializers.cart_validation import OrderableCheckSerializerMode
 
 
 class PortOneV1PaymentStatus(models.TextChoices):
@@ -124,6 +126,9 @@ class PortOneV1WebhookRequestSerializer(serializers.Serializer):
         if retrieved_order_data["currency"] != "KRW":
             self._reject_and_cancel_paid_payment(PortOneWebhookFailureCode.UNSUPPORTED_CURRENCY)
 
+        if retrieved_order_data["amount"] <= 0:
+            self._reject_and_cancel_paid_payment(PortOneWebhookFailureCode.UNEXPECTED_PAID_PRICE)
+
         if not order.matches_payment_preparation(data["merchant_uid"], retrieved_order_data["amount"]):
             self._reject_and_cancel_paid_payment(PortOneWebhookFailureCode.UNEXPECTED_PAID_PRICE)
 
@@ -132,6 +137,11 @@ class PortOneV1WebhookRequestSerializer(serializers.Serializer):
     @transaction.atomic
     def create(self, validated_data: dict) -> PaymentHistory:
         # CANCELLED webhook (관리자 콘솔 취소) 자동 처리는 미구현 — validate_status 에서 거부됨.
+        validation_mode = (
+            OrderableCheckSerializerMode.CHECKOUT_SINGLE_PRODUCT
+            if isinstance(self.cart_or_order, SingleProductCart)
+            else OrderableCheckSerializerMode.CHECKOUT_CART
+        )
         order = self._lock_or_promote_order(validated_data["merchant_uid"])
         # cart→Order 승격 시 cached cart_or_order 가 stale (cart 는 hard_delete 됨) — 새 Order 로 교체해
         # 이후 _queue_event 가 derive 하는 order/single_product_cart 가 deleted row 를 가리키지 않게 한다.
@@ -144,7 +154,12 @@ class PortOneV1WebhookRequestSerializer(serializers.Serializer):
         if not is_legal_payment_status_transition(order.current_status, next_status):
             self._reject(PortOneWebhookFailureCode.ILLEGAL_STATUS_TRANSITION)
 
-        for product_rel in order.products.filter_active():
+        try:
+            product_rels = lock_and_revalidate_checkout_order(order, validation_mode)
+        except serializers.ValidationError:
+            self._reject_and_cancel_paid_payment(PortOneWebhookFailureCode.ORDER_NOT_ORDERABLE)
+
+        for product_rel in product_rels:
             product_rel.status = OrderProductRelation.OrderProductStatus.paid
             product_rel.save()
 

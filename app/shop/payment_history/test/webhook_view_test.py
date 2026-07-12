@@ -59,7 +59,7 @@ def _post_webhook(
 def test_ip_allowlist_respects_debug_bypass(
     debug, expected_status, expected_body, mock_portone_find_payment_info, order_factory
 ):
-    pending_order = order_factory(status="prepared")
+    pending_order = order_factory(status="prepared", is_ticket=False)
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=pending_order)
     with override_settings(DEBUG=debug):
         response = _post_webhook(merchant_uid=pending_order.merchant_uid, ip=_NON_WHITELISTED_IP)
@@ -96,7 +96,7 @@ def test_ip_allowlist_respects_debug_bypass(
 )
 @pytest.mark.django_db
 def test_accepts_request_from_whitelisted_ip(post_kwargs, mock_portone_find_payment_info, order_factory):
-    pending_order = order_factory(status="prepared")
+    pending_order = order_factory(status="prepared", is_ticket=False)
     mock_portone_find_payment_info.return_value = make_portone_payment_info(order=pending_order)
     response = _post_webhook(merchant_uid=pending_order.merchant_uid, **post_kwargs)
     assert response.status_code == HTTP_200_OK

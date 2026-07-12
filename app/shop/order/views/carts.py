@@ -1,11 +1,12 @@
 import typing
 
 from core.const.tag import OpenAPITag
+from django.db import transaction
 from django.db.models import Exists, OuterRef, QuerySet
 from drf_spectacular.openapi import OpenApiParameter, OpenApiTypes
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from drf_standardized_errors.openapi_serializers import ErrorResponse403Serializer, ValidationErrorResponseSerializer
-from rest_framework import mixins, request, response, status, viewsets
+from rest_framework import exceptions, mixins, request, response, status, viewsets
 from shop.order.models import Order, OrderProductRelation
 from shop.order.serializers.dto import OrderDto
 from shop.payment_history.models import PaymentHistory
@@ -77,7 +78,13 @@ class CartProductViewSet(mixins.CreateModelMixin, mixins.DestroyModelMixin, view
     lookup_url_kwarg = "order_product_rel_id"
     serializer_class = ProductOrderableCheckSerializer
 
-    def get_queryset(self) -> QuerySet[Order]:
+    def get_queryset(self) -> QuerySet[OrderProductRelation]:
+        queryset = self._base_queryset()
+        if self.action == "destroy":
+            return queryset.select_for_update(of=("self",))
+        return queryset
+
+    def _base_queryset(self) -> QuerySet[OrderProductRelation]:
         if not isinstance(self.request.user, UserExt):
             return OrderProductRelation.objects.none()
 
@@ -88,3 +95,19 @@ class CartProductViewSet(mixins.CreateModelMixin, mixins.DestroyModelMixin, view
             single_product_cart__isnull=True,
             status=OrderProductRelation.OrderProductStatus.pending,
         )
+
+    def _lock_parent_order_for_destroy(self, order_product_rel_id: typing.Any) -> None:
+        order_id = self._base_queryset().filter(id=order_product_rel_id).values_list("order_id", flat=True).first()
+        if not order_id:
+            raise exceptions.NotFound()
+
+        order = Order.objects.select_for_update().filter_active().filter(id=order_id).first()
+        if not order or PaymentHistory.objects.filter_active().filter(order_id=order_id).exists():
+            raise exceptions.NotFound()
+
+    @transaction.atomic
+    def destroy(
+        self, request: request.Request, *args: tuple[typing.Any], **kwargs: dict[str, typing.Any]
+    ) -> response.Response:
+        self._lock_parent_order_for_destroy(kwargs.get(self.lookup_url_kwarg))
+        return super().destroy(request, *args, **kwargs)
