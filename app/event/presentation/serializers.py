@@ -61,10 +61,11 @@ class PresentationSpeakerSerializer(serializers.ModelSerializer):
 
 class RoomScheduleSerializer(serializers.ModelSerializer):
     room_name = serializers.CharField(source="room.name", read_only=True)
+    room_order = serializers.IntegerField(source="room.order", read_only=True)
 
     class Meta:
         model = RoomSchedule
-        fields = ("id", "room_name", "start_at", "end_at")
+        fields = ("id", "room_name", "room_order", "start_at", "end_at")
 
 
 class CallForPresentationScheduleSerializer(serializers.ModelSerializer):

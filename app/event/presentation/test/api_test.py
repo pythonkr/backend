@@ -16,7 +16,13 @@ def test_presentation_api(api_client: APIClient, create_presentation_set: Presen
     url = reverse("v1:presentation-list")
     response = api_client.get(url)
     assert response.status_code == http.HTTPStatus.OK
-    assert len(response.json()) > 0
+    response_data = response.json()
+    assert len(response_data) > 0
+
+    # room_schedules 는 방 정렬(시간표 열 순서)을 위해 Room.order 를 포함한다.
+    room_schedule = response_data[0]["room_schedules"][0]
+    assert room_schedule["room_name"] == create_presentation_set.room.name
+    assert room_schedule["room_order"] == create_presentation_set.room.order
 
 
 @pytest.mark.django_db
