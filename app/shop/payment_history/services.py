@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from core.const.shop_error_messages import FreeCheckoutErrorMessages
 from django.db import transaction
 from rest_framework import serializers
 from shop.order.models import Order, OrderProductOptionRelation, OrderProductRelation, SingleProductCart, TicketInfo
@@ -14,9 +15,6 @@ from shop.serializers.cart_validation import (
     ProductOrderableCheckSerializer,
 )
 
-FREE_CHECKOUT_PRICE_ERROR = "무료 주문은 결제 준비 금액이 0원이어야 합니다."
-FREE_CHECKOUT_TARGET_ERROR = "무료 주문 대상을 찾을 수 없습니다."
-FREE_CHECKOUT_TRANSITION_ERROR = "이미 처리된 주문이거나 무료 완료로 전환할 수 없습니다."
 _LOCKED_OPTIONS_ATTR = "_locked_checkout_options"
 _LOCKED_TICKET_INFO_ATTR = "_locked_checkout_ticket_info"
 _MISSING = object()
@@ -33,9 +31,9 @@ def complete_free_checkout(cart_or_order: Order | SingleProductCart) -> Order:
         order = _lock_or_promote_order(cart_or_order)
 
         if order.prepared_price != 0:
-            raise serializers.ValidationError(FREE_CHECKOUT_PRICE_ERROR)
+            raise serializers.ValidationError(FreeCheckoutErrorMessages.PRICE_NOT_ZERO)
         if not is_legal_payment_status_transition(order.current_status, PaymentHistoryStatus.completed):
-            raise serializers.ValidationError(FREE_CHECKOUT_TRANSITION_ERROR)
+            raise serializers.ValidationError(FreeCheckoutErrorMessages.ILLEGAL_STATUS_TRANSITION)
 
         product_rels = lock_and_revalidate_checkout_order(order, validation_mode)
 
@@ -60,7 +58,7 @@ def _lock_or_promote_order(cart_or_order: Order | SingleProductCart) -> Order:
             return cart.to_order()
         if order := Order.objects.select_for_update().filter_active().filter(id=cart_or_order.id).first():
             return order
-        raise serializers.ValidationError(FREE_CHECKOUT_TARGET_ERROR)
+        raise serializers.ValidationError(FreeCheckoutErrorMessages.TARGET_NOT_FOUND)
 
     return Order.objects.select_for_update().filter_active().get(id=cart_or_order.id)
 

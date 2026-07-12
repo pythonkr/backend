@@ -62,6 +62,12 @@ class CartNotOrderableErrorMessages:
     TICKET_INFO_REQUIRED = "참가자 정보가 입력되지 않은 티켓이 있습니다. 모든 티켓의 참가자 정보를 입력해주세요."
 
 
+class FreeCheckoutErrorMessages:
+    PRICE_NOT_ZERO = "무료 주문은 결제 준비 금액이 0원이어야 합니다."
+    TARGET_NOT_FOUND = "무료 주문 대상을 찾을 수 없습니다."
+    ILLEGAL_STATUS_TRANSITION = "이미 처리된 주문이거나 무료 완료로 전환할 수 없습니다."
+
+
 class NotRefundableErrorMessages:
     ONE_OF_PRODUCT_IS_USED = "주문 중 이미 사용한 상품이 존재합니다. 개별 환불을 진행해주세요."
     ONE_OF_PRODUCT_IS_USED_TRY_AFTER_CHANGING_STATUS = (
