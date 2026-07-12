@@ -83,7 +83,9 @@ def lock_and_revalidate_checkout_order(
 
 def _lock_order_allocation_rows(order: Order) -> list[OrderProductRelation]:
     product_rels = list(
-        OrderProductRelation.objects.select_for_update()
+        # of=("self",) — 조인한 Product/Category 까지 잠그지 않도록 제한. Product 는 아래에서 id 순으로 잠근다.
+        # (기본 FOR UPDATE 는 조인 테이블을 OPR.id 순으로 잠가, 상품을 공유하는 서로 다른 주문 간 락 순서가 엇갈려 데드락이 날 수 있음.)
+        OrderProductRelation.objects.select_for_update(of=("self",))
         .filter_active()
         .filter(order=order)
         .select_related("product", "product__category")
@@ -116,7 +118,10 @@ def _lock_order_allocation_rows(order: Order) -> list[OrderProductRelation]:
         .order_by("id")
     )
     ticket_infos = list(
-        TicketInfo.objects.select_for_update().filter_active().filter(order_product_relation_id__in=product_rel_ids)
+        TicketInfo.objects.select_for_update()
+        .filter_active()
+        .filter(order_product_relation_id__in=product_rel_ids)
+        .order_by("id")
     )
 
     option_rels_by_product_rel_id: dict[int, list[OrderProductOptionRelation]] = {}
