@@ -80,7 +80,7 @@ class CartProductViewSet(mixins.CreateModelMixin, mixins.DestroyModelMixin, view
 
     def get_queryset(self) -> QuerySet[OrderProductRelation]:
         queryset = self._base_queryset()
-        if getattr(self, "action", None) == "destroy":
+        if self.action == "destroy":
             return queryset.select_for_update(of=("self",))
         return queryset
 
