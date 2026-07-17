@@ -21,7 +21,10 @@ class NotFoundPrimaryKeyRelatedField(serializers.PrimaryKeyRelatedField):
 
 
 class PresentationBookmarkRequestSerializer(serializers.Serializer):
-    presentation = NotFoundPrimaryKeyRelatedField(queryset=Presentation.objects.filter(deleted_at__isnull=True))
+    presentation_id = NotFoundPrimaryKeyRelatedField(
+        queryset=Presentation.objects.filter(deleted_at__isnull=True),
+        source="presentation",
+    )
 
     def create(self, validated_data: Any) -> tuple[PresentationBookmark, bool]:
         validated_data["user"] = self.context["request"].user
