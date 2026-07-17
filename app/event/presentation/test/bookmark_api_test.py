@@ -219,7 +219,7 @@ class TestBookmarkCreate:
         """
         response = authed_client.post(
             list_url(event.id),
-            data={"presentation": str(presentation.id)},
+            data={"presentation_id": str(presentation.id)},
             format="json",
         )
 
@@ -235,7 +235,7 @@ class TestBookmarkCreate:
         북마크 생성 시 presentation의 type.event로부터 event를 자동 설정하는지 검증합니다.
         프론트는 POST 시 event를 명시적으로 보내지 않으므로, 서버가 presentation에서 파생해야 합니다.
         """
-        authed_client.post(list_url(event.id), data={"presentation": str(presentation.id)}, format="json")
+        authed_client.post(list_url(event.id), data={"presentation_id": str(presentation.id)}, format="json")
 
         bookmark = PresentationBookmark.objects.get(user=user, presentation=presentation)
         assert bookmark.presentation.type.event.id == event.id
@@ -253,7 +253,7 @@ class TestBookmarkCreate:
 
         response = authed_client.post(
             list_url(event.id),
-            data={"presentation": str(presentation.id)},
+            data={"presentation_id": str(presentation.id)},
             format="json",
         )
 
@@ -269,7 +269,7 @@ class TestBookmarkCreate:
         """
         response = authed_client.post(
             list_url(event.id),
-            data={"presentation": str(uuid.uuid4())},
+            data={"presentation_id": str(uuid.uuid4())},
             format="json",
         )
 
@@ -288,7 +288,7 @@ class TestBookmarkCreate:
 
         response = authed_client.post(
             list_url(event.id),
-            data={"presentation": str(presentation.id)},
+            data={"presentation_id": str(presentation.id)},
             format="json",
         )
 
@@ -302,7 +302,7 @@ class TestBookmarkCreate:
         """
         response = authed_client.post(
             list_url(event.id),
-            data={"presentation": "not-a-uuid"},
+            data={"presentation_id": "not-a-uuid"},
             format="json",
         )
 
@@ -326,7 +326,7 @@ class TestBookmarkCreate:
         """
         response = anon_client.post(
             list_url(event.id),
-            data={"presentation": str(presentation.id)},
+            data={"presentation_id": str(presentation.id)},
             format="json",
         )
 
@@ -345,8 +345,8 @@ class TestBookmarkCreate:
         시간이 겹치는 세션들도 모두 북마크할 수 있는지 검증합니다.
         UX 확정 사항: 겹침 경고는 프론트가 처리하고, 서버는 시간대 충돌을 검사하지 않습니다.
         """
-        resp1 = authed_client.post(list_url(event.id), data={"presentation": str(presentation.id)}, format="json")
-        resp2 = authed_client.post(list_url(event.id), data={"presentation": str(presentation_2.id)}, format="json")
+        resp1 = authed_client.post(list_url(event.id), data={"presentation_id": str(presentation.id)}, format="json")
+        resp2 = authed_client.post(list_url(event.id), data={"presentation_id": str(presentation_2.id)}, format="json")
 
         assert resp1.status_code == http.HTTPStatus.CREATED
         assert resp2.status_code == http.HTTPStatus.CREATED
@@ -359,7 +359,7 @@ class TestBookmarkCreate:
         """
         response = authed_client.post(
             list_url(uuid.uuid4()),
-            data={"presentation": str(presentation.id)},
+            data={"presentation_id": str(presentation.id)},
             format="json",
         )
 
@@ -492,7 +492,7 @@ class TestBookmarkUndoFlow:
         각 단계에서 GET으로 목록을 조회해 상태가 올바른지 확인합니다.
         """
         # 1단계: 담기
-        resp = authed_client.post(list_url(event.id), data={"presentation": str(presentation.id)}, format="json")
+        resp = authed_client.post(list_url(event.id), data={"presentation_id": str(presentation.id)}, format="json")
         assert resp.status_code == http.HTTPStatus.CREATED
 
         # GET으로 확인: 1개
@@ -508,7 +508,7 @@ class TestBookmarkUndoFlow:
         assert len(resp.json()["presentation_ids"]) == 0
 
         # 3단계: 되돌리기 (다시 POST)
-        resp = authed_client.post(list_url(event.id), data={"presentation": str(presentation.id)}, format="json")
+        resp = authed_client.post(list_url(event.id), data={"presentation_id": str(presentation.id)}, format="json")
         assert resp.status_code == http.HTTPStatus.CREATED
 
         # GET으로 확인: 다시 1개
@@ -540,8 +540,8 @@ class TestBookmarkUndoFlow:
         같은 세션에 대해 POST가 빠르게 2번 연속 호출되어도
         두 번째 요청이 에러 없이 200을 반환하고 중복 레코드가 생기지 않는지 검증합니다.
         """
-        resp1 = authed_client.post(list_url(event.id), data={"presentation": str(presentation.id)}, format="json")
-        resp2 = authed_client.post(list_url(event.id), data={"presentation": str(presentation.id)}, format="json")
+        resp1 = authed_client.post(list_url(event.id), data={"presentation_id": str(presentation.id)}, format="json")
+        resp2 = authed_client.post(list_url(event.id), data={"presentation_id": str(presentation.id)}, format="json")
 
         assert resp1.status_code == http.HTTPStatus.CREATED
         assert resp2.status_code == http.HTTPStatus.OK
@@ -584,7 +584,7 @@ class TestErrorResponseFormat:
         """
         response = authed_client.post(
             list_url(event.id),
-            data={"presentation": str(uuid.uuid4())},
+            data={"presentation_id": str(uuid.uuid4())},
             format="json",
         )
 
@@ -601,7 +601,7 @@ class TestErrorResponseFormat:
         """
         response = authed_client.post(
             list_url(event.id),
-            data={"presentation": "invalid"},
+            data={"presentation_id": "invalid"},
             format="json",
         )
 
