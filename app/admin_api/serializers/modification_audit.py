@@ -2,6 +2,7 @@ import typing
 import unicodedata
 
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
+from django.db import transaction
 from event.presentation.models import Presentation, PresentationSpeaker
 from participant_portal_api.models import ModificationAudit, ModificationAuditComment
 from rest_framework import serializers
@@ -63,9 +64,10 @@ class ModificationAuditApprovalAdminSerializer(serializers.ModelSerializer):
 
     def save(self, **kwargs: dict) -> ModificationAudit:
         instance: ModificationAudit = self.instance
-        instance.status = ModificationAudit.Status.APPROVED
-        instance.apply_modification()
-        instance.save()
+        with transaction.atomic():
+            instance.status = ModificationAudit.Status.APPROVED
+            instance.apply_modification()
+            instance.save()
 
         return instance
 

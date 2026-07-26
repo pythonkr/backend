@@ -12,6 +12,8 @@ from django.db import models
 from django.db.models.fields.files import FieldFile
 from django.forms import model_to_dict
 from django.utils.functional import Promise
+from modeltranslation.translator import NotRegistered
+from modeltranslation.translator import translator as modeltranslation_translator
 
 
 def arbitrary_value_to_basic_type(value: typing.Any) -> str | int | float | bool | None:
@@ -258,8 +260,17 @@ def apply_diff_to_model(models_data: dict[str, dict[str, typing.Any]]) -> list[m
         if not (model_instance := identifier_to_model(model_identifier)):
             raise ValueError(f"Model class not found for identifier: {model_identifier}")
 
+        # 원본 필드는 활성 언어로 라우팅되는 descriptor라 적용 시점의 언어에 좌우되므로, 언어별 컬럼만 적용한다.
+        try:
+            skip_fields = set(modeltranslation_translator.get_options_for_model(type(model_instance)).fields)
+        except NotRegistered:
+            skip_fields = set()
+
         # Apply the data to the model instance
         for field_name, value in model_data.items():
+            if field_name in skip_fields:
+                continue
+
             if is_identifier(value):
                 # If the value is a model identifier, resolve it to a model instance
                 if not (related_model_instance := identifier_to_model(value)):
