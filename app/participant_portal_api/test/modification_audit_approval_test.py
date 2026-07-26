@@ -1,9 +1,4 @@
-"""수정 심사 승인(approve) 시 변경 내역이 올바른 언어 컬럼에 반영되는지 검증한다.
-
-modeltranslation 의 원본 필드(nickname 등)는 '현재 활성 언어'로 라우팅되는 descriptor 다.
-수정 요청을 만든 시점(요청자의 언어)과 승인 시점(승인자의 언어)이 다르면
-반대쪽 언어 컬럼을 덮어쓰던 버그가 있었다.
-"""
+"""수정 심사 승인 시 변경 내역이 승인자의 언어와 무관하게 올바른 언어 컬럼에 반영되는지 검증한다."""
 
 from contextlib import contextmanager
 from types import SimpleNamespace

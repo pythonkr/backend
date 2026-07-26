@@ -4,6 +4,7 @@ import pytest
 from core.util.django_orm import apply_diff_to_model, model_to_identifier, translated_original_field_names
 from django.utils.translation import override
 from event.presentation.models import Presentation
+from file.models import PublicFile
 from model_bakery import baker
 from user.models import UserExt
 
@@ -14,10 +15,8 @@ def test_translated_original_field_names_returns_registered_fields():
     assert translated_original_field_names(Presentation) == {"title", "summary", "description"}
 
 
-def test_translated_original_field_names_is_empty_for_unregistered_model(db):
+def test_translated_original_field_names_is_empty_for_unregistered_model():
     """번역 등록이 없는 모델은 빈 집합을 돌려준다."""
-    from file.models import PublicFile
-
     assert translated_original_field_names(PublicFile) == set()
 
 
