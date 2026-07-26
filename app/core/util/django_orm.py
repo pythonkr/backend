@@ -253,13 +253,6 @@ def json_to_simplenamespace(model_data: dict[str, dict[str, typing.Any]], key: s
     return resolved_models[key]
 
 
-def translated_original_field_names(model_class: type[models.Model]) -> set[str]:
-    try:
-        return set(modeltranslation_translator.get_options_for_model(model_class).fields)
-    except NotRegistered:
-        return set()
-
-
 def apply_diff_to_model(models_data: dict[str, dict[str, typing.Any]]) -> list[models.Model]:
     result_instances: list[models.Model] = []
 
@@ -268,7 +261,10 @@ def apply_diff_to_model(models_data: dict[str, dict[str, typing.Any]]) -> list[m
             raise ValueError(f"Model class not found for identifier: {model_identifier}")
 
         # 원본 필드는 활성 언어로 라우팅되는 descriptor라 적용 시점의 언어에 좌우되므로, 언어별 컬럼만 적용한다.
-        skip_fields = translated_original_field_names(type(model_instance))
+        try:
+            skip_fields = set(modeltranslation_translator.get_options_for_model(type(model_instance)).fields)
+        except NotRegistered:
+            skip_fields = set()
 
         # Apply the data to the model instance
         for field_name, value in model_data.items():
