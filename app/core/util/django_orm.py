@@ -254,7 +254,6 @@ def json_to_simplenamespace(model_data: dict[str, dict[str, typing.Any]], key: s
 
 
 def translated_original_field_names(model_class: type[models.Model]) -> set[str]:
-    """django-modeltranslation이 번역 대상으로 등록한 '원본' 필드명(예: nickname, title) 집합."""
     try:
         return set(modeltranslation_translator.get_options_for_model(model_class).fields)
     except NotRegistered:
