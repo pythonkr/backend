@@ -12,6 +12,8 @@ from django.db import models
 from django.db.models.fields.files import FieldFile
 from django.forms import model_to_dict
 from django.utils.functional import Promise
+from modeltranslation.translator import NotRegistered
+from modeltranslation.translator import translator as modeltranslation_translator
 
 
 def arbitrary_value_to_basic_type(value: typing.Any) -> str | int | float | bool | None:
@@ -251,6 +253,15 @@ def json_to_simplenamespace(model_data: dict[str, dict[str, typing.Any]], key: s
     return resolved_models[key]
 
 
+def translated_original_field_names(model_class: type[models.Model]) -> set[str]:
+    """django-modeltranslation이 번역 대상으로 등록한 '원본' 필드명(예: nickname, title) 집합."""
+    try:
+        # TranslationOptions.fields는 버전에 따라 tuple 또는 dict이므로 set()으로 통일해 원본 필드명만 얻는다.
+        return set(modeltranslation_translator.get_options_for_model(model_class).fields)
+    except NotRegistered:
+        return set()
+
+
 def apply_diff_to_model(models_data: dict[str, dict[str, typing.Any]]) -> list[models.Model]:
     result_instances: list[models.Model] = []
 
@@ -258,8 +269,16 @@ def apply_diff_to_model(models_data: dict[str, dict[str, typing.Any]]) -> list[m
         if not (model_instance := identifier_to_model(model_identifier)):
             raise ValueError(f"Model class not found for identifier: {model_identifier}")
 
+        # modeltranslation의 원본 필드(nickname 등)는 현재 활성 언어로 라우팅되는 descriptor다.
+        # diff를 만든 시점(요청자의 언어)과 적용하는 시점(승인자의 언어)이 다르면 엉뚱한 언어 컬럼을
+        # 덮어쓰므로, 적용은 언어별 실제 컬럼(nickname_ko/nickname_en)으로만 수행한다.
+        skip_fields = translated_original_field_names(type(model_instance))
+
         # Apply the data to the model instance
         for field_name, value in model_data.items():
+            if field_name in skip_fields:
+                continue
+
             if is_identifier(value):
                 # If the value is a model identifier, resolve it to a model instance
                 if not (related_model_instance := identifier_to_model(value)):

@@ -2,6 +2,7 @@ import typing
 import unicodedata
 
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
+from django.db import transaction
 from event.presentation.models import Presentation, PresentationSpeaker
 from participant_portal_api.models import ModificationAudit, ModificationAuditComment
 from rest_framework import serializers
@@ -63,9 +64,12 @@ class ModificationAuditApprovalAdminSerializer(serializers.ModelSerializer):
 
     def save(self, **kwargs: dict) -> ModificationAudit:
         instance: ModificationAudit = self.instance
-        instance.status = ModificationAudit.Status.APPROVED
-        instance.apply_modification()
-        instance.save()
+        # 수정 요청은 여러 모델(예: 발표 + 발표자)에 걸칠 수 있다. 중간에 실패하면 일부만 반영된 채
+        # 심사 상태는 requested로 남으므로, 적용과 상태 변경을 한 트랜잭션으로 묶는다.
+        with transaction.atomic():
+            instance.status = ModificationAudit.Status.APPROVED
+            instance.apply_modification()
+            instance.save()
 
         return instance
 
