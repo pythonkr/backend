@@ -7,6 +7,7 @@ from django.urls import reverse
 from event.models import Event
 from event.presentation.models import Presentation, PresentationType
 from event.presentation.test.conftest import PresentationTestEntity
+from file.models import PublicFile
 from rest_framework.test import APIClient
 from user.models.organization import Organization
 
@@ -86,3 +87,56 @@ def test_presentation_defaults_to_latest_event(api_client: APIClient):
     response_data = response.json()
     assert len(response_data) == 1
     assert response_data[0]["id"] == str(new_prst.id)
+
+
+def _make_public_file(name: str) -> PublicFile:
+    return PublicFile.objects.create(file=f"public/{name}.png", mimetype="image/png", hash=name, size=0)
+
+
+def _get_speaker_image(api_client: APIClient) -> str | None:
+    response = api_client.get(reverse("v1:presentation-list"))
+    assert response.status_code == http.HTTPStatus.OK
+    return response.json()[0]["speakers"][0]["image"]
+
+
+@pytest.mark.django_db
+def test_speaker_image_falls_back_to_profile_image(
+    api_client: APIClient, create_presentation_set: PresentationTestEntity
+):
+    # Given: 발표자 이미지는 비어 있고 프로필 이미지만 등록된 발표자
+    user = create_presentation_set.user
+    user.image = _make_public_file("profile")
+    user.save()
+
+    # Then: 프로필 이미지가 대신 노출된다.
+    image_url = _get_speaker_image(api_client)
+    assert image_url is not None and image_url.endswith(user.image.file.url)
+
+
+@pytest.mark.django_db
+def test_speaker_image_takes_precedence_over_profile_image(
+    api_client: APIClient, create_presentation_set: PresentationTestEntity
+):
+    # Given: 발표자 이미지와 프로필 이미지가 모두 등록된 발표자
+    user = create_presentation_set.user
+    user.image = _make_public_file("profile")
+    user.save()
+
+    speaker = create_presentation_set.presentation_speaker
+    speaker.image = _make_public_file("speaker")
+    speaker.save()
+
+    # Then: 발표자 이미지가 우선한다.
+    image_url = _get_speaker_image(api_client)
+    assert image_url is not None and image_url.endswith(speaker.image.file.url)
+
+
+@pytest.mark.django_db
+def test_speaker_image_is_null_without_any_image(
+    api_client: APIClient, create_presentation_set: PresentationTestEntity
+):
+    # Given: 발표자 이미지도 프로필 이미지도 없는 발표자
+    assert create_presentation_set.presentation_speaker.image is None
+    assert create_presentation_set.user.image is None
+
+    assert _get_speaker_image(api_client) is None

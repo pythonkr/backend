@@ -55,7 +55,7 @@ class PresentationCategorySerializer(serializers.ModelSerializer):
 
 class PresentationSpeakerSerializer(serializers.ModelSerializer):
     nickname = serializers.CharField(source="user.nickname", read_only=True)
-    image = serializers.FileField(source="image.file", read_only=True, allow_null=True)
+    image = serializers.FileField(source="display_image.file", read_only=True, allow_null=True)
 
     class Meta:
         model = PresentationSpeaker
