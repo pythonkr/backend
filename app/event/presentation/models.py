@@ -26,7 +26,7 @@ class PresentationQuerySet(BaseAbstractModelQuerySet):
                 ),
                 models.Prefetch(
                     lookup="speakers",
-                    queryset=PresentationSpeaker.objects.filter_active().select_related("user", "image"),
+                    queryset=PresentationSpeaker.objects.filter_active().select_related("user__image", "image"),
                     to_attr="_prefetched_active_speakers",
                 ),
                 models.Prefetch(
@@ -158,6 +158,11 @@ class PresentationSpeaker(BaseAbstractModel):
     user = models.ForeignKey(User, on_delete=models.PROTECT)
     image = models.ForeignKey(PublicFile, on_delete=models.PROTECT, null=True, blank=True)
     biography = MarkdownField(blank=True, default="")
+
+    @property
+    def display_image(self) -> PublicFile | None:
+        """발표자 이미지를 따로 등록하지 않았다면 프로필 이미지로 대체한다."""
+        return self.image or self.user.image
 
 
 class CallForPresentationSchedule(BaseAbstractModel):
