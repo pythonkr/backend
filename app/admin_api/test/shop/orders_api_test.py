@@ -23,6 +23,7 @@ from rest_framework.status import (
 from rest_framework.test import APIClient
 from shop.order.models import CustomerInfo, Order, OrderProductRelation
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
+from user.models import UserExt
 
 
 @pytest.mark.parametrize("client_fixture", ["anon_client", "customer_client"])
@@ -288,6 +289,34 @@ def test_admin_import_csv_persists_paid_order_from_uploaded_row(api_client, cust
     opr = OrderProductRelation.objects.get(product=ticket_product)
     assert opr.status == OrderProductRelation.OrderProductStatus.paid
     assert opr.order.user == customer_user
+    # 빈 셀은 pandas NaN → 문자열 "nan" 이 아니라 빈 문자열로 저장돼야 한다.
+    assert opr.order.customer_info.organization == ""
+
+
+@pytest.mark.django_db
+def test_admin_import_csv_rejects_blank_required_cell(api_client, customer_user, ticket_product):
+    response = OrdersAdminApi(http_client=api_client).import_csv(
+        csv_file=_csv_file(
+            "name,phone,email,organization,product_id,donation_price\n"
+            f",010-1234-5678,{customer_user.email},,{ticket_product.id},0\n"
+        )
+    )
+    assert response.status_code == HTTP_400_BAD_REQUEST
+    assert [error["attr"] for error in response.json()["errors"]] == ["0.name"]
+    assert not OrderProductRelation.objects.exists()
+
+
+@pytest.mark.django_db
+def test_admin_import_csv_skips_option_group_with_blank_cell(api_client, customer_user, ticket_product, option_group):
+    option_group.options.create(name="M", additional_price=0)
+    response = OrdersAdminApi(http_client=api_client).import_csv(
+        csv_file=_csv_file(
+            "name,phone,email,organization,product_id,donation_price,사이즈\n"
+            f"홍길동,010-1234-5678,{customer_user.email},,{ticket_product.id},0,\n"
+        )
+    )
+    assert response.status_code == HTTP_201_CREATED
+    assert OrderProductRelation.objects.get(product=ticket_product).options.count() == 0
 
 
 @pytest.mark.django_db
@@ -343,12 +372,12 @@ def test_admin_import_csv_rejects_missing_file(api_client):
 
 
 @pytest.mark.django_db
-def test_admin_import_csv_returns_400_for_invalid_rows_without_persisting(api_client, ticket_product):
-    # email 매칭되는 user 부재 → 모든 row validate 실패 → atomic rollback.
+def test_admin_import_csv_returns_400_for_invalid_rows_without_persisting(api_client, customer_user, ticket_product):
+    # 전화번호 형식 불일치 → 모든 row validate 실패 → atomic rollback.
     response = OrdersAdminApi(http_client=api_client).import_csv(
         csv_file=_csv_file(
             "name,phone,email,organization,product_id,donation_price\n"
-            f"홍길동,010-1234-5678,nobody@example.com,,{ticket_product.id},0\n"
+            f"홍길동,전화번호아님,{customer_user.email},,{ticket_product.id},0\n"
         )
     )
     assert response.status_code == HTTP_400_BAD_REQUEST
@@ -357,19 +386,49 @@ def test_admin_import_csv_returns_400_for_invalid_rows_without_persisting(api_cl
 
 
 @pytest.mark.django_db
-def test_admin_import_csv_error_attr_identifies_the_failing_row(api_client, customer_user, ticket_product):
-    # 1행은 유효, 2행은 미가입 이메일 → attr 의 행 인덱스로 실패한 행을 식별할 수 있어야 한다.
+def test_admin_import_csv_error_attr_identifies_the_failing_row(
+    api_client, customer_user, ticket_product, option_group
+):
+    # 1행은 유효, 2행은 정의되지 않은 옵션값 → attr 의 행 인덱스로 실패한 행을 식별할 수 있어야 한다.
+    option_group.options.create(name="M", additional_price=0)
     response = OrdersAdminApi(http_client=api_client).import_csv(
         csv_file=_csv_file(
-            "name,phone,email,organization,product_id,donation_price\n"
-            f"홍길동,010-1234-5678,{customer_user.email},,{ticket_product.id},0\n"
-            f"김철수,010-2222-3333,nobody@example.com,,{ticket_product.id},0\n"
+            "name,phone,email,organization,product_id,donation_price,사이즈\n"
+            f"홍길동,010-1234-5678,{customer_user.email},,{ticket_product.id},0,M\n"
+            f"김철수,010-2222-3333,other@example.com,,{ticket_product.id},0,XXL\n"
         )
     )
     assert response.status_code == HTTP_400_BAD_REQUEST
     assert [error["attr"] for error in response.json()["errors"]] == ["1.non_field_errors"]
     # 유효한 1행도 저장되지 않는다 (전부 성공해야 저장).
     assert not OrderProductRelation.objects.exists()
+
+
+@pytest.mark.django_db
+def test_admin_import_csv_creates_missing_user_from_row_email(api_client, ticket_product):
+    response = OrdersAdminApi(http_client=api_client).import_csv(
+        csv_file=_csv_file(
+            "name,phone,email,organization,product_id,donation_price\n"
+            f"홍길동,010-1234-5678,nobody@example.com,,{ticket_product.id},0\n"
+        )
+    )
+    assert response.status_code == HTTP_201_CREATED
+    assert OrderProductRelation.objects.get(product=ticket_product).order.user.email == "nobody@example.com"
+
+
+@pytest.mark.django_db
+def test_admin_import_csv_rolls_back_created_users_when_a_later_row_fails(api_client, ticket_product, option_group):
+    # 1행이 유저를 만들고 2행이 실패 → 라우트 atomic 으로 유저 생성까지 되돌아가야 한다.
+    option_group.options.create(name="M", additional_price=0)
+    response = OrdersAdminApi(http_client=api_client).import_csv(
+        csv_file=_csv_file(
+            "name,phone,email,organization,product_id,donation_price,사이즈\n"
+            f"홍길동,010-1234-5678,first@example.com,,{ticket_product.id},0,M\n"
+            f"김철수,010-2222-3333,second@example.com,,{ticket_product.id},0,XXL\n"
+        )
+    )
+    assert response.status_code == HTTP_400_BAD_REQUEST
+    assert not UserExt.objects.filter(email__in=["first@example.com", "second@example.com"]).exists()
 
 
 @pytest.mark.parametrize("include_refunded", [False, True])

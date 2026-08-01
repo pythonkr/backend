@@ -19,6 +19,10 @@ def b64_to_uuid(in_str: str) -> UUID:
     return UUID(bytes=urlsafe_b64decode(in_str + "=" * (-len(in_str) % 4)))
 
 
+def normalize_email(email: str | None) -> str:
+    return str(email or "").strip().lower()
+
+
 def format_korean_date(value: datetime) -> str:
     local = value.astimezone(KST)
     return f"{local.year}년 {local.month}월 {local.day}일({KOREAN_WEEKDAYS[local.weekday()]})"

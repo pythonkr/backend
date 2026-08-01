@@ -1,9 +1,11 @@
 import pytest
+from allauth.account.models import EmailAddress
 from core.util.testutil import errors_payload
 from shop.order.imports import OrderProductImportSerializer
 from shop.order.models import CustomerInfo, Order, OrderProductOptionRelation, OrderProductRelation
 from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
 from shop.product.models import OptionGroup
+from user.models import UserExt
 
 
 @pytest.mark.django_db
@@ -63,38 +65,94 @@ def test_import_includes_option_additional_price_in_opr_price(customer_user, tic
     assert opr.price == ticket_product.price + 1000
 
 
-@pytest.mark.parametrize(
-    ("override_email", "size_value", "expected_error"),
-    [
-        # CSV email 이 매칭되는 UserExt 없음 → validate 단계 1.
-        ("nobody@example.com", "M", "User does not exists"),
-        # 옵션 값이 그룹에 정의된 옵션명과 불일치 → validate 단계 2.
-        (None, "XXL", "Invalid option: '사이즈' - XXL"),
-    ],
-)
 @pytest.mark.django_db
-def test_import_rejects_invalid_row_and_persists_nothing(
-    customer_user, ticket_product, option_group, override_email, size_value, expected_error
-):
+def test_import_rejects_invalid_row_and_persists_nothing(customer_user, ticket_product, option_group):
     option_group.options.create(name="M", additional_price=0)
     serializer = OrderProductImportSerializer(
         data={
             "name": "홍길동",
             "phone": "010-1234-5678",
-            # None 일 때 fixture user 매칭 — 옵션 검증 단계까지 도달.
-            "email": override_email or customer_user.email,
+            "email": customer_user.email,
             "organization": "",
             "product_id": str(ticket_product.id),
             "donation_price": 0,
-            "사이즈": size_value,
+            # 옵션 값이 그룹에 정의된 옵션명과 불일치.
+            "사이즈": "XXL",
         }
     )
     assert serializer.is_valid() is False
+    expected_error = "Invalid option: '사이즈' - XXL"
     assert errors_payload(serializer.errors) == {"non_field_errors": [{"detail": expected_error, "code": "invalid"}]}
-    # 어느 단계의 validation 실패든 atomic — Order / OPR / CustomerInfo 일체 미생성.
+    # validation 실패 시 Order / OPR / CustomerInfo 일체 미생성. 유저 생성도 옵션 검증 이후라 발생하지 않음.
     assert not Order.objects.exists()
     assert not OrderProductRelation.objects.exists()
     assert not CustomerInfo.objects.exists()
+    assert not UserExt.objects.filter(email="홍길동").exists()
+
+
+@pytest.mark.django_db
+def test_import_creates_user_when_email_matches_no_account(ticket_product):
+    serializer = OrderProductImportSerializer(
+        data={
+            "name": "홍길동",
+            "phone": "010-1234-5678",
+            "email": "nobody@example.com",
+            "organization": "",
+            "product_id": str(ticket_product.id),
+            "donation_price": 0,
+        }
+    )
+    assert serializer.is_valid(), serializer.errors
+    opr = serializer.save()
+
+    created = UserExt.objects.get(email="nobody@example.com")
+    assert opr.order.user == created
+    assert created.nickname_ko == created.nickname_en == "홍길동"
+    # 비밀번호 미설정 — 본인이 비밀번호 재설정 / 소셜 로그인으로 계정을 이어받는다.
+    assert not created.has_usable_password()
+    assert EmailAddress.objects.filter(user=created, email="nobody@example.com", verified=True, primary=True).exists()
+
+
+@pytest.mark.django_db
+def test_import_matches_user_by_secondary_email_address(customer_user, ticket_product):
+    EmailAddress.objects.create(user=customer_user, email="alt@example.com", verified=True)
+    serializer = OrderProductImportSerializer(
+        data={
+            "name": "홍길동",
+            "phone": "010-1234-5678",
+            "email": "alt@example.com",
+            "organization": "",
+            "product_id": str(ticket_product.id),
+            "donation_price": 0,
+        }
+    )
+    assert serializer.is_valid(), serializer.errors
+    opr = serializer.save()
+
+    assert opr.order.user == customer_user
+    assert UserExt.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_import_resolves_merged_account_to_merge_target(customer_user, other_user, ticket_product):
+    # 병합된 소스 계정에 남은 이메일로 들어와도 주문은 병합 대상 계정에 붙어야 한다.
+    EmailAddress.objects.create(user=other_user, email="merged@example.com", verified=True)
+    other_user.merged_to = customer_user
+    other_user.is_active = False
+    other_user.save(update_fields=["merged_to", "is_active"])
+
+    serializer = OrderProductImportSerializer(
+        data={
+            "name": "홍길동",
+            "phone": "010-1234-5678",
+            "email": "merged@example.com",
+            "organization": "",
+            "product_id": str(ticket_product.id),
+            "donation_price": 0,
+        }
+    )
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.save().order.user == customer_user
 
 
 @pytest.mark.django_db

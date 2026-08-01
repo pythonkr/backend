@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 import typing
 from functools import cached_property
 from uuid import uuid4
@@ -7,6 +8,7 @@ from uuid import uuid4
 from core.const.system import SYSTEM_EMAIL, SYSTEM_USERNAME
 from core.fields import EncryptedTextField
 from core.scancode_mixin import ScanCodeMixin
+from core.util.strutil import normalize_email
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models
 
@@ -23,6 +25,43 @@ class UserExtManager(UserManager):
                 defaults={"verified": True, "primary": True},
             )
         return user
+
+    def filter_by_email(self, email: str) -> models.QuerySet[UserExt]:
+        if not (email := normalize_email(email)):
+            return self.none()
+        return self.filter(models.Q(emailaddress__email__iexact=email) | models.Q(email__iexact=email)).distinct()
+
+    def get_or_create_by_email(
+        self, email: str, password: str | None = None, **extra_fields: typing.Any
+    ) -> tuple[UserExt, bool]:
+        email = normalize_email(email)
+        candidates = self.filter_by_email(email).order_by("-is_active", "-date_joined")
+        user = (
+            candidates.filter(emailaddress__email__iexact=email, emailaddress__verified=True).first()
+            or candidates.first()
+        )
+        if user is None:
+            return self.create_by_email(email, password, **extra_fields), True
+
+        seen: set[int] = set()  # 병합 대상 계정으로 해석. seen 은 비정상 병합 체인의 무한 루프 방어.
+        while user.merged_to_id and user.pk not in seen:
+            seen.add(user.pk)
+            user = user.merged_to
+        return user, False
+
+    def create_by_email(self, email: str, password: str | None = None, **extra_fields: typing.Any) -> UserExt:
+        email = normalize_email(email)
+        if "username" not in extra_fields:
+            max_length: int = self.model._meta.get_field("username").max_length
+            local, _, domain = email.partition("@")
+            username = local[:max_length]
+            if self.filter(username=username).exists():
+                username = (base := f"{domain}-{local}")[:max_length]
+                while self.filter(username=username).exists():
+                    suffix = f"-{secrets.token_hex(3)}"
+                    username = base[: max_length - len(suffix)] + suffix
+            extra_fields["username"] = username
+        return self.create_user(email=email, password=password, **extra_fields)
 
 
 class UserExt(ScanCodeMixin, AbstractUser):

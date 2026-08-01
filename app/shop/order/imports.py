@@ -51,7 +51,7 @@ class OrderProductImportSerializer(serializers.ModelSerializer):
 
     product_id = serializers.PrimaryKeyRelatedField(queryset=Product.objects.filter_active(), source="id")
     donation_price = serializers.IntegerField(required=True)
-    options = serializers.DictField(child=serializers.CharField(), required=True)
+    options = serializers.DictField(child=serializers.CharField(allow_blank=True), required=True)
 
     class Meta:
         model = OrderProductRelation
@@ -65,8 +65,14 @@ class OrderProductImportSerializer(serializers.ModelSerializer):
         return pandas.DataFrame(columns=serializer_fields + option_fields).to_csv(index=False)
 
     @functools.cached_property
-    def user(self) -> UserExt | None:
-        return UserExt.objects.filter(email=self.initial_data.get("email", "")).first()
+    def user(self) -> UserExt:
+        name: str = self.initial_data["name"]
+        user, _ = UserExt.objects.get_or_create_by_email(
+            email=self.initial_data["email"],
+            nickname_ko=name,
+            nickname_en=name,
+        )
+        return user
 
     @functools.cached_property
     def product(self) -> Product | None:
@@ -113,9 +119,6 @@ class OrderProductImportSerializer(serializers.ModelSerializer):
         return super().to_internal_value(data | {"options": options})
 
     def validate(self, data: dict) -> dict:
-        if not self.user:
-            raise serializers.ValidationError("User does not exists")
-
         check_data = {
             "product": self.product.id,
             "donation_price": data["donation_price"],

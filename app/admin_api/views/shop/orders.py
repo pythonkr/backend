@@ -187,7 +187,7 @@ class OrderAdminViewSet(
         if not (csv_file := request.FILES.get("csv_file")):
             raise exceptions.ValidationError({"csv_file": "이 값이 필요합니다."})
 
-        csv_df = read_uploaded_csv(csv_file.read())
+        csv_df = read_uploaded_csv(csv_file.read()).fillna("")
         csv_serializers = [
             imports.OrderProductImportSerializer(data=datum) for datum in csv_df.to_dict(orient="index").values()
         ]
