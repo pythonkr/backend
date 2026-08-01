@@ -1,7 +1,7 @@
 import datetime
 import io
-import json
 import typing
+from codecs import BOM_UTF8
 from logging import getLogger
 
 import pandas
@@ -10,11 +10,12 @@ from admin_api.serializers.shop.orders import OrderAdminSerializer, OrderExportR
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
 from core.pagination import AdminPagination
+from core.util.fileutil import read_uploaded_csv
 from core.viewset.json_schema_viewset import JsonSchemaMixin
 from core.viewset.selectables_viewset import SelectablesMixin
 from django.core.files import File
 from django.db import models, transaction
-from django.http.response import StreamingHttpResponse
+from django.http.response import HttpResponse, StreamingHttpResponse
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema, extend_schema_view
 from drf_standardized_errors.openapi_serializers import ValidationErrorResponseSerializer
 from rest_framework import exceptions, mixins, parsers, request, response, status, viewsets
@@ -146,7 +147,7 @@ class OrderAdminViewSet(
         responses={status.HTTP_200_OK: OpenApiTypes.STR},
     )
     @action(detail=False, methods=["get"], url_path="import-template")
-    def import_template(self, request: request.Request) -> response.Response:
+    def import_template(self, request: request.Request) -> HttpResponse:
         if not (product_id := request.query_params.get("product_id")):
             raise exceptions.ValidationError({"product_id": "이 값이 필요합니다."})
         try:
@@ -154,9 +155,10 @@ class OrderAdminViewSet(
         except Product.DoesNotExist as e:
             raise exceptions.NotFound("Product not found") from e
 
-        return response.Response(
-            data=imports.OrderProductImportSerializer.get_template_csv(product=product),
-            content_type="text/csv",
+        csv_content = imports.OrderProductImportSerializer.get_template_csv(product=product)
+        return HttpResponse(
+            content=BOM_UTF8.decode("utf-8") + csv_content,
+            content_type="text/csv; charset=utf-8",
             headers={"Content-Disposition": "attachment; filename=order_import_template.csv"},
         )
 
@@ -169,7 +171,10 @@ class OrderAdminViewSet(
                 "properties": {"csv_file": {"type": "string", "format": "binary"}},
             }
         },
-        responses={status.HTTP_201_CREATED: None},
+        responses={
+            status.HTTP_201_CREATED: None,
+            status.HTTP_400_BAD_REQUEST: ValidationErrorResponseSerializer,
+        },
     )
     @action(
         detail=False,
@@ -182,18 +187,13 @@ class OrderAdminViewSet(
         if not (csv_file := request.FILES.get("csv_file")):
             raise exceptions.ValidationError({"csv_file": "이 값이 필요합니다."})
 
-        csv_io = io.StringIO(csv_file.read().decode("utf-8"))
-        csv_df = pandas.read_csv(csv_io)
+        csv_df = read_uploaded_csv(csv_file.read())
         csv_serializers = [
             imports.OrderProductImportSerializer(data=datum) for datum in csv_df.to_dict(orient="index").values()
         ]
         # 모든 serializer 의 .is_valid() 를 호출하기 위해 list comprehension 사용 (all() 의 short-circuit 회피).
         if not all([s.is_valid() for s in csv_serializers]):
-            errors = [s.errors for s in csv_serializers]
-            return response.Response(
-                data=json.loads(json.dumps(errors, ensure_ascii=False)),
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            raise exceptions.ValidationError([s.errors for s in csv_serializers])
         for s in csv_serializers:
             s.save()
         return response.Response(status=status.HTTP_201_CREATED)

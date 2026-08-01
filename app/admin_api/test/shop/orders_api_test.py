@@ -1,3 +1,4 @@
+from codecs import BOM_UTF8
 from datetime import datetime, timezone
 from io import BytesIO
 
@@ -246,6 +247,11 @@ def test_admin_import_template_returns_csv(api_client, ticket_product):
     response = OrdersAdminApi(http_client=api_client).import_template(product_id=str(ticket_product.id))
     assert response.status_code == HTTP_200_OK
     assert "text/csv" in response.headers["Content-Type"]
+    # JSONRenderer 를 거치지 않은 그대로의 CSV 본문 + Excel 용 BOM 인지 확인.
+    assert response.content.startswith(BOM_UTF8)
+    assert response.content.decode("utf-8-sig").splitlines() == [
+        "name,phone,email,organization,product_id,donation_price"
+    ]
 
 
 @pytest.mark.django_db
@@ -260,10 +266,14 @@ def test_admin_import_template_returns_404_for_unknown_product(api_client):
     assert response.status_code == HTTP_404_NOT_FOUND
 
 
-def _csv_file(rows: str) -> BytesIO:
-    csv_file = BytesIO(rows.encode("utf-8"))
+def _csv_bytes(raw: bytes) -> BytesIO:
+    csv_file = BytesIO(raw)
     csv_file.name = "import.csv"
     return csv_file
+
+
+def _csv_file(rows: str, encoding: str = "utf-8") -> BytesIO:
+    return _csv_bytes(rows.encode(encoding))
 
 
 @pytest.mark.django_db
@@ -278,6 +288,52 @@ def test_admin_import_csv_persists_paid_order_from_uploaded_row(api_client, cust
     opr = OrderProductRelation.objects.get(product=ticket_product)
     assert opr.status == OrderProductRelation.OrderProductStatus.paid
     assert opr.order.user == customer_user
+
+
+@pytest.mark.django_db
+def test_admin_import_csv_accepts_template_output_verbatim(api_client, customer_user, ticket_product):
+    """템플릿 → 작성 → 업로드 왕복. BOM 이 첫 컬럼명(name)에 섞여 들어가지 않아야 한다."""
+    template = OrdersAdminApi(http_client=api_client).import_template(product_id=str(ticket_product.id))
+    filled_csv = (
+        template.content.decode("utf-8") + f"홍길동,010-1234-5678,{customer_user.email},,{ticket_product.id},0\n"
+    )
+
+    response = OrdersAdminApi(http_client=api_client).import_csv(csv_file=_csv_file(filled_csv))
+
+    assert response.status_code == HTTP_201_CREATED
+    assert OrderProductRelation.objects.filter(product=ticket_product).exists()
+
+
+@pytest.mark.django_db
+def test_admin_import_csv_accepts_cp949_encoded_file(api_client, customer_user, ticket_product):
+    """한국어 Windows Excel 이 저장하는 CP949 파일도 읽어야 한다."""
+    response = OrdersAdminApi(http_client=api_client).import_csv(
+        csv_file=_csv_file(
+            "name,phone,email,organization,product_id,donation_price\n"
+            f"홍길동,010-1234-5678,{customer_user.email},파이콘,{ticket_product.id},0\n",
+            encoding="cp949",
+        )
+    )
+    assert response.status_code == HTTP_201_CREATED
+    assert CustomerInfo.objects.get(order__products__product=ticket_product).name == "홍길동"
+
+
+@pytest.mark.django_db
+def test_admin_import_csv_rejects_undecodable_file(api_client):
+    """Excel '유니코드 텍스트'(UTF-16) 저장처럼 지원하지 않는 인코딩은 500 이 아니라 400."""
+    response = OrdersAdminApi(http_client=api_client).import_csv(
+        csv_file=_csv_bytes("name,phone\n홍길동,010-1234-5678\n".encode("utf-16"))
+    )
+    assert response.status_code == HTTP_400_BAD_REQUEST
+    assert [error["attr"] for error in response.json()["errors"]] == ["csv_file"]
+
+
+@pytest.mark.django_db
+def test_admin_import_csv_rejects_malformed_csv(api_client):
+    """열 개수가 어긋난 CSV 도 500 이 아니라 400."""
+    response = OrdersAdminApi(http_client=api_client).import_csv(csv_file=_csv_file("a,b,c\n1,2,3\n4,5,6,7,8\n"))
+    assert response.status_code == HTTP_400_BAD_REQUEST
+    assert [error["attr"] for error in response.json()["errors"]] == ["csv_file"]
 
 
 @pytest.mark.django_db
@@ -296,6 +352,23 @@ def test_admin_import_csv_returns_400_for_invalid_rows_without_persisting(api_cl
         )
     )
     assert response.status_code == HTTP_400_BAD_REQUEST
+    assert not OrderProductRelation.objects.exists()
+    assert response.json()["type"] == "validation_error"
+
+
+@pytest.mark.django_db
+def test_admin_import_csv_error_attr_identifies_the_failing_row(api_client, customer_user, ticket_product):
+    # 1행은 유효, 2행은 미가입 이메일 → attr 의 행 인덱스로 실패한 행을 식별할 수 있어야 한다.
+    response = OrdersAdminApi(http_client=api_client).import_csv(
+        csv_file=_csv_file(
+            "name,phone,email,organization,product_id,donation_price\n"
+            f"홍길동,010-1234-5678,{customer_user.email},,{ticket_product.id},0\n"
+            f"김철수,010-2222-3333,nobody@example.com,,{ticket_product.id},0\n"
+        )
+    )
+    assert response.status_code == HTTP_400_BAD_REQUEST
+    assert [error["attr"] for error in response.json()["errors"]] == ["1.non_field_errors"]
+    # 유효한 1행도 저장되지 않는다 (전부 성공해야 저장).
     assert not OrderProductRelation.objects.exists()
 
 
