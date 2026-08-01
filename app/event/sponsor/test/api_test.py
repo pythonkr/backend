@@ -4,7 +4,7 @@ from datetime import datetime
 import pytest
 from django.urls import reverse
 from event.models import Event
-from event.sponsor.models import Sponsor, SponsorTier, SponsorTierSponsorRelation
+from event.sponsor.models import Sponsor, SponsorTag, SponsorTagRelation, SponsorTier, SponsorTierSponsorRelation
 from file.models import PublicFile
 from rest_framework.test import APIClient
 from user.models.organization import Organization
@@ -78,6 +78,32 @@ def test_sponsor_filter_by_event_name(api_client: APIClient, two_events):
     response_data = response.json()
     assert len(response_data) == 1
     assert response_data[0]["id"] == str(old_tier.id)
+
+
+@pytest.mark.django_db
+def test_sponsor_tags_include_color(api_client: APIClient, two_events):
+    _, new_event = two_events
+    tier = SponsorTier.objects.create(event=new_event, name="Gold", order=0)
+    sponsor = _make_sponsor(new_event, "New Sponsor", tier)
+
+    # Given: 색상이 있는 태그와 없는 태그, 그리고 삭제된 태그가 붙어있음
+    colored_tag = SponsorTag.objects.create(event=new_event, name="Keynote", color="#3498db")
+    plain_tag = SponsorTag.objects.create(event=new_event, name="Community")
+    deleted_tag = SponsorTag.objects.create(event=new_event, name="Deleted")
+    for tag in (colored_tag, plain_tag, deleted_tag):
+        SponsorTagRelation.objects.create(sponsor=sponsor, tag=tag)
+    SponsorTag.objects.filter(pk=deleted_tag.pk).delete()
+
+    # When: 후원사 목록을 조회
+    response = api_client.get(reverse("v1:sponsor-list"))
+
+    # Then: 살아있는 태그만 id/name/color 형태로 반환
+    assert response.status_code == http.HTTPStatus.OK
+    tags = response.json()[0]["sponsors"][0]["tags"]
+    assert sorted(tags, key=lambda t: t["name"]) == [
+        {"id": str(plain_tag.id), "name": "Community", "color": None},
+        {"id": str(colored_tag.id), "name": "Keynote", "color": "#3498db"},
+    ]
 
 
 @pytest.mark.django_db

@@ -3,7 +3,7 @@ import contextlib
 import functools
 import typing
 
-from core.models import BaseAbstractModel, MarkdownField
+from core.models import BaseAbstractModel, ColorField, MarkdownField
 from django.db import models
 from event.models import Event
 
@@ -95,6 +95,12 @@ class SponsorTag(BaseAbstractModel):
 
     event = models.ForeignKey(Event, on_delete=models.PROTECT)
     name = models.CharField(max_length=256)
+    color = ColorField(
+        null=True,
+        blank=True,
+        default=None,
+        help_text="태그 표시 색상 (예: #3498db). 지정하지 않으면 프론트엔드 기본색을 사용합니다.",
+    )
 
     class Meta:
         ordering = ["name"]

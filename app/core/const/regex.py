@@ -18,3 +18,7 @@ EMAIL_REGEX = re.compile(EMAIL_PATTERN)
 # 전화번호
 PHONE_PATTERN = r"^([\d]{3}-[\d]{3,4}-[\d]{4}|\+[\d]{9,14})$"
 PHONE_REGEX = re.compile(PHONE_PATTERN)
+
+# 색상
+COLOR_PATTERN = r"^#[0-9a-fA-F]{6}$"
+COLOR_REGEX = re.compile(COLOR_PATTERN)

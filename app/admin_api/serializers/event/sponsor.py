@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from core.const.serializer import COMMON_ADMIN_FIELDS
 from core.serializer.base_abstract_serializer import BaseAbstractSerializer
 from core.serializer.json_schema_serializer import JsonSchemaSerializer
@@ -14,7 +16,8 @@ class SponsorTierAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, s
 class SponsorTagAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
     class Meta:
         model = SponsorTag
-        fields = COMMON_ADMIN_FIELDS + ("event", "name_ko", "name_en")
+        fields = COMMON_ADMIN_FIELDS + ("event", "name_ko", "name_en", "color")
+        extra_kwargs: ClassVar = {"color": {"allow_blank": False}}
 
 
 class SponsorAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):

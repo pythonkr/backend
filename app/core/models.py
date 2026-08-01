@@ -2,8 +2,10 @@ import collections.abc
 import typing
 import uuid
 
+from core.const.regex import COLOR_REGEX
 from core.util.thread_local import get_current_user
 from django.contrib.auth import get_user_model
+from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models.functions import Now
 from django.utils import timezone
@@ -121,3 +123,17 @@ class BaseAbstractModel(models.Model):
 
 class MarkdownField(models.TextField):
     is_markdown = True
+
+
+class ColorField(models.CharField):
+    empty_strings_allowed = False
+    default_validators: typing.ClassVar = [
+        RegexValidator(regex=COLOR_REGEX, message="색상은 #RRGGBB 형식이어야 합니다.")
+    ]
+
+    def __init__(self, *args, **kwargs) -> None:
+        kwargs.setdefault("max_length", 7)
+        super().__init__(*args, **kwargs)
+
+    def get_prep_value(self, value: str | None) -> str | None:
+        return super().get_prep_value(value) or None

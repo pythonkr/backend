@@ -1,10 +1,16 @@
-from event.sponsor.models import Sponsor, SponsorTier
+from event.sponsor.models import Sponsor, SponsorTag, SponsorTier
 from rest_framework import serializers
+
+
+class SponsorTagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SponsorTag
+        fields = ("id", "name", "color")
 
 
 class SponsorSerializer(serializers.ModelSerializer):
     logo = serializers.FileField(source="logo.file", read_only=True)
-    tags = serializers.StringRelatedField(many=True, read_only=True)
+    tags = SponsorTagSerializer(many=True, read_only=True)
 
     class Meta:
         model = Sponsor

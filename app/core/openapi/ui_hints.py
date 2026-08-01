@@ -1,4 +1,4 @@
-from core.models import MarkdownField
+from core.models import ColorField, MarkdownField
 from django.db.models.fields import TextField
 from django.db.models.fields.files import FileField
 from django.db.models.fields.related import ForeignKey, ManyToManyField
@@ -22,6 +22,8 @@ def ui_hints_for_model_field(model_field: object) -> dict:
         return {"ui:field": "file"}
     if isinstance(model_field, TranslationField):
         model_field = model_field.translated_field
+    if isinstance(model_field, ColorField):
+        return {"ui:widget": "color"}
     if isinstance(model_field, MarkdownField):  # MarkdownField 는 TextField 하위 → 먼저 검사
         return {"ui:widget": "textarea", "ui:field": "markdown"}
     if isinstance(model_field, TextField):
