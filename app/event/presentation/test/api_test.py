@@ -89,6 +89,26 @@ def test_presentation_defaults_to_latest_event(api_client: APIClient):
     assert response_data[0]["id"] == str(new_prst.id)
 
 
+@pytest.mark.django_db
+def test_presentation_retrieve_ignores_latest_event_default(api_client: APIClient):
+    # Given: 지난 행사의 발표가 있고, 그보다 최신인 행사가 존재함.
+    organization = Organization.objects.create(name="Test Organization")
+    old_event = Event.objects.create(
+        organization=organization, name="PyCon Korea 2025", event_start_at=datetime(2025, 8, 1)
+    )
+    Event.objects.create(organization=organization, name="PyCon Korea 2026", event_start_at=datetime(2026, 8, 1))
+
+    old_type = PresentationType.objects.create(event=old_event, name="Talk")
+    old_prst = Presentation.objects.create(type=old_type, title="Old Presentation")
+
+    # When: event 파라미터 없이 지난 행사의 발표를 단건 조회
+    response = api_client.get(reverse("v1:presentation-detail", kwargs={"pk": old_prst.id}))
+
+    # Then: 목록 기본 스코프(최신 행사)와 무관하게 조회된다.
+    assert response.status_code == http.HTTPStatus.OK
+    assert response.json()["id"] == str(old_prst.id)
+
+
 def _make_public_file(name: str) -> PublicFile:
     return PublicFile.objects.create(file=f"public/{name}.png", mimetype="image/png", hash=name, size=0)
 

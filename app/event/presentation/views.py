@@ -1,4 +1,5 @@
 from core.const.tag import OpenAPITag
+from core.viewset.list_only_filter_viewset import ListOnlyFilterMixin
 from django.db.models.query import QuerySet
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
@@ -28,7 +29,12 @@ class PresentationCategoryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet
 
 @method_decorator(name="list", decorator=extend_schema(tags=[OpenAPITag.EVENT_PRESENTATION]))
 @method_decorator(name="retrieve", decorator=extend_schema(tags=[OpenAPITag.EVENT_PRESENTATION]))
-class PresentationViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+class PresentationViewSet(
+    ListOnlyFilterMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet,
+):
     queryset = Presentation.objects.get_all_nested_data()
     serializer_class = PresentationSerializer
     filterset_class = PresentationFilterSet
