@@ -18,15 +18,30 @@ def _email_msg(code: str) -> str:
     return EMAIL_MESSAGES[code]["en" if is_english() else "ko"]
 
 
+def _verified_elsewhere(user, email: str) -> bool:
+    """다른 계정이 같은 주소를 이미 인증했는지. ACCOUNT_UNIQUE_EMAIL 때문에 이 경우 인증이 영영 불가능하다."""
+    return EmailAddress.objects.filter(email__iexact=email, verified=True).exclude(user=user).exists()
+
+
 def _render_emails(
     request: HttpRequest, *, error: str | None = None, notice: str | None = None, status: HTTPStatus = HTTPStatus.OK
 ) -> HttpResponse:
+    emails = list(EmailAddress.objects.filter(user=request.user).order_by("-primary", "-verified", "email"))
+    conflicts = set(
+        EmailAddress.objects.filter(email__in=[e.email for e in emails], verified=True)
+        .exclude(user=request.user)
+        .values_list("email", flat=True)
+    )
+    for email in emails:
+        email.taken_by_other = not email.verified and email.email in conflicts
+
     return render(
         request,
         "user/email_manage.html",
         {
             "user": request.user,
-            "emails": EmailAddress.objects.filter(user=request.user).order_by("-primary", "-verified", "email"),
+            "emails": emails,
+            "taken_by_other_msg": _email_msg("taken_by_other"),
             "error": error,
             "notice": notice,
         },
@@ -52,6 +67,9 @@ def add_email(request: HttpRequest) -> HttpResponse:
     form = AddEmailForm(user=request.user, data=request.POST)
     if not form.is_valid():
         return _render_emails(request, error=_email_msg("add_failed"), status=HTTPStatus.BAD_REQUEST)
+    # allauth 는 ACCOUNT_PREVENT_ENUMERATION 때문에 여기를 통과시키지만, 인증은 뒤에서 반드시 실패한다.
+    if _verified_elsewhere(request.user, form.cleaned_data["email"]):
+        return _render_emails(request, error=_email_msg("taken_by_other"), status=HTTPStatus.BAD_REQUEST)
     form.save(request)
     return _render_emails(request, notice=_email_msg("verification_sent"))
 
@@ -72,6 +90,8 @@ def resend_email(request: HttpRequest) -> HttpResponse:
     email = _target_email(request)
     if email.verified:
         return _render_emails(request, error=_email_msg("already_verified"), status=HTTPStatus.BAD_REQUEST)
+    if _verified_elsewhere(request.user, email.email):
+        return _render_emails(request, error=_email_msg("taken_by_other"), status=HTTPStatus.BAD_REQUEST)
     email.send_confirmation(request)
     return _render_emails(request, notice=_email_msg("resent"))
 
@@ -92,5 +112,11 @@ def confirm_email(request: HttpRequest, key: str) -> HttpResponse:
     if confirmation is None:
         context = {"error": _email_msg("invalid_link")}
         return render(request, "user/email_confirm_result.html", context, status=HTTPStatus.BAD_REQUEST)
-    confirmation.confirm(request)
-    return render(request, "user/email_confirm_result.html", {"email": confirmation.email_address.email})
+
+    email_address = confirmation.email_address
+    if confirmation.confirm(request) is None:
+        # allauth 는 인증 거부를 조용히 None 으로 돌려준다. 성공으로 표시하면 안 된다.
+        taken = _verified_elsewhere(email_address.user, email_address.email)
+        context = {"error": _email_msg("taken_by_other" if taken else "confirm_failed"), "show_merge_link": taken}
+        return render(request, "user/email_confirm_result.html", context, status=HTTPStatus.BAD_REQUEST)
+    return render(request, "user/email_confirm_result.html", {"email": email_address.email})

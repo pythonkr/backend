@@ -12,6 +12,11 @@ def user(db) -> UserExt:
     return u
 
 
+@pytest.fixture
+def other_user(db) -> UserExt:
+    return UserExt.objects.create_user(username="other", email="taken@example.com")
+
+
 def _unverified(user: UserExt, email: str = "new@example.com") -> EmailAddress:
     return EmailAddress.objects.create(user=user, email=email, verified=False)
 
@@ -64,6 +69,45 @@ def test_confirm_verifies_email(client, user):
 def test_confirm_invalid_key_rejected(client, db):
     response = client.get(reverse("account-email-confirm", kwargs={"key": "bogus-key"}))
     assert response.status_code == http.HTTPStatus.BAD_REQUEST
+
+
+# ---- 다른 계정이 이미 인증한 주소 (ACCOUNT_UNIQUE_EMAIL 충돌) --------------------
+
+
+def test_add_taken_by_other_account_rejected(client, user, other_user, mailoutbox):
+    # allauth 는 열거 방지 때문에 통과시키지만, 인증이 불가능하므로 애초에 막는다.
+    client.force_login(user)
+    response = client.post(reverse("account-email-add"), {"email": "taken@example.com"})
+    assert response.status_code == http.HTTPStatus.BAD_REQUEST
+    assert not EmailAddress.objects.filter(user=user, email="taken@example.com").exists()
+    assert len(mailoutbox) == 0
+
+
+def test_confirm_taken_by_other_account_fails_loudly(client, user, other_user):
+    email = _unverified(user, "taken@example.com")
+    key = EmailConfirmationHMAC(email).key
+
+    response = client.get(reverse("account-email-confirm", kwargs={"key": key}))
+    assert response.status_code == http.HTTPStatus.BAD_REQUEST
+    email.refresh_from_db()
+    assert email.verified is False
+    assert reverse("account-merge-start").encode() in response.content
+
+
+def test_resend_taken_by_other_account_rejected(client, user, other_user, mailoutbox):
+    email = _unverified(user, "taken@example.com")
+    client.force_login(user)
+    response = client.post(reverse("account-email-resend"), {"email_id": email.pk})
+    assert response.status_code == http.HTTPStatus.BAD_REQUEST
+    assert len(mailoutbox) == 0
+
+
+def test_manage_shows_reason_for_conflicting_email(client, user, other_user):
+    _unverified(user, "taken@example.com")
+    client.force_login(user)
+    response = client.get(reverse("account-email"))
+    assert response.status_code == http.HTTPStatus.OK
+    assert reverse("account-merge-start").encode() in response.content
 
 
 # ---- Resend -----------------------------------------------------------------

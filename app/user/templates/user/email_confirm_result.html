@@ -4,6 +4,9 @@
   <h1>{% if en %}Email verification{% else %}이메일 인증{% endif %}</h1>
   {% if error %}
     <div class="error">{{ error }}</div>
+    {% if show_merge_link %}
+      <p><a href="{% url 'account-merge-start' %}"><em>{% if en %}Merge accounts{% else %}계정 병합{% endif %}</em></a></p>
+    {% endif %}
   {% else %}
     <div class="notice">
       {% if en %}Your email has been verified.{% else %}이메일이 인증되었습니다.{% endif %}

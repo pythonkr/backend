@@ -96,6 +96,16 @@ EMAIL_MESSAGES = {
         "ko": "이 이메일은 추가할 수 없습니다. 형식이 올바르지 않거나 이미 사용 중일 수 있습니다.",
         "en": "This email can't be added. It may be invalid or already in use.",
     },
+    "taken_by_other": {
+        "ko": "이미 다른 계정에서 인증된 이메일입니다. 두 계정이 모두 본인 것이라면 계정 병합을 이용해 주세요.",
+        "en": (
+            "This email is already verified on another account. If both accounts are yours, use account merge instead."
+        ),
+    },
+    "confirm_failed": {
+        "ko": "이메일 인증에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+        "en": "We couldn't verify this email. Please try again later.",
+    },
     "not_found": {
         "ko": "이메일을 찾을 수 없습니다.",
         "en": "Email not found.",

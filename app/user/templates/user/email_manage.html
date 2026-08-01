@@ -19,10 +19,16 @@
                 <sup>{% if en %}unverified{% else %}미인증{% endif %}</sup>
               {% endif %}
             </div>
+            {% if email.taken_by_other %}
+              <div class="reason">
+                {{ taken_by_other_msg }}
+                <a href="{% url 'account-merge-start' %}"><em>{% if en %}Merge accounts{% else %}계정 병합{% endif %}</em></a>
+              </div>
+            {% endif %}
           </td>
           <td class="actions">
             <div class="btns">
-              {% if not email.verified %}
+              {% if not email.verified and not email.taken_by_other %}
                 <form method="post" action="{% url 'account-email-resend' %}">
                   {% csrf_token %}<input type="hidden" name="email_id" value="{{ email.pk }}">
                   <button class="sm action-btn">{% if en %}Resend{% else %}재발송{% endif %}</button>
