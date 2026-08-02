@@ -11,7 +11,8 @@ from rest_framework.status import (
     HTTP_403_FORBIDDEN,
 )
 from shop.conftest import FAR_FUTURE, FAR_PAST
-from shop.product.models import Category, CategoryGroup, OptionGroup, Product, Tag
+from shop.order.models import OrderProductOptionRelation
+from shop.product.models import Category, CategoryGroup, Option, OptionGroup, Product, Tag
 
 PRODUCT_SELECTABLES_URL = reverse("v1:admin-shop-product-list") + "selectables/"
 
@@ -489,3 +490,74 @@ def test_admin_product_selectables_include_meta(api_client, ticket_product):
     )
     # meta_schema 는 모델의 choices_meta_schema 를 반영한다.
     assert {"category", "price", "stock", "status"} <= set(body["meta_schema"])
+
+
+@pytest.fixture
+def sold_option(order_factory, option_group) -> Option:
+    """paid OPR 2건이 붙은 옵션 — sold_count=2, stock=10."""
+    sized = option_group.options.create(name="M", stock=10)
+    for _ in range(2):
+        OrderProductOptionRelation.objects.create(
+            order_product_relation=order_factory(status="completed").products.get(),
+            product_option_group=option_group,
+            product_option=sized,
+        )
+    return sized
+
+
+def _option_payload(option: Option, *, stock: int) -> dict:
+    # nested options 는 전량 동기화라 유지할 옵션을 모두 실어야 한다 (누락 시 soft delete).
+    return {"options": [{"id": str(option.id), "name_ko": option.name_ko, "name_en": option.name_en, "stock": stock}]}
+
+
+@pytest.mark.django_db
+def test_admin_option_update_rejects_stock_below_sold_count(api_client, option_group, sold_option):
+    # 이미 2개 팔린 옵션에 stock=1 → leftover_stock 이 -1 이 되는 유일한 입력 경로라 거절.
+    response = OptionGroupsAdminApi(http_client=api_client).update(
+        option_group.id, _option_payload(sold_option, stock=1)
+    )
+    assert response.status_code == HTTP_400_BAD_REQUEST
+    assert "이미 2개가 판매된 옵션입니다" in str(response.json())
+    sold_option.refresh_from_db()
+    assert sold_option.stock == 10
+
+
+@pytest.mark.django_db
+def test_admin_option_update_allows_stock_equal_to_sold_count(api_client, option_group, sold_option):
+    # 판매 수량과 같은 값 = leftover 0 (판매 마감) — 운영자가 실제로 쓰는 마감 방식이라 허용.
+    response = OptionGroupsAdminApi(http_client=api_client).update(
+        option_group.id, _option_payload(sold_option, stock=2)
+    )
+    assert response.status_code == HTTP_200_OK
+    sold_option.refresh_from_db()
+    assert sold_option.stock == 2
+    assert sold_option.leftover_stock == 0
+
+
+@pytest.mark.django_db
+def test_admin_option_update_allows_zero_stock_as_unlimited(api_client, option_group, sold_option):
+    response = OptionGroupsAdminApi(http_client=api_client).update(
+        option_group.id, _option_payload(sold_option, stock=0)
+    )
+    assert response.status_code == HTTP_200_OK
+    sold_option.refresh_from_db()
+    assert sold_option.leftover_stock is None
+
+
+@pytest.mark.django_db
+def test_admin_option_update_allows_negative_stock_when_nothing_sold(api_client, option_group, option):
+    # 판매 이력 없는 옵션을 품절 노출시키는 관용구(-1) — stock=0 이 무제한이라 이 방법뿐이므로 막지 않는다.
+    response = OptionGroupsAdminApi(http_client=api_client).update(option_group.id, _option_payload(option, stock=-1))
+    assert response.status_code == HTTP_200_OK
+    option.refresh_from_db()
+    assert option.stock == -1
+
+
+@pytest.mark.django_db
+def test_admin_option_group_retrieve_exposes_sold_count(api_client, option_group, sold_option):
+    # stock=0 이면 leftover_stock 이 null 이라 어드민에서 판매 수량을 볼 수 없었다 — sold_count 로 항상 노출.
+    response = OptionGroupsAdminApi(http_client=api_client).retrieve(option_group.id)
+    assert response.status_code == HTTP_200_OK
+    payload = {o["id"]: o for o in response.json()["options"]}[str(sold_option.id)]
+    assert payload["sold_count"] == 2
+    assert payload["leftover_stock"] == 8

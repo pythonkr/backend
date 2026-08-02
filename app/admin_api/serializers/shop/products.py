@@ -99,16 +99,25 @@ class CategoryReadAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, 
 
 class TagAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
     leftover_stock = serializers.IntegerField(read_only=True, allow_null=True)
+    sold_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Tag
-        fields = COMMON_ADMIN_FIELDS + ("name_ko", "name_en", "stock", "max_quantity_per_user", "leftover_stock")
+        fields = COMMON_ADMIN_FIELDS + (
+            "name_ko",
+            "name_en",
+            "stock",
+            "max_quantity_per_user",
+            "leftover_stock",
+            "sold_count",
+        )
 
 
 class OptionGroupAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, NestedFieldModelSerializer):
     class OptionAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, NestedModelSerializer):
         id = serializers.UUIDField(required=False, help_text="기존 Option 수정 시 PK 전달, 새로 추가 시 생략")
         leftover_stock = serializers.IntegerField(read_only=True, allow_null=True)
+        sold_count = serializers.IntegerField(read_only=True)
 
         class Meta:
             model = Option
@@ -121,10 +130,23 @@ class OptionGroupAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, N
                 "additional_price",
                 "stock",
                 "leftover_stock",
+                "sold_count",
             )
             # group 은 NestedFieldSpec.parent_fk_name 으로 부모 인스턴스에서 주입되므로 입력 시 생략 가능.
             extra_kwargs = {"group": {"required": False}}
             list_serializer_class = InstanceListSerializer
+
+        def validate_stock(self, stock: int) -> int:
+            # stock=0 은 "무제한" sentinel, 판매 이력이 없는 옵션의 음수는 품절 처리 관용구라 둘 다 허용.
+            # 판매분보다 작은 값만 거절 — leftover_stock 이 음수가 되는 유일한 입력 경로다.
+            if self.instance is None or stock == 0:
+                return stock
+            sold_count: int = self.instance.sold_count
+            if sold_count and stock < sold_count:
+                raise serializers.ValidationError(
+                    f"이미 {sold_count}개가 판매된 옵션입니다. 재고는 {sold_count} 이상이거나 0(무제한)이어야 합니다."
+                )
+            return stock
 
     options = OptionAdminSerializer(many=True, required=False)
 
@@ -239,6 +261,7 @@ class ProductAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, seria
     tag_set = serializers.PrimaryKeyRelatedField(many=True, queryset=Tag.objects.filter_active(), required=False)
     tag_set_detail = TagAdminSerializer(many=True, read_only=True, source="tag_set")
     leftover_stock = serializers.IntegerField(read_only=True, allow_null=True)
+    sold_count = serializers.IntegerField(read_only=True)
     current_status = serializers.ChoiceField(choices=Product.CurrentStatus.choices, read_only=True)
     image = serializers.PrimaryKeyRelatedField(
         queryset=PublicFile.objects.filter_active(),
@@ -271,6 +294,7 @@ class ProductAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, seria
             "tag_set",
             "tag_set_detail",
             "leftover_stock",
+            "sold_count",
             "current_status",
         )
 

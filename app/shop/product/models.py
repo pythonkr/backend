@@ -87,21 +87,21 @@ class Tag(BaseAbstractModel):
     @functools.cached_property
     def leftover_stock(self) -> int | None:
         """해당 태그에 속한 상품들의 재고를 반환합니다."""
+        return (self.stock - self.sold_count) if self.stock else None
+
+    @functools.cached_property
+    def sold_count(self) -> int:
+        """해당 태그에 속한 상품들의 판매 수량을 반환합니다."""
         from shop.order.models import OrderProductRelation
 
         return (
-            (
-                self.stock
-                - OrderProductRelation.objects.filter_active()
-                .filter(
-                    product__tags__tag=self,
-                    single_product_cart__isnull=True,
-                    status__in=OrderProductRelation.PURCHASED_STOCK_STATUS,
-                )
-                .count()
+            OrderProductRelation.objects.filter_active()
+            .filter(
+                product__tags__tag=self,
+                single_product_cart__isnull=True,
+                status__in=OrderProductRelation.PURCHASED_STOCK_STATUS,
             )
-            if self.stock
-            else None
+            .count()
         )
 
     def get_user_taken_stock_count(self, *, user: "UserExt", include_cart: bool, include_purchased: bool) -> int:
@@ -230,24 +230,24 @@ class Product(BaseAbstractModel):
         return self.CurrentStatus.ACTIVE
 
     @functools.cached_property
-    def leftover_stock(self) -> int | None:
-        """해당 상품의 재고를 반환합니다."""
+    def sold_count(self) -> int:
+        """해당 상품의 판매 수량을 반환합니다."""
         from shop.order.models import OrderProductRelation
 
         return (
-            (
-                self.stock
-                - OrderProductRelation.objects.filter_active()
-                .filter(
-                    product=self,
-                    single_product_cart__isnull=True,
-                    status__in=OrderProductRelation.PURCHASED_STOCK_STATUS,
-                )
-                .count()
+            OrderProductRelation.objects.filter_active()
+            .filter(
+                product=self,
+                single_product_cart__isnull=True,
+                status__in=OrderProductRelation.PURCHASED_STOCK_STATUS,
             )
-            if self.stock
-            else None
+            .count()
         )
+
+    @functools.cached_property
+    def leftover_stock(self) -> int | None:
+        """해당 상품의 재고를 반환합니다."""
+        return (self.stock - self.sold_count) if self.stock else None
 
     def get_user_taken_stock_count(self, *, user: "UserExt", include_cart: bool, include_purchased: bool) -> int:
         """해당 유저가 담거나 구매한 상품의 수량을 반환합니다."""
@@ -429,25 +429,25 @@ class Option(BaseAbstractModel):
         return f"{self.name} ({self.additional_price}원)"
 
     @functools.cached_property
-    def leftover_stock(self) -> int | None:
-        """해당 옵션의 재고를 반환합니다."""
+    def sold_count(self) -> int:
+        """해당 옵션의 판매 수량을 반환합니다."""
         from shop.order.models import OrderProductOptionRelation, OrderProductRelation
 
         return (
-            (
-                self.stock
-                - OrderProductOptionRelation.objects.filter_active()
-                .filter(
-                    product_option=self,
-                    order_product_relation__single_product_cart__isnull=True,
-                    order_product_relation__deleted_at__isnull=True,
-                    order_product_relation__status__in=OrderProductRelation.PURCHASED_STOCK_STATUS,
-                )
-                .count()
+            OrderProductOptionRelation.objects.filter_active()
+            .filter(
+                product_option=self,
+                order_product_relation__single_product_cart__isnull=True,
+                order_product_relation__deleted_at__isnull=True,
+                order_product_relation__status__in=OrderProductRelation.PURCHASED_STOCK_STATUS,
             )
-            if self.stock
-            else None
+            .count()
         )
+
+    @functools.cached_property
+    def leftover_stock(self) -> int | None:
+        """해당 옵션의 재고를 반환합니다."""
+        return (self.stock - self.sold_count) if self.stock else None
 
     def get_user_taken_stock_count(self, *, user: "UserExt", include_cart: bool, include_purchased: bool) -> int:
         """해당 유저가 담거나 구매한 옵션의 수량을 반환합니다."""

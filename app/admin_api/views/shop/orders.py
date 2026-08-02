@@ -254,9 +254,12 @@ class OrderAdminViewSet(
             "주문": exports.OrderExportSerializer(instance=order_qs, many=True).export(),
             "주문상품": exports.OrderProductExportSerializer(instance=order_product_qs, many=True).export(),
         }
-        with pandas.ExcelWriter(fileio) as writer:
+        # engine 명시 — pandas 의 "auto" 는 설치된 패키지에 따라 openpyxl 로 바뀔 수 있고,
+        # autofit_columns 는 xlsxwriter 의 set_column API 에 의존한다.
+        with pandas.ExcelWriter(fileio, engine="xlsxwriter") as writer:
             for sheet_name, df in df_dict.items():
                 df.to_excel(writer, sheet_name=sheet_name, startrow=0, startcol=0)
+                exports.autofit_columns(writer.sheets[sheet_name], df)
         return StreamingHttpResponse(
             streaming_content=File(fileio),
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
