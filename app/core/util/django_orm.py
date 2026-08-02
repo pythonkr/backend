@@ -262,6 +262,21 @@ def json_to_simplenamespace(model_data: dict[str, dict[str, typing.Any]], key: s
     return resolved_models[key]
 
 
+def _apply_related_diff(manager: models.manager.BaseManager, field_name: str, identifiers: list[str]) -> None:
+    related_model_instances = [identifier_to_model(item) for item in identifiers]
+    if None in related_model_instances:
+        raise ValueError(f"One or more related models not found for identifiers: {identifiers}")
+
+    if {item.pk for item in manager.all()} == {item.pk for item in related_model_instances}:
+        return
+
+    # 역참조 FK의 remove()는 Django가 field.null=True일 때만 제공하므로, 그 외에는 구성원 변경을 적용할 수 없다.
+    if not hasattr(manager, "remove"):
+        raise ValueError(f"Cannot change members of the non-nullable reverse relation '{field_name}'")
+
+    manager.set(related_model_instances)
+
+
 def apply_diff_to_model(models_data: dict[str, dict[str, typing.Any]]) -> list[models.Model]:
     result_instances: list[models.Model] = []
 
@@ -285,20 +300,11 @@ def apply_diff_to_model(models_data: dict[str, dict[str, typing.Any]]) -> list[m
                 if not (related_model_instance := identifier_to_model(value)):
                     raise ValueError(f"Related model not found for identifier: {value}")
                 setattr(model_instance, field_name, related_model_instance)
-            elif isinstance(value, collections.abc.Iterable) and value and all(is_identifier(item) for item in value):
-                # If the value is a list of model identifiers, resolve them to model instances
-                related_model_instances = [identifier_to_model(item) for item in value]
-                if None in related_model_instances:
-                    raise ValueError(f"One or more related models not found for identifiers: {value}")
-
-                old_related_models = {item.pk: item for item in getattr(model_instance, field_name, [])}
-                new_related_models = {item.pk: item for item in related_model_instances}
-
-                field = getattr(model_instance, field_name)
-                for del_pk in old_related_models.keys() - new_related_models.keys():
-                    field.remove(old_related_models[del_pk])
-                for add_pk in new_related_models.keys() - old_related_models.keys():
-                    field.add(new_related_models[add_pk])
+            elif is_identifier_list(value) and isinstance(
+                related_manager := getattr(model_instance, field_name, None), models.manager.BaseManager
+            ):
+                # If the value is a list of model identifiers, it is an m2m/reverse relation
+                _apply_related_diff(related_manager, field_name, value)
             else:
                 setattr(model_instance, field_name, value)
 

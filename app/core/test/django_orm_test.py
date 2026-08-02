@@ -38,6 +38,38 @@ def test_apply_diff_to_model_applies_plain_field(db):
     assert presentation.slideshow_url == "https://example.com/new"
 
 
+def test_apply_diff_to_model_ignores_reordered_reverse_relation(db):
+    presentation = baker.make(Presentation)
+    speakers = baker.make(PresentationSpeaker, presentation=presentation, _quantity=2)
+    diff = {model_to_identifier(presentation): {"speakers": [model_to_identifier(s) for s in reversed(speakers)]}}
+
+    apply_diff_to_model(diff)
+
+    assert set(presentation.speakers.values_list("id", flat=True)) == {s.pk for s in speakers}
+
+
+def test_apply_diff_to_model_rejects_member_change_on_non_nullable_reverse_relation(db):
+    presentation = baker.make(Presentation)
+    speakers = baker.make(PresentationSpeaker, presentation=presentation, _quantity=2)
+    diff = {model_to_identifier(presentation): {"speakers": [model_to_identifier(speakers[0])]}}
+
+    with pytest.raises(ValueError, match="speakers"):
+        apply_diff_to_model(diff)
+
+    assert presentation.speakers.count() == 2
+
+
+def test_apply_diff_to_model_applies_many_to_many_members(db):
+    presentation = baker.make(Presentation)
+    old_category, new_category = baker.make(PresentationCategory, type=presentation.type, _quantity=2)
+    baker.make(PresentationCategoryRelation, presentation=presentation, category=old_category)
+    diff = {model_to_identifier(presentation): {"categories": [model_to_identifier(new_category)]}}
+
+    apply_diff_to_model(diff)
+
+    assert set(presentation.categories.values_list("id", flat=True)) == {new_category.pk}
+
+
 def test_model_to_jsonable_dict_sorts_reverse_relation_identifiers(db):
     presentation = baker.make(Presentation)
     speakers = baker.make(PresentationSpeaker, presentation=presentation, _quantity=3)

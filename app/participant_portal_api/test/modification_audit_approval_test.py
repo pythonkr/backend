@@ -2,8 +2,12 @@ from contextlib import contextmanager
 from types import SimpleNamespace
 
 import pytest
+from core.util.django_orm import model_to_identifier
 from core.util.thread_local import thread_local
+from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import override
+from event.presentation.models import Presentation, PresentationSpeaker
+from model_bakery import baker
 from participant_portal_api.models import ModificationAudit
 from participant_portal_api.serializers.user import UserPortalSerializer
 from rest_framework import status
@@ -75,3 +79,27 @@ def test_approve_ko_nickname_request_under_en_locale_keeps_en_nickname(requester
     requester.refresh_from_db()
     assert requester.nickname_ko == "새한글이름"
     assert requester.nickname_en == "EnglishName"
+
+
+def test_approve_presentation_audit_with_reordered_speakers(db, admin_client):
+    """발표자 순서만 뒤집힌 채 저장된 과거 수정 요청도 승인할 수 있어야 한다."""
+    presentation = baker.make(Presentation)
+    speakers = baker.make(PresentationSpeaker, presentation=presentation, biography_ko="이전 소개", _quantity=2)
+    audit = ModificationAudit.objects.create(
+        instance_type=ContentType.objects.get_for_model(Presentation),
+        instance_id=str(presentation.pk),
+        original_data={model_to_identifier(presentation): {}},
+        modification_data={
+            model_to_identifier(presentation): {
+                "speakers": [model_to_identifier(speaker) for speaker in reversed(speakers)]
+            },
+            model_to_identifier(speakers[0]): {"biography_ko": "새 소개"},
+        },
+    )
+
+    response = admin_client.patch(APPROVE_URL.format(audit_id=audit.id), data={}, format="json")
+
+    assert response.status_code == status.HTTP_200_OK, response.data
+    speakers[0].refresh_from_db()
+    assert speakers[0].biography_ko == "새 소개"
+    assert set(presentation.speakers.values_list("id", flat=True)) == {speaker.pk for speaker in speakers}
