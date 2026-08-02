@@ -1,5 +1,10 @@
 import pytest
-from core.util.django_orm import apply_diff_to_model, model_to_identifier, model_to_jsonable_dict
+from core.util.django_orm import (
+    apply_diff_to_model,
+    get_diff_data_from_jsonized_models,
+    model_to_identifier,
+    model_to_jsonable_dict,
+)
 from django.utils.translation import override
 from event.presentation.models import (
     Presentation,
@@ -51,3 +56,29 @@ def test_model_to_jsonable_dict_sorts_many_to_many_identifiers(db):
     snapshot = model_to_jsonable_dict(presentation)["model_data"][model_to_identifier(presentation)]
 
     assert snapshot["categories"] == sorted(model_to_identifier(category) for category in categories)
+
+
+PRESENTATION_KEY = "mdl:presentation:presentation:7dee621b-c3bb-4404-9900-fd796b03a5a0"
+SPEAKER_A = "mdl:presentation:presentationspeaker:aee66cdf-d110-43e5-904a-41b8a7910923"
+SPEAKER_B = "mdl:presentation:presentationspeaker:1367c0d5-312e-4606-b143-7d5ebbdafee1"
+
+
+def test_get_diff_data_ignores_reordered_relation_identifiers():
+    asis = {PRESENTATION_KEY: {"speakers": [SPEAKER_B, SPEAKER_A]}}
+    tobe = {PRESENTATION_KEY: {"speakers": [SPEAKER_A, SPEAKER_B]}}
+
+    assert get_diff_data_from_jsonized_models(asis, tobe) == {}
+
+
+def test_get_diff_data_detects_changed_relation_members():
+    asis = {PRESENTATION_KEY: {"speakers": [SPEAKER_B]}}
+    tobe = {PRESENTATION_KEY: {"speakers": [SPEAKER_A, SPEAKER_B]}}
+
+    assert get_diff_data_from_jsonized_models(asis, tobe) == {PRESENTATION_KEY: {"speakers": [SPEAKER_A, SPEAKER_B]}}
+
+
+def test_get_diff_data_keeps_order_significant_for_plain_lists():
+    asis = {PRESENTATION_KEY: {"tags": ["b", "a"]}}
+    tobe = {PRESENTATION_KEY: {"tags": ["a", "b"]}}
+
+    assert get_diff_data_from_jsonized_models(asis, tobe) == {PRESENTATION_KEY: {"tags": ["a", "b"]}}

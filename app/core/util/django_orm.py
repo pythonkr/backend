@@ -45,6 +45,11 @@ def is_identifier(identifier: str) -> bool:
     return isinstance(identifier, str) and identifier.startswith("mdl:") and len(identifier.split(":")) == 4
 
 
+def is_identifier_list(value: typing.Any) -> bool:
+    """Check if the given value is a list of model identifiers (a serialized m2m/reverse relation)."""
+    return isinstance(value, list) and all(is_identifier(item) for item in value)
+
+
 def identifier_to_model(identifier: str) -> models.Model | None:
     if not is_identifier(identifier):
         raise ValueError(f"Invalid model identifier: {identifier}")
@@ -184,6 +189,9 @@ def get_diff_data_from_jsonized_models(
             value_a = model_asis[field_name]
             value_b = model_tobe[field_name]
             if value_a == value_b:
+                continue
+            # 관계 필드는 구성원만 의미가 있으므로, 순서만 다른 경우는 변경으로 보지 않는다.
+            if is_identifier_list(value_a) and is_identifier_list(value_b) and set(value_a) == set(value_b):
                 continue
             if value_a is not None and value_b is not None and type(value_a) != type(value_b):  # noqa: E721
                 raise TypeError(
