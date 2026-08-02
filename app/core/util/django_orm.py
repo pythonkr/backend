@@ -126,7 +126,8 @@ def _model_to_jsonable_dict(  # noqa: C901
                     jsonable_value.append(key)
                     if key not in converted_models:
                         converted_models[key] = _model_to_jsonable_dict(v, converted_models, None, True)
-                jsonable_model_dict[field] = jsonable_value
+                # 관계 조회는 정렬이 없으면 DB 물리 순서를 따르므로, 순서 변동이 변경으로 오인되지 않게 정렬한다.
+                jsonable_model_dict[field] = sorted(jsonable_value)
             else:
                 jsonable_model_dict[field] = [arbitrary_value_to_basic_type(v) for v in value]
         else:
@@ -147,7 +148,7 @@ def _model_to_jsonable_dict(  # noqa: C901
                 model_identifier_list.append(key)
                 if key not in converted_models:
                     converted_models[key] = _model_to_jsonable_dict(model, converted_models, None, True)
-            jsonable_model_dict[leftover_field] = model_identifier_list
+            jsonable_model_dict[leftover_field] = sorted(model_identifier_list)
 
     return jsonable_model_dict
 
