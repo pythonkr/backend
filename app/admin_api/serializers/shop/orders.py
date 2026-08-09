@@ -124,8 +124,19 @@ class OrderExportRequestSerializer(JsonSchemaSerializer, serializers.Serializer)
     include_refunded = serializers.BooleanField(default=False)
 
 
+def _option_response_context(order_product_rel: OrderProductRelation) -> dict[str, Any]:
+    return {
+        o_rel.product_option_group.name: (
+            o_rel.custom_response
+            if o_rel.product_option_group.is_custom_response
+            else (o_rel.product_option.name if o_rel.product_option else "")
+        )
+        for o_rel in order_product_rel.options.all()
+    }
+
+
 class _OrderRecipientItemSerializer(serializers.Serializer):
-    """Order → Recipient ({recipient, context}) 변환.
+    """Order → Recipient ({recipient, context, dedupe_key}) 변환.
 
     customer_info / 첫 상품 / recipient 부재 시 None 반환. None-skip 의미를 가지므로
     반드시 `SkipNoneListSerializer` (Meta.list_serializer_class) 와 함께 `many=True` 로 사용 — 단독 사용 시 호출자가 None 처리 책임.
@@ -133,6 +144,7 @@ class _OrderRecipientItemSerializer(serializers.Serializer):
 
     recipient = serializers.CharField()
     context = serializers.JSONField()
+    dedupe_key = serializers.CharField(allow_blank=True)
 
     class Meta:
         list_serializer_class = SkipNoneListSerializer
@@ -144,25 +156,52 @@ class _OrderRecipientItemSerializer(serializers.Serializer):
             return None
         if not (recipient := getattr(customer_info, CUSTOMER_INFO_RECIPIENT_ATTR_BY_CHANNEL[channel], "")):
             return None
-        if not (order_product_rel := next(iter(order.products.filter_active()), None)):
+        if not (order_product_rel := next(iter(order.products.all()), None)):
             return None
 
-        ctx: dict[str, Any] = {
-            o_rel.product_option_group.name: (
-                o_rel.custom_response
-                if o_rel.product_option_group.is_custom_response
-                else (o_rel.product_option.name if o_rel.product_option else "")
-            )
-            for o_rel in order_product_rel.options.filter_active()
-        } | order.build_notification_context()
+        ctx = _option_response_context(order_product_rel) | order.build_notification_context()
+        return {"recipient": recipient, "context": ctx | self.context["context_override"], "dedupe_key": ""}
 
-        return {"recipient": recipient, "context": ctx | self.context["context_override"]}
+
+class _OrderProductRecipientItemSerializer(serializers.Serializer):
+    """OrderProductRelation → Recipient 변환. None-skip 규약은 `_OrderRecipientItemSerializer` 와 동일.
+
+    한 주문에서 여러 건이 나오므로 같은 수신자 중복을 허용하기 위해 `dedupe_key` 에 OPR id 를 싣는다.
+    """
+
+    recipient = serializers.CharField()
+    context = serializers.JSONField()
+    dedupe_key = serializers.CharField(allow_blank=True)
+
+    class Meta:
+        list_serializer_class = SkipNoneListSerializer
+
+    def to_representation(self, opr: OrderProductRelation) -> Recipient | None:
+        channel: NotificationChannel = self.context["channel"]
+
+        if (participant := opr.participant_info) is None:
+            return None
+        if not (recipient := getattr(participant, CUSTOMER_INFO_RECIPIENT_ATTR_BY_CHANNEL[channel], "")):
+            return None
+
+        ctx: dict[str, Any] = {}
+        if (order := opr.order) is not None and getattr(order, "customer_info", None):
+            ctx = order.build_notification_context()
+
+        ctx |= opr.build_notification_context(participant=participant) | _option_response_context(opr)
+
+        return {
+            "recipient": recipient,
+            "context": ctx | self.context["context_override"],
+            "dedupe_key": str(opr.id),
+        }
 
 
 class OrderSendNotificationPreviewResponseSerializer(JsonSchemaSerializer, serializers.Serializer):
     class RecipientItemSerializer(JsonSchemaSerializer, serializers.Serializer):
         recipient = serializers.CharField()
         context = serializers.JSONField()
+        dedupe_key = serializers.CharField(allow_blank=True)
         missing_variables = serializers.ListField(child=serializers.CharField())
 
     template_variables = serializers.ListField(child=serializers.CharField())
@@ -170,6 +209,9 @@ class OrderSendNotificationPreviewResponseSerializer(JsonSchemaSerializer, seria
 
 
 class OrderSendNotificationSerializer(JsonSchemaSerializer, serializers.Serializer):
+    recipient_item_serializer_class: type[serializers.Serializer] = _OrderRecipientItemSerializer
+    empty_recipients_message = "발송 대상이 없습니다 (filterset 결과 0건 또는 customer_info/첫 상품 부재)."
+
     channel = serializers.ChoiceField(choices=NotificationChannel.choices)
     template_id = serializers.UUIDField()
     context_override = serializers.JSONField(required=False, default=dict)
@@ -185,7 +227,11 @@ class OrderSendNotificationSerializer(JsonSchemaSerializer, serializers.Serializ
         return {**attrs, "template": t}
 
     def _build_recipient_items(self) -> list[Recipient]:
-        return _OrderRecipientItemSerializer(instance=self.instance, many=True, context=self.validated_data).data
+        return self.recipient_item_serializer_class(
+            instance=self.instance,
+            many=True,
+            context=self.validated_data,
+        ).data
 
     def build_preview_response(self) -> OrderSendNotificationPreviewResponseSerializer:
         template_vars = self.validated_data["template"].template_variables
@@ -199,11 +245,15 @@ class OrderSendNotificationSerializer(JsonSchemaSerializer, serializers.Serializ
             },
         )
 
+    def build_rendered_html(self) -> str:
+        """filterset 에 걸린 첫 대상의 context 로 렌더한 HTML — 특정 건을 보려면 `?id=` 로 좁힌다."""
+        if not (items := self._build_recipient_items()):
+            raise serializers.ValidationError(self.empty_recipients_message)
+        return self.validated_data["template"].build_preview_sent_to(items[0]["context"]).render_as_html()
+
     def build_send_response(self) -> serializers.Serializer:
         if not (items := self._build_recipient_items()):
-            raise serializers.ValidationError(
-                "발송 대상이 없습니다 (filterset 결과 0건 또는 customer_info/첫 상품 부재)."
-            )
+            raise serializers.ValidationError(self.empty_recipients_message)
         channel: NotificationChannel = self.validated_data["channel"]
         template = self.validated_data["template"]
         if invalid := [
@@ -218,3 +268,8 @@ class OrderSendNotificationSerializer(JsonSchemaSerializer, serializers.Serializ
         history.send()
         history.refresh_from_db()
         return HISTORY_ADMIN_SERIALIZER_BY_CHANNEL[channel](instance=history)
+
+
+class OrderProductSendNotificationSerializer(OrderSendNotificationSerializer):
+    recipient_item_serializer_class = _OrderProductRecipientItemSerializer
+    empty_recipients_message = "발송 대상이 없습니다 (filterset 결과 0건 또는 참가자/주문자 정보 부재)."

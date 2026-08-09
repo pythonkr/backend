@@ -30,14 +30,27 @@ class OrdersAdminApi(ModelApiFixture):
         return self.http_client.post(url, format="json")
 
 
-class OrderNotificationsAdminApi(ModelApiFixture):
+class _NotificationSendApiFixture(ModelApiFixture):
+    def _url(self, action, params):
+        url = reverse(f"{self.name}-{action}")
+        return f"{url}?{urlencode(params, doseq=True)}" if params else url
+
+    def preview(self, data=None, params=None):
+        return self.http_client.post(self._url("preview", params), data, format="json")
+
+    def send(self, data=None, params=None):
+        return self.http_client.post(self._url("send", params), data, format="json")
+
+    def render(self, data=None, params=None):
+        return self.http_client.post(self._url("render-preview", params), data, format="json")
+
+
+class OrderNotificationsAdminApi(_NotificationSendApiFixture):
     name: ClassVar[str] = "v1:admin-shop-order-notification"
 
-    def preview(self, data=None):
-        return self.http_client.post(reverse(f"{self.name}-preview"), data, format="json")
 
-    def send(self, data=None):
-        return self.http_client.post(reverse(f"{self.name}-send"), data, format="json")
+class OrderProductNotificationsAdminApi(_NotificationSendApiFixture):
+    name: ClassVar[str] = "v1:admin-shop-order-product-notification"
 
 
 class CategoryGroupsAdminApi(ModelApiFixture):

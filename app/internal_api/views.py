@@ -14,7 +14,7 @@ from drf_standardized_errors.openapi_serializers import (
 from internal_api.filters import DeskSupportFilterSet
 from internal_api.serializers import DeskSupportSerializer
 from rest_framework import mixins, request, response, status, viewsets
-from shop.order.models import Order, OrderProductOptionRelation, OrderProductRelation
+from shop.order.models import Order, OrderProductRelation
 from shop.payment_history.models import PaymentHistory
 from shop.serializers.refund import OrderTotalRefundSerializer
 
@@ -57,16 +57,7 @@ class DeskSupportViewSet(
             models.Prefetch(
                 lookup="products",
                 queryset=(
-                    OrderProductRelation.objects.filter_active()
-                    .select_related("product")
-                    .prefetch_related(
-                        models.Prefetch(
-                            lookup="options",
-                            queryset=OrderProductOptionRelation.objects.filter_active().select_related(
-                                "product_option_group", "product_option"
-                            ),
-                        )
-                    )
+                    OrderProductRelation.objects.filter_active().select_related("product").prefetch_active_options()
                 ),
             ),
             models.Prefetch(

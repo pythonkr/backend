@@ -35,6 +35,7 @@ class NotificationStatus(models.TextChoices):
 class Recipient(TypedDict):
     recipient: str
     context: NotRequired[dict[str, Any]]
+    dedupe_key: NotRequired[str]
 
 
 def _walk_strings(value: Any, fn: Any) -> Any:
@@ -216,6 +217,8 @@ class NotificationHistorySentToBase(BaseAbstractModel):
     history: models.ForeignKey[NotificationHistoryBase]
 
     recipient = models.CharField(max_length=256)
+    # null 이 아닌 "" 기본값 — 안 쓰는 발송은 (history, recipient) 중복 방지가 그대로 유지된다.
+    dedupe_key = models.CharField(max_length=64, blank=True, default="")
     context = models.JSONField(default=dict)
     status = models.CharField(
         max_length=16,
@@ -229,7 +232,7 @@ class NotificationHistorySentToBase(BaseAbstractModel):
         abstract = True
         constraints = [
             models.UniqueConstraint(
-                fields=["history", "recipient"],
+                fields=["history", "recipient", "dedupe_key"],
                 condition=models.Q(deleted_at__isnull=True),
                 name="uq_%(app_label)s_%(class)s_history_recipient",
             ),
@@ -259,11 +262,16 @@ class NotificationHistorySentToBase(BaseAbstractModel):
                 f"without required context variables: {sorted(missing)}",
             )
 
-    def render(self, undef_var: UnhandledVariableHandling = UnhandledVariableHandling.RAISE) -> dict[str, Any]:
+    def render(
+        self,
+        undef_var: UnhandledVariableHandling = UnhandledVariableHandling.RAISE,
+        *,
+        autoescape: bool = False,
+    ) -> dict[str, Any]:
         # template_data를 JSON으로 먼저 파싱한 뒤 string value에만 Django Template을 적용 →
         # context가 JSON-special char(`"`, `\`, 줄바꿈 등)를 포함해도 결과 JSON 구조가 깨지지 않음.
-        # autoescape=False — 외부 채널(SMS, Kakao templateParameter)은 raw text 기대. HTML escape이 필요한 경우는
-        # template 작성자가 명시적으로 |escape 필터를 사용해야 함.
+        # autoescape 기본 False — 외부 채널(SMS, Kakao templateParameter)은 raw text 기대.
+        # HTML 로 출력하는 경로는 반드시 autoescape=True (render_as_html 참고).
         template_class = self.history.template_class
         payload = self._parsed_template_data()
 
@@ -285,11 +293,15 @@ class NotificationHistorySentToBase(BaseAbstractModel):
                 case UnhandledVariableHandling.REMOVE:
                     rendered_context[key] = ""
 
-        ctx = Context(rendered_context, autoescape=False)
+        ctx = Context(rendered_context, autoescape=autoescape)
         return _walk_strings(payload, lambda s: Template(template_class._to_dtl(s)).render(ctx))
 
     def render_as_html(self, undef_var: UnhandledVariableHandling = UnhandledVariableHandling.RANDOM) -> str:
-        return get_template(self.history.template_class.html_template_name).render(self.render(undef_var=undef_var))
+        # autoescape=True 필수 — Template.render() 결과는 SafeString 이라 바깥 HTML 템플릿이 재이스케이프하지 않는다.
+        # 여기서 escape 하지 않으면 구매자가 입력한 이름/소속이 admin 브라우저에서 그대로 실행된다.
+        return get_template(self.history.template_class.html_template_name).render(
+            self.render(undef_var=undef_var, autoescape=True),
+        )
 
     @property
     def payload(self) -> dict[str, Any]:

@@ -32,6 +32,16 @@ UserModel = get_user_model()
 PAYMENT_HASH_LENGTH = 16
 
 
+def korean_alias_context(*, name: str, organization: str, year: int | None = None) -> dict:
+    """승인된 카카오 알림톡 템플릿의 한글 변수(`#{성함}` 등)용 별칭 — 변수명 변경이 재검수 대상이라 백엔드가 맞춘다.
+
+    수신자마다 다른 값이라 `context_override`(전 수신자 공통)로는 못 채운다.
+    `연도` 는 없으면 키를 뺀다 — 빈 문자열로 채우면 preview 의 누락 검사를 통과해 빈 채로 발송된다.
+    """
+    aliases = {"성함": name, "성명": name, "소속": organization}
+    return aliases if year is None else aliases | {"연도": year}
+
+
 class PaymentPreparationMixin:
     id: UUID
     prepared_cart_snapshot: dict[str, typing.Any] | None
@@ -155,14 +165,8 @@ class OrderQuerySet(BaseCartQuerySet):
                 queryset=(
                     OrderProductRelation.objects.filter_active()
                     .select_related("product__category", "ticket_info")
+                    .prefetch_active_options()
                     .prefetch_related(
-                        models.Prefetch(
-                            "options",
-                            queryset=OrderProductOptionRelation.objects.filter_active().select_related(
-                                "product_option_group",
-                                "product_option",
-                            ),
-                        ),
                         models.Prefetch("issued_documents", queryset=IssuedDocument.objects.filter_active()),
                     )
                 ),
@@ -269,8 +273,8 @@ class Order(PaymentPreparationMixin, ScanCodeMixin, BaseAbstractModel):
     def build_notification_context(self) -> dict:
         """결제 완료 알림 (auto + admin manual) 에서 공통으로 사용하는 Order-derived context.
 
-        `first_paid_at` 은 isoformat 문자열로 변환 — JSONField 저장 시 psycopg `json.dumps` 가
-        datetime 을 직접 직렬화 못함. 호출자는 customer_info 존재를 사전 검증해야 함.
+        `first_paid_at` 은 isoformat 문자열로 변환 — JSONField 저장 시 psycopg `json.dumps` 가 datetime 을 직접 직렬화 못함.
+        호출자는 customer_info 존재를 사전 검증해야 함.
         """
         customer_info = self.customer_info
         return {
@@ -280,7 +284,9 @@ class Order(PaymentPreparationMixin, ScanCodeMixin, BaseAbstractModel):
             "customer_name": customer_info.name,
             "customer_phone": customer_info.phone,
             "customer_email": customer_info.email,
-            "scancode_url": urljoin(settings.BACKEND_DOMAIN, self.scancode_path),
+            "customer_organization": customer_info.organization or "",
+            # 주문은 event 를 몰라 연도는 빠진다.
+            **korean_alias_context(name=customer_info.name, organization=customer_info.organization or ""),
         }
 
     @functools.cached_property
@@ -343,6 +349,19 @@ class Order(PaymentPreparationMixin, ScanCodeMixin, BaseAbstractModel):
         return None
 
 
+class OrderProductRelationQuerySet(BaseAbstractModelQuerySet):
+    def prefetch_active_options(self) -> models.QuerySet[OrderProductRelation]:
+        return self.prefetch_related(
+            models.Prefetch(
+                "options",
+                queryset=OrderProductOptionRelation.objects.filter_active().select_related(
+                    "product_option_group",
+                    "product_option",
+                ),
+            ),
+        )
+
+
 class OrderProductRelation(ScanCodeMixin, IssuableMixin, BaseAbstractModel):
     ISSUED_DOCUMENT_TYPE = DocumentType.confirmation_of_participation
     scancode_prefix = "opr"
@@ -365,6 +384,8 @@ class OrderProductRelation(ScanCodeMixin, IssuableMixin, BaseAbstractModel):
 
     single_product_cart: SingleProductCart | None
     options: BaseManager[OrderProductOptionRelation]
+
+    objects: OrderProductRelationQuerySet = OrderProductRelationQuerySet.as_manager()  # type: ignore[assignment, misc]
 
     issued_documents = GenericRelation(
         "document.IssuedDocument",
@@ -439,6 +460,47 @@ class OrderProductRelation(ScanCodeMixin, IssuableMixin, BaseAbstractModel):
             return NotRefundableErrorMessages.PRODUCT_PRICE_IS_ZERO
 
         return None
+
+    @property
+    def ticket_info_or_none(self) -> TicketInfo | None:
+        try:
+            ticket_info = self.ticket_info
+        except TicketInfo.DoesNotExist:
+            return None
+        return ticket_info if ticket_info.deleted_at is None else None
+
+    @property
+    def customer_info_or_none(self) -> CustomerInfo | None:
+        customer_info = getattr(self.order or self.single_product_cart, "customer_info", None)
+        return customer_info if customer_info and customer_info.deleted_at is None else None
+
+    @property
+    def participant_info(self) -> TicketInfo | CustomerInfo | None:
+        return self.ticket_info_or_none or self.customer_info_or_none
+
+    def build_notification_context(self, participant: TicketInfo | CustomerInfo | None = None) -> dict:
+        if participant is None:
+            participant = self.participant_info
+        name = (getattr(participant, "name", "")) or ""
+        organization = (getattr(participant, "organization", "")) or ""
+        event = self.product.category.event
+        return {
+            "scancode_url": urljoin(settings.BACKEND_DOMAIN, self.scancode_path),
+            "product_name": self.product.name,
+            "product_price": self.price,
+            "product_donation_price": self.donation_price,
+            "product_status": self.get_status_display(),
+            "participant_name": name,
+            "participant_phone": (getattr(participant, "phone", "")) or "",
+            "participant_email": (getattr(participant, "email", "")) or "",
+            "participant_organization": organization,
+            "contribution_message": (getattr(participant, "contribution_message", "")) or "",
+            **korean_alias_context(
+                name=name,
+                organization=organization,
+                year=event.event_start_at.year if event and event.event_start_at else None,
+            ),
+        }
 
     def build_document_context(self) -> dict:
         try:

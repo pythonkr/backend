@@ -26,7 +26,10 @@ from admin_api.views.notification import (
     NHNCloudSMSNotificationTemplateAdminViewSet,
 )
 from admin_api.views.proxy.dooray import DoorayProxyView
-from admin_api.views.shop.order_notifications import OrderNotificationAdminViewSet
+from admin_api.views.shop.order_notifications import (
+    OrderNotificationAdminViewSet,
+    OrderProductNotificationAdminViewSet,
+)
 from admin_api.views.shop.orders import OrderAdminViewSet
 from admin_api.views.shop.products import (
     CategoryAdminViewSet,
@@ -119,6 +122,11 @@ admin_shop_router = routers.SimpleRouter()
 admin_shop_router.register("order", OrderAdminViewSet, basename="admin-shop-order")
 admin_shop_router.register(
     "order-notifications", OrderNotificationAdminViewSet, basename="admin-shop-order-notification"
+)
+admin_shop_router.register(
+    "order-product-notifications",
+    OrderProductNotificationAdminViewSet,
+    basename="admin-shop-order-product-notification",
 )
 admin_shop_router.register("product", ProductAdminViewSet, basename="admin-shop-product")
 admin_shop_router.register("category", CategoryAdminViewSet, basename="admin-shop-category")

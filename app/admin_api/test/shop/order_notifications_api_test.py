@@ -1,8 +1,5 @@
-from urllib.parse import urljoin
-
 import pytest
 from admin_api.test.helpers import OrderNotificationsAdminApi
-from django.conf import settings
 from notification.models.email import EmailNotificationHistory, EmailNotificationTemplate
 from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_400_BAD_REQUEST, HTTP_403_FORBIDDEN
 from shop.order.models import CustomerInfo
@@ -27,7 +24,6 @@ def test_notification_preview_returns_recipients_for_completed_order(api_client,
         {"channel": "email", "template_id": str(order_email_template.id)}
     )
     assert response.status_code == HTTP_200_OK
-    scancode_url = urljoin(settings.BACKEND_DOMAIN, completed_order.scancode_path)
     # 서버에서 isoformat 문자열로 변환된 채로 응답 / DB 저장 (JSONField datetime 미지원 회피).
     first_paid_at_str = completed_order.first_paid_at.isoformat()
     assert response.json() == {
@@ -36,14 +32,18 @@ def test_notification_preview_returns_recipients_for_completed_order(api_client,
             {
                 "recipient": "customer@example.com",
                 "context": {
-                    "scancode_url": scancode_url,
                     "order_name": "파이콘 한국 2026 티켓",
                     "first_paid_at": first_paid_at_str,
                     "first_paid_price": 10000,
                     "customer_name": "홍길동",
                     "customer_phone": "01012345678",
                     "customer_email": "customer@example.com",
+                    "customer_organization": "",
+                    "성함": "홍길동",
+                    "성명": "홍길동",
+                    "소속": "",
                 },
+                "dedupe_key": "",
                 "missing_variables": [],
             }
         ],
@@ -53,8 +53,6 @@ def test_notification_preview_returns_recipients_for_completed_order(api_client,
 @pytest.mark.django_db
 def test_notification_preview_includes_free_completed_order(api_client, order_email_template, order_factory):
     order = order_factory(status="completed", product_price=0, imp_id=None)
-    scancode_url = urljoin(settings.BACKEND_DOMAIN, order.scancode_path)
-
     response = OrderNotificationsAdminApi(http_client=api_client).preview(
         {"channel": "email", "template_id": str(order_email_template.id)}
     )
@@ -66,14 +64,18 @@ def test_notification_preview_includes_free_completed_order(api_client, order_em
             {
                 "recipient": order.customer_info.email,
                 "context": {
-                    "scancode_url": scancode_url,
                     "order_name": order.name,
                     "first_paid_at": order.first_paid_at.isoformat(),
                     "first_paid_price": 0,
                     "customer_name": order.customer_info.name,
                     "customer_phone": order.customer_info.phone,
                     "customer_email": order.customer_info.email,
+                    "customer_organization": "",
+                    "성함": order.customer_info.name,
+                    "성명": order.customer_info.name,
+                    "소속": "",
                 },
+                "dedupe_key": "",
                 "missing_variables": [],
             }
         ],
@@ -94,16 +96,24 @@ def test_notification_preview_rejects_unknown_template_id(api_client, order_fact
 
 
 @pytest.mark.django_db
-def test_notification_preview_excludes_refunded_orders(api_client, order_email_template, order_factory):
-    order_factory(status="refunded")
+def test_notification_preview_includes_refunded_orders(api_client, order_email_template, order_factory):
+    order = order_factory(status="refunded")
     response = OrderNotificationsAdminApi(http_client=api_client).preview(
         {"channel": "email", "template_id": str(order_email_template.id)}
     )
     assert response.status_code == HTTP_200_OK
-    assert response.json() == {
-        "template_variables": ["customer_email", "customer_name", "first_paid_price", "order_name"],
-        "recipients": [],
-    }
+    [recipient] = response.json()["recipients"]
+    assert recipient["recipient"] == order.customer_info.email
+
+
+@pytest.mark.django_db
+def test_notification_preview_excludes_unpaid_orders(api_client, order_email_template, order_factory):
+    order_factory(status="cart")
+    response = OrderNotificationsAdminApi(http_client=api_client).preview(
+        {"channel": "email", "template_id": str(order_email_template.id)}
+    )
+    assert response.status_code == HTTP_200_OK
+    assert response.json()["recipients"] == []
 
 
 @pytest.mark.django_db

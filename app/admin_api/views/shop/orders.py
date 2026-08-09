@@ -21,7 +21,7 @@ from drf_standardized_errors.openapi_serializers import ValidationErrorResponseS
 from rest_framework import exceptions, mixins, parsers, request, response, status, viewsets
 from rest_framework.decorators import action
 from shop.order import exports, imports
-from shop.order.models import Order, OrderProductOptionRelation, OrderProductRelation
+from shop.order.models import Order, OrderProductRelation
 from shop.payment_history.models import PURCHASED_STATUSES, REFUNDABLE_STATUSES, PaymentHistory
 from shop.product.models import Product
 from shop.serializers.refund import OrderProductRefundSerializer, OrderTotalRefundSerializer
@@ -33,16 +33,7 @@ ADMIN_METHODS = ["list", "retrieve", "partial_update"]
 
 # OrderProductRelation + nested Options prefetch — `Order.products` 용.
 _OPR_PREFETCH_QS = (
-    OrderProductRelation.objects.filter_active()
-    .select_related("product", "ticket_info")
-    .prefetch_related(
-        models.Prefetch(
-            "options",
-            queryset=OrderProductOptionRelation.objects.filter_active().select_related(
-                "product_option_group", "product_option"
-            ),
-        ),
-    )
+    OrderProductRelation.objects.filter_active().select_related("product", "ticket_info").prefetch_active_options()
 )
 
 # `Order.payment_histories` 용 prefetch — 최신순.
@@ -237,14 +228,7 @@ class OrderAdminViewSet(
             OrderProductRelation.objects.filter_active()
             .filter(order__in=order_qs)
             .select_related("product")
-            .prefetch_related(
-                models.Prefetch(
-                    "options",
-                    queryset=OrderProductOptionRelation.objects.filter_active().select_related(
-                        "product_option_group", "product_option"
-                    ),
-                ),
-            )
+            .prefetch_active_options()
             .distinct()
         )
 
