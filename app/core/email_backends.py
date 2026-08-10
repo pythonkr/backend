@@ -1,4 +1,4 @@
-from base64 import b64encode
+from base64 import b64decode, b64encode
 from datetime import UTC, datetime, timedelta
 from logging import getLogger
 from smtplib import SMTPAuthenticationError
@@ -41,15 +41,20 @@ class GmailOAuth2Backend(EmailBackend):
             self.password = saved_password
 
     @property
-    def _access_token(self) -> str:
+    def _refresh_token(self) -> str:
         if not (
             record := cast(GoogleOAuth2 | None, GoogleOAuth2.objects.filter_active().order_by("-created_at").first())
         ):
             raise RuntimeError(
                 "No GoogleOAuth2 refresh token configured. Run /v1/external-api/google-oauth2/authorize first.",
             )
-        refresh_token = cast(str, record.refresh_token)
+        return cast(str, record.refresh_token)
 
+    @property
+    def _access_token(self) -> str:
+        return self._access_token_for(self._refresh_token)
+
+    def _access_token_for(self, refresh_token: str) -> str:
         access_token, expires_at = _access_token_cache.get(refresh_token, (None, None))
         if access_token and expires_at and expires_at > datetime.now(UTC):
             return access_token
@@ -81,8 +86,18 @@ class GmailOAuth2Backend(EmailBackend):
 
         # STARTTLS 이후 smtplib가 ehlo_resp를 비워두기 때문에, docmd("AUTH") 전에 EHLO를 재전송해야 503을 피할 수 있다.
         self.connection.ehlo_or_helo_if_needed()
-        auth_payload = f"user={self.username}\x01auth=Bearer {self._access_token}\x01\x01"
+        refresh_token = self._refresh_token
+        auth_payload = f"user={self.username}\x01auth=Bearer {self._access_token_for(refresh_token)}\x01\x01"
         auth_payload = f"XOAUTH2 {b64encode(auth_payload.encode()).decode()}"
         code, response = self.connection.docmd("AUTH", auth_payload)
-        if code != 235:
-            raise SMTPAuthenticationError(code, response)
+        if code == 235:
+            return
+
+        # XOAUTH2 실패는 334 challenge로 오고, 빈 줄을 보내야 사유가 담긴 최종 응답을 받는다.
+        if code == 334:
+            logger.warning("Gmail rejected XOAUTH2: %s", b64decode(response).decode(errors="replace"))
+            code, response = self.connection.docmd("")
+
+        # 거부된 토큰을 캐시에 남겨두면 만료될 때까지 같은 토큰으로 계속 실패한다.
+        _access_token_cache.pop(refresh_token, None)
+        raise SMTPAuthenticationError(code, response)

@@ -1,9 +1,12 @@
 import re
 from email.header import decode_header, make_header
+from email.policy import SMTP as SMTP_EMAIL_POLICY
+from smtplib import SMTPServerDisconnected
+from unittest.mock import MagicMock, patch
 
 import pytest
 from core.external_apis.__interface__ import SendParameters
-from core.external_apis.smtp_email import email_client
+from core.external_apis.smtp_email import EmailClient, email_client
 from django.core import mail
 
 _MAX_ENCODED_WORD_LENGTH = 75  # RFC 2047, 구분자 포함
@@ -23,7 +26,8 @@ def _params(**overrides) -> SendParameters:
 
 
 def _sent_subject_header() -> str:
-    head = mail.outbox[0].message().as_bytes().split(b"\r\n\r\n")[0].decode()
+    # SMTP 백엔드(_send)와 동일하게 policy를 명시로 넘겨 실제 발송되는 헤더를 재현한다.
+    head = mail.outbox[0].message(policy=SMTP_EMAIL_POLICY).as_bytes().split(b"\r\n\r\n")[0].decode()
     return re.search(r"^Subject:(.*?)(?=^\S+:)", head + "\nX:", re.S | re.M).group(1)
 
 
@@ -57,3 +61,44 @@ def test_send_message_requires_title():
 def test_send_message_requires_sent_from():
     with pytest.raises(ValueError, match="sent_from"):
         email_client.send_message(data=_params(sent_from=""))
+
+
+class TestConnectionReuse:
+    # 메일마다 로그인하면 Gmail이 "454 Too many login attempts"로 차단한다.
+    def test_connection_is_opened_once_and_reused(self):
+        client = EmailClient()
+        connection = MagicMock()
+        connection.send_messages.return_value = 1
+
+        with patch("core.external_apis.smtp_email.get_connection", return_value=connection) as factory:
+            for _ in range(3):
+                client.send_message(data=_params())
+
+        assert factory.call_count == 1
+        assert connection.open.call_count == 1
+        assert connection.send_messages.call_count == 3
+        assert connection.close.call_count == 0
+
+    def test_disconnected_connection_is_reopened_once(self):
+        client = EmailClient()
+        dropped, fresh = MagicMock(), MagicMock()
+        dropped.send_messages.side_effect = SMTPServerDisconnected("idle timeout")
+        fresh.send_messages.return_value = 1
+
+        with patch("core.external_apis.smtp_email.get_connection", side_effect=[dropped, fresh]):
+            client.send_message(data=_params())
+
+        assert fresh.send_messages.call_count == 1
+
+    def test_repeated_disconnect_propagates(self):
+        client = EmailClient()
+        connection = MagicMock()
+        connection.send_messages.side_effect = SMTPServerDisconnected("gone")
+
+        with (
+            patch("core.external_apis.smtp_email.get_connection", return_value=connection),
+            pytest.raises(SMTPServerDisconnected),
+        ):
+            client.send_message(data=_params())
+
+        assert connection.send_messages.call_count == 2

@@ -140,3 +140,28 @@ class TestAuthenticateXOAuth2:
         backend.username = ""
         with pytest.raises(SMTPAuthenticationError, match="EMAIL_HOST_USER"):
             backend._authenticate_xoauth2()
+
+    def test_334_challenge_sends_empty_response_to_get_final_error(
+        self, backend, google_oauth_record, mock_token_endpoint
+    ):
+        backend.username = "user@example.com"
+        backend.connection = MagicMock()
+        challenge = base64.b64encode(b'{"status":"400","schemes":"Bearer"}')
+        backend.connection.docmd.side_effect = [(334, challenge), (535, b"5.7.8 Bad credentials")]
+
+        with pytest.raises(SMTPAuthenticationError) as e:
+            backend._authenticate_xoauth2()
+
+        assert e.value.smtp_code == 535
+        assert backend.connection.docmd.call_args.args == ("",)
+
+    def test_auth_failure_evicts_cached_token(self, backend, google_oauth_record, mock_token_endpoint):
+        backend.username = "user@example.com"
+        backend.connection = MagicMock()
+        backend.connection.docmd.return_value = (535, b"Auth failed")
+
+        with pytest.raises(SMTPAuthenticationError):
+            backend._authenticate_xoauth2()
+
+        # 캐시가 남아 있으면 만료될 때까지 같은 토큰으로 계속 실패한다.
+        assert google_oauth_record.refresh_token not in _access_token_cache
