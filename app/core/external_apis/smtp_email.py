@@ -1,6 +1,7 @@
+from contextlib import suppress
 from email.policy import SMTP as SMTP_EMAIL_POLICY
 from logging import getLogger
-from smtplib import SMTPServerDisconnected
+from smtplib import SMTPException, SMTPSenderRefused, SMTPServerDisconnected
 from threading import Lock
 from typing import TypedDict, cast
 
@@ -12,6 +13,14 @@ logger = getLogger(__name__)
 
 # 기본값 78이면 긴 한글 제목이 RFC 2047 상한(75자)을 넘는 encoded-word로 접혀 일부 클라이언트에서 깨진다.
 _EMAIL_POLICY = SMTP_EMAIL_POLICY.clone(max_line_length=76)
+
+
+def _is_stale_connection(error: SMTPException) -> bool:
+    # Gmail은 유휴 커넥션을 끊을 때 TCP를 그냥 닫기도 하고 MAIL FROM에 `451 4.4.2 Timeout - closing connection`을
+    # 응답하기도 한다. 둘 다 메시지가 수락되기 전이라 재연결 후 재시도해도 중복 발송되지 않는다.
+    if isinstance(error, SMTPServerDisconnected):
+        return True
+    return isinstance(error, SMTPSenderRefused) and 400 <= error.smtp_code < 500
 
 
 class _SafeHeaderEmailMessage(EmailMessage):
@@ -59,12 +68,17 @@ class EmailClient(NotificationServiceInterface):
                 self._connection.open()
             try:
                 return self._connection.send_messages([message])
-            except SMTPServerDisconnected:
-                # 유휴 커넥션을 서버가 끊은 경우. 메시지가 수락되기 전이므로 재연결 후 한 번만 재시도한다.
-                self._connection = None
-                if is_last_attempt:
+            except (SMTPServerDisconnected, SMTPSenderRefused) as error:
+                if is_last_attempt or not _is_stale_connection(error):
                     raise
+                self._discard_connection()
         return 0
+
+    def _discard_connection(self) -> None:
+        connection, self._connection = self._connection, None
+        if connection is not None:
+            with suppress(Exception):
+                connection.close()
 
 
 email_client = EmailClient()

@@ -1,7 +1,7 @@
 import re
 from email.header import decode_header, make_header
 from email.policy import SMTP as SMTP_EMAIL_POLICY
-from smtplib import SMTPServerDisconnected
+from smtplib import SMTPSenderRefused, SMTPServerDisconnected
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -89,6 +89,32 @@ class TestConnectionReuse:
             client.send_message(data=_params())
 
         assert fresh.send_messages.call_count == 1
+
+    def test_idle_timeout_on_mail_from_is_retried(self):
+        # Gmail이 유휴 커넥션에 `451 4.4.2 Timeout - closing connection`을 응답하는 경우.
+        client = EmailClient()
+        stale, fresh = MagicMock(), MagicMock()
+        stale.send_messages.side_effect = SMTPSenderRefused(451, b"4.4.2 Timeout - closing connection.", "a@b.c")
+        fresh.send_messages.return_value = 1
+
+        with patch("core.external_apis.smtp_email.get_connection", side_effect=[stale, fresh]):
+            client.send_message(data=_params())
+
+        assert stale.close.call_count == 1
+        assert fresh.send_messages.call_count == 1
+
+    def test_permanent_sender_rejection_is_not_retried(self):
+        client = EmailClient()
+        connection = MagicMock()
+        connection.send_messages.side_effect = SMTPSenderRefused(550, b"5.7.1 Sender denied", "a@b.c")
+
+        with (
+            patch("core.external_apis.smtp_email.get_connection", return_value=connection),
+            pytest.raises(SMTPSenderRefused),
+        ):
+            client.send_message(data=_params())
+
+        assert connection.send_messages.call_count == 1
 
     def test_repeated_disconnect_propagates(self):
         client = EmailClient()
