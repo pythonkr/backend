@@ -53,6 +53,7 @@ class NotificationTemplateBase(BaseAbstractModel):
     variable_start: ClassVar[str] = "{{"
     variable_end: ClassVar[str] = "}}"
     html_template_name: ClassVar[str]
+    required_data_keys: ClassVar[tuple[str, ...]] = ()
 
     choices_meta_schema: ClassVar[dict] = {
         "code": {"label": "코드", "type": "string", "filter": "search"},
@@ -241,11 +242,20 @@ class NotificationHistorySentToBase(BaseAbstractModel):
     def __str__(self) -> str:
         return f"{self.recipient} ({self.get_status_display()})"
 
-    def _parsed_template_data(self) -> Any:
+    def _parsed_template_data(self) -> dict[str, Any]:
+        # render 결과가 그대로 채널 payload가 되므로 JSON object가 아니면 여기서 fail-fast.
+        # (평문/HTML이 저장된 경우 Django template context나 채널 client에서 TypeError로 뒤늦게 터진다.)
         try:
-            return json_loads(self.history.template_data)
+            parsed = json_loads(self.history.template_data)
         except ValueError:
-            return self.history.template_data
+            parsed = None
+
+        if not isinstance(parsed, dict):
+            raise ValueError(
+                f"Notification (template_code={self.history.template_code or '-'}) has invalid template_data: "
+                f"expected a JSON object, got {type(parsed).__name__ if parsed is not None else 'non-JSON text'}.",
+            )
+        return parsed
 
     def _required_template_variables(self, payload: Any) -> set[str]:
         template_class = self.history.template_class

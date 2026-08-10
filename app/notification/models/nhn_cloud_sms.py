@@ -12,6 +12,7 @@ from notification.models.base import (
 
 class NHNCloudSMSNotificationTemplate(NotificationTemplateBase):
     html_template_name: ClassVar[str] = "nhn_cloud_sms_preview.html"
+    required_data_keys: ClassVar[tuple[str, ...]] = ("body",)  # title은 MMS 전용이라 선택
 
 
 class NHNCloudSMSNotificationHistorySentTo(NotificationHistorySentToBase):

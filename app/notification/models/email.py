@@ -12,6 +12,7 @@ from notification.models.base import (
 
 class EmailNotificationTemplate(NotificationTemplateBase):
     html_template_name: ClassVar[str] = "email_preview.html"
+    required_data_keys: ClassVar[tuple[str, ...]] = ("title", "body")
 
 
 class EmailNotificationHistorySentTo(NotificationHistorySentToBase):
@@ -19,8 +20,9 @@ class EmailNotificationHistorySentTo(NotificationHistorySentToBase):
 
     @property
     def payload(self) -> dict[str, Any]:
+        # body는 HTML이라 context를 escape, title은 메일 제목(plain text)이라 그대로 둔다.
         rendered = self.render()
-        rendered["body"] = self.render_as_html()
+        rendered["body"] = self.render(autoescape=True).get("body", "")
         return rendered
 
 

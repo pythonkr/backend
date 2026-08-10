@@ -130,6 +130,24 @@ def test_render_as_html_kakao_preview_renders_buttons():
     assert "가기" in html
 
 
+# ---- template_data 형식 검증 --------------------------------------------------
+
+
+def test_render_raises_on_non_json_template_data():
+    # 에디터가 컴파일된 HTML을 data에 통째로 저장한 경우 — Django template context TypeError 대신
+    # 발송 실패 사유로 읽히는 ValueError로 fail-fast.
+    tpl = EmailNotificationTemplate(data="<!DOCTYPE html><html><body>Hello {{ name }}</body></html>")
+    sent_to = tpl.build_preview_sent_to({"name": "길동"})
+    with pytest.raises(ValueError, match="JSON object"):
+        sent_to.render_as_html()
+
+
+def test_render_raises_on_json_non_object_template_data():
+    tpl = EmailNotificationTemplate(data='["body"]')
+    with pytest.raises(ValueError, match="JSON object"):
+        tpl.build_preview_sent_to({}).render()
+
+
 # ---- JSON-unsafe context (per-string substitution 검증) -----------------------
 
 

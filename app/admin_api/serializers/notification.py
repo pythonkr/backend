@@ -1,3 +1,4 @@
+from json import loads as json_loads
 from typing import Any
 
 from core.const.serializer import COMMON_ADMIN_FIELDS
@@ -22,6 +23,23 @@ from notification.models.base import (
     UnhandledVariableHandling,
 )
 from rest_framework import serializers
+
+
+def _validate_template_data(value: str, template_class: type[NotificationTemplateBase]) -> str:
+    # 에디터가 컴파일된 HTML을 통째로 넣는 실수를 발송 시점이 아니라 저장 시점에 잡는다.
+    try:
+        parsed = json_loads(value)
+    except ValueError as e:
+        raise serializers.ValidationError("올바른 JSON이 아닙니다.") from e
+
+    if not isinstance(parsed, dict):
+        raise serializers.ValidationError('JSON object여야 합니다. (예: {"title": "제목", "body": "<html>...</html>"})')
+
+    if missing := sorted(k for k in template_class.required_data_keys if not str(parsed.get(k) or "").strip()):
+        raise serializers.ValidationError(f"다음 key가 비어 있습니다: {missing}")
+
+    return value
+
 
 # ---- SentTo nested ----------------------------------------------------------
 
@@ -69,6 +87,9 @@ class _NotiHistoryAdminSerializerBase(BaseAbstractSerializer, JsonSchemaSerializ
             "sent_to_list",
             "sent_to_status_summary",
         )
+
+    def validate_template_data(self, value: str) -> str:
+        return _validate_template_data(value, self.Meta.model.template_class) if value else value
 
     def create(self, validated_data: dict[str, Any]) -> NotificationHistoryBase:
         # template이 명시되지 않은 templateless 경로면 transient (unsaved) template_class 인스턴스로 폴백.
@@ -154,6 +175,9 @@ class _NotiTemplateAdminSerializerBase(BaseAbstractSerializer, JsonSchemaSeriali
 
     def get_template_variables(self, obj: NotificationTemplateBase) -> list[str]:
         return sorted(obj.template_variables)
+
+    def validate_data(self, value: str) -> str:
+        return _validate_template_data(value, self.Meta.model)
 
     def render(self, context: dict[str, Any]) -> str:
         return self.instance.build_preview_sent_to(context).render_as_html(undef_var=UnhandledVariableHandling.RANDOM)

@@ -127,13 +127,13 @@ def test_history_send_parameters_uses_rendered_payload(system_user):
 
 
 @pytest.mark.django_db
-def test_email_payload_body_is_html_rendered(system_user):
-    # 이메일 발송 시 payload["body"]는 HTML 템플릿으로 렌더링된 결과여야 함.
+def test_email_payload_body_is_template_body_without_preview_chrome(system_user):
+    # 어드민 미리보기 껍데기(email_preview.html)의 아바타/날짜/"…에게" UI가 실제 메일에 섞이면 안 된다.
     tpl = EmailNotificationTemplate.objects.create(
         code="html-body",
         title="t",
         sent_from="a@b.c",
-        data='{"title":"안녕 {{ name }}","body":"본문 {{ name }}"}',
+        data='{"title":"안녕 {{ name }}","body":"<p>본문 {{ name }}</p>"}',
         created_by=system_user,
         updated_by=system_user,
     )
@@ -141,13 +141,27 @@ def test_email_payload_body_is_html_rendered(system_user):
     sent_to = history.sent_to_list.get()
     payload = sent_to.payload
 
-    # title은 plain text
     assert payload["title"] == "안녕 길동"
-    assert not payload["title"].strip().startswith("<")
+    assert payload["body"] == "<p>본문 길동</p>"
+    assert "email-main" not in payload["body"]
+    assert "에게" not in payload["body"]
 
-    # body는 HTML 렌더링 결과
-    assert payload["body"].strip().startswith("<")
-    assert "길동" in payload["body"]
+
+@pytest.mark.django_db
+def test_email_payload_escapes_context_in_body(system_user):
+    tpl = EmailNotificationTemplate.objects.create(
+        code="escape-body",
+        title="t",
+        sent_from="a@b.c",
+        data='{"title":"안녕 {{ name }}","body":"<p>{{ name }}</p>"}',
+        created_by=system_user,
+        updated_by=system_user,
+    )
+    history = _create_history(tpl, context={"name": "<script>alert(1)</script>"})
+    payload = history.sent_to_list.get().payload
+
+    assert payload["body"] == "<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>"
+    assert payload["title"] == "안녕 <script>alert(1)</script>"  # 제목은 plain text
 
 
 @pytest.mark.django_db

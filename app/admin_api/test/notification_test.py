@@ -65,6 +65,40 @@ def test_template_create(api_client):
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(
+    "data",
+    [
+        "<!DOCTYPE html><html><body>Hello</body></html>",  # 에디터 컴파일 결과를 그대로 넣은 경우
+        '["not", "an", "object"]',
+        '{"body":"b"}',  # title 누락
+        '{"title":"  ","body":"b"}',
+    ],
+)
+def test_template_create_rejects_invalid_data(api_client, data):
+    response = api_client.post(
+        reverse("v1:admin-notification-email-template-list"),
+        data={"code": "bad-tpl", "title": "잘못됨", "sent_from": "from@example.com", "data": data},
+        format="json",
+    )
+    assert response.status_code == http.HTTPStatus.BAD_REQUEST
+    assert not EmailNotificationTemplate.objects.filter(code="bad-tpl").exists()
+
+
+@pytest.mark.django_db
+def test_create_history_templateless_rejects_invalid_template_data(api_client):
+    response = api_client.post(
+        reverse("v1:admin-notification-email-history-list"),
+        data={
+            "template_data": "<html>plain</html>",
+            "sent_from": "from@example.com",
+            "sent_to_list": [{"recipient": "to@example.com"}],
+        },
+        format="json",
+    )
+    assert response.status_code == http.HTTPStatus.BAD_REQUEST
+
+
+@pytest.mark.django_db
 def test_template_partial_update(api_client, email_template):
     response = api_client.patch(
         reverse("v1:admin-notification-email-template-detail", kwargs={"pk": email_template.id}),
