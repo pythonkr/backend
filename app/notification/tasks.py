@@ -8,8 +8,11 @@ from notification.models.base import NotificationStatus, slack_logger
 
 # 연결/인증 단계 실패만 재시도한다 — 메시지 전송이 시작된 뒤의 예외는 중복 발송 위험이 있다.
 # Gmail은 짧은 시간에 로그인이 몰리면 XOAUTH2를 일시 거부하므로 백오프가 필요하다.
+# rate_limit은 worker 단위이고 채널 공통 — 분당 90건대에서 Gmail이 차단했던 이력을 기준으로 여유를 뒀다.
+# 운영 중 조정은 배포 없이 `app.control.rate_limit(task_name, "30/m")`로 가능하다.
 @shared_task(
     ignore_result=True,
+    rate_limit="60/m",
     autoretry_for=(SMTPAuthenticationError, SMTPConnectError),
     retry_backoff=30,
     retry_backoff_max=600,
