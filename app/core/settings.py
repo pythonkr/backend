@@ -489,7 +489,12 @@ NHN_KCP = types.SimpleNamespace(
 
 # Shop Settings
 SHOP = types.SimpleNamespace(
-    order_scancode_salt=env("ORDER_SCANCODE_SALT", default="local_order_scancode_salt"),
+    # 쉼표로 여러 개 지정 가능 — 맨 앞이 발급용, 나머지는 rotation 기간 동안 검증만 허용.
+    order_scancode_salts=[
+        stripped
+        for salt in env.list("ORDER_SCANCODE_SALT", default=["local_order_scancode_salt"])
+        if (stripped := salt.strip())
+    ],
     refund_authorizer_secret_key=env("REFUND_AUTHORIZER_SECRET_KEY", default="local_refund_authorizer_secret_key"),
 )
 

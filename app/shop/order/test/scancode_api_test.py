@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 import shortuuid
+from django.conf import settings
 from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN, HTTP_404_NOT_FOUND
 from shop.order.models import Order
 from shop.test.helpers import ScanCodeApi
@@ -115,3 +116,28 @@ def test_scancode_pages_render_qr_with_full_token(anon_client, customer_user, or
         response = ScanCodeApi(http_client=anon_client).list({"token": token})
         assert response.status_code == HTTP_200_OK
         assert f'text: "{token}"' in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_scancode_token_issued_with_rotated_out_salt_still_verifies(anon_client, order_factory, monkeypatch):
+    order = order_factory(status="completed")
+
+    monkeypatch.setattr(settings.SHOP, "order_scancode_salts", ["old_salt"])
+    old_token = Order.objects.get(id=order.id).scancode_token  # cached_property 라 매번 새로 조회.
+
+    monkeypatch.setattr(settings.SHOP, "order_scancode_salts", ["new_salt", "old_salt"])
+    new_token = Order.objects.get(id=order.id).scancode_token
+    assert new_token != old_token
+    assert ScanCodeApi(http_client=anon_client).list({"token": old_token}).status_code == HTTP_200_OK
+    assert ScanCodeApi(http_client=anon_client).list({"token": new_token}).status_code == HTTP_200_OK
+
+
+@pytest.mark.django_db
+def test_scancode_token_rejected_after_old_salt_removed(anon_client, order_factory, monkeypatch):
+    order = order_factory(status="completed")
+
+    monkeypatch.setattr(settings.SHOP, "order_scancode_salts", ["old_salt"])
+    old_token = Order.objects.get(id=order.id).scancode_token
+
+    monkeypatch.setattr(settings.SHOP, "order_scancode_salts", ["new_salt"])
+    assert ScanCodeApi(http_client=anon_client).list({"token": old_token}).status_code == HTTP_404_NOT_FOUND

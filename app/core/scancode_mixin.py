@@ -4,6 +4,7 @@ from base64 import urlsafe_b64encode
 from contextlib import suppress
 from functools import cached_property
 from hashlib import sha256
+from hmac import compare_digest
 from hmac import new as hmac_new
 from typing import ClassVar, Self
 from uuid import UUID
@@ -25,10 +26,17 @@ class ScanCodeMixin:
     def short_id(self) -> str:
         return encode(self._scancode_uuid)
 
+    def _salt_with(self, secret: str) -> str:
+        hmac_result = hmac_new(secret.encode(), self._scancode_uuid.bytes, sha256).digest()
+        return urlsafe_b64encode(hmac_result).decode("utf-8").rstrip("=")
+
     @cached_property
     def salt(self) -> str:
-        hmac_result = hmac_new(settings.SHOP.order_scancode_salt.encode(), self._scancode_uuid.bytes, sha256).digest()
-        return urlsafe_b64encode(hmac_result).decode("utf-8").rstrip("=")
+        return self._salt_with(settings.SHOP.order_scancode_salts[0])
+
+    def verify_salt(self, salt: str) -> bool:
+        # rotation 중에는 과거 salt 로 발급된 토큰도 받아준다.
+        return any(compare_digest(self._salt_with(secret), salt) for secret in settings.SHOP.order_scancode_salts)
 
     @cached_property
     def scancode_token(self) -> str:
@@ -53,6 +61,6 @@ class ScanCodeMixin:
         prefix, short_id, salt = parts
         if prefix != cls.scancode_prefix or not (short_id and salt):
             return None
-        if (instance := cls.from_short_id(short_id)) and instance.salt == salt:
+        if (instance := cls.from_short_id(short_id)) and instance.verify_salt(salt):
             return instance
         return None
