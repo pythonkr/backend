@@ -40,7 +40,7 @@ class _OrderProductRelationSerializer(serializers.ModelSerializer):
 
 
 class OrderProductScanCodeSerializer(_OrderProductRelationSerializer):
-    """단일 OrderProductRelation (티켓) 의 QR 페이지용 응답 — base + id/short_id/order context."""
+    """단일 OrderProductRelation (티켓) 의 QR 페이지용 응답 — base + id/scancode_token/order context."""
 
     class _OrderSerializer(serializers.ModelSerializer):
         class Meta:
@@ -50,7 +50,7 @@ class OrderProductScanCodeSerializer(_OrderProductRelationSerializer):
     order = _OrderSerializer()
 
     class Meta(_OrderProductRelationSerializer.Meta):
-        fields = ("id", "short_id", "order", *_OrderProductRelationSerializer.Meta.fields)
+        fields = ("id", "scancode_token", "order", *_OrderProductRelationSerializer.Meta.fields)
 
 
 class OrderScanCodeSerializer(serializers.ModelSerializer):
@@ -68,7 +68,7 @@ class OrderScanCodeSerializer(serializers.ModelSerializer):
         model = Order
         fields = (
             "id",
-            "short_id",
+            "scancode_token",
             "name",
             "created_at",
             "first_paid_at",
@@ -84,4 +84,4 @@ class UserScanCodeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserExt
-        fields = ("unique_id", "short_id")
+        fields = ("unique_id", "scancode_token")

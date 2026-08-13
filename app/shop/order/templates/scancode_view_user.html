@@ -99,7 +99,7 @@
 </div>
 <script type="text/javascript">
   var qrcode = new QRCode("qrcode", {
-    text: "user:{{ user.short_id }}",
+    text: "{{ user.scancode_token }}",
     width: 192,
     height: 192,
     colorDark : "#000000",

@@ -105,3 +105,13 @@ def test_scancode_order_token_returns_404_when_order_does_not_exist(anon_client)
     token = f"order:{shortuuid.encode(uuid.uuid4())}:fakesalt"
     response = ScanCodeApi(http_client=anon_client).list({"token": token})
     assert response.status_code == HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_scancode_pages_render_qr_with_full_token(anon_client, customer_user, order_factory):
+    # QR 에 salt 없는 `prefix:short_id` 가 들어가면 등록 데스크 스캔이 전부 거절된다.
+    order = order_factory(status="completed")
+    for token in (customer_user.scancode_token, order.scancode_token, order.products.first().scancode_token):
+        response = ScanCodeApi(http_client=anon_client).list({"token": token})
+        assert response.status_code == HTTP_200_OK
+        assert f'text: "{token}"' in response.content.decode()

@@ -49,7 +49,7 @@
 </table>
 <script type="text/javascript">
   var qrcode = new QRCode("qrcode", {
-    text: "order:{{ order.short_id }}",
+    text: "{{ order.scancode_token }}",
     width: 192,
     height: 192,
     colorDark : "#000000",
