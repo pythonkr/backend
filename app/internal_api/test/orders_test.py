@@ -490,12 +490,12 @@ def test_orders_patch_rejects_null_custom_response_when_required(
 @pytest.mark.django_db
 def test_orders_list_exposes_tags(ticket_config, staff_client, order_factory):
     order = order_factory(status="completed")
-    tag = OrderProductRelationTag.objects.create(code="speaker", name="발표자")
+    tag = OrderProductRelationTag.objects.create(code="speaker", name="발표자", priority=1)
     tag.order_product_relations.add(order.products.get())
 
     body = staff_client.get(ORDERS_URL, SEARCH).json()["results"][0]
 
-    assert body["products"][0]["tags"] == [{"id": str(tag.id), "code": "speaker", "name": "발표자"}]
+    assert body["products"][0]["tags"] == [{"id": str(tag.id), "code": "speaker", "name": "발표자", "priority": 1}]
 
 
 @pytest.mark.django_db

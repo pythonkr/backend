@@ -78,3 +78,4 @@ def test_configuration_lists_available_tags(staff_client, ticket_config):
 
     # 소프트 삭제 태그는 빠지고, priority 순서로 고정된다.
     assert [tag["code"] for tag in tags] == ["speaker", "volunteer"]
+    assert [tag["priority"] for tag in tags] == [1, 2]

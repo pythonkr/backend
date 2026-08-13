@@ -41,7 +41,7 @@ def desk_refund_reason(reason: str | None) -> str | None:
 
 class RegistrationDeskTagDto(serializers.ModelSerializer):
     class Meta:
-        fields = ("id", "code", "name")
+        fields = ("id", "code", "name", "priority")
         model = OrderProductRelationTag
 
 
