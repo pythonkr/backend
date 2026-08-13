@@ -400,6 +400,8 @@ REST_FRAMEWORK = {
     "URL_FORMAT_OVERRIDE": None,
 }
 
+DRF_STANDARDIZED_ERRORS = {"EXCEPTION_HANDLER_CLASS": "core.exception_handler.DBConstraintExceptionHandler"}
+
 # DRF Spectacular Settings
 SPECTACULAR_SETTINGS = {
     "TITLE": "PyCon KR Backend API",
