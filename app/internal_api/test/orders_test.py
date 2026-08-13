@@ -6,7 +6,6 @@ from django.urls import reverse
 from rest_framework.status import HTTP_200_OK, HTTP_204_NO_CONTENT, HTTP_400_BAD_REQUEST, HTTP_403_FORBIDDEN
 from shop.order.models import OrderProductRelation, OrderProductRelationTag, TicketInfo
 from shop.product.models import OptionGroup
-from shop.test.helpers import valid_refund_totp
 
 ORDERS_URL = reverse("v1:registration_desk:orders-list")
 SEARCH = {"keywords": "홍길동"}
@@ -165,22 +164,12 @@ def test_orders_patch_rejects_forbidden_status_transition(ticket_config, staff_c
 
 
 @pytest.mark.django_db
-def test_orders_refund_requires_valid_otp(ticket_config, staff_client, order_factory, mock_portone_req_cancel_payment):
-    order = order_factory(status="completed")
-
-    response = staff_client.delete(f"{_refund_url(order.id)}?otp=000000")
-
-    assert response.status_code == HTTP_400_BAD_REQUEST
-    mock_portone_req_cancel_payment.assert_not_called()
-
-
-@pytest.mark.django_db
 def test_orders_refund_cancels_payment_and_marks_products_refunded(
     ticket_config, staff_client, order_factory, mock_portone_req_cancel_payment
 ):
     order = order_factory(status="completed")
 
-    response = staff_client.delete(f"{_refund_url(order.id)}?otp={valid_refund_totp()}")
+    response = staff_client.delete(_refund_url(order.id))
 
     assert response.status_code == HTTP_204_NO_CONTENT
     mock_portone_req_cancel_payment.assert_called_once()
@@ -191,7 +180,7 @@ def test_orders_refund_cancels_payment_and_marks_products_refunded(
 def test_orders_refund_rejects_non_superuser(customer_client, order_factory, mock_portone_req_cancel_payment):
     order = order_factory(status="completed")
 
-    response = customer_client.delete(f"{_refund_url(order.id)}?otp={valid_refund_totp()}")
+    response = customer_client.delete(_refund_url(order.id))
 
     assert response.status_code == HTTP_403_FORBIDDEN
     mock_portone_req_cancel_payment.assert_not_called()
@@ -381,7 +370,7 @@ def test_orders_refund_rejects_out_of_scope_order(
 ):
     order = order_factory(status="completed", is_ticket=False)
 
-    response = staff_client.delete(f"{_refund_url(order.id)}?otp={valid_refund_totp()}")
+    response = staff_client.delete(_refund_url(order.id))
 
     assert response.status_code == HTTP_403_FORBIDDEN
     mock_portone_req_cancel_payment.assert_not_called()

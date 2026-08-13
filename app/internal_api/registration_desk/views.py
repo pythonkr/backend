@@ -6,7 +6,7 @@ from core.pagination import AdminPagination
 from django.db import models, transaction
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
-from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema, extend_schema_view
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from drf_standardized_errors.openapi_serializers import (
     Error403Serializer,
     Error404Serializer,
@@ -173,16 +173,6 @@ class RegistrationDeskOrderViewSet(
     @extend_schema(
         summary="주문 전체 환불",
         tags=[OpenAPITag.EXT_REGISTRATION_DESK_API],
-        parameters=[
-            OpenApiParameter(
-                name="otp",
-                type=OpenApiTypes.STR,
-                location=OpenApiParameter.QUERY,
-                allow_blank=False,
-                required=True,
-                description="환불 승인자의 6자리 TOTP 코드",
-            ),
-        ],
         responses={
             status.HTTP_204_NO_CONTENT: None,
             status.HTTP_400_BAD_REQUEST: ValidationErrorResponseSerializer,
@@ -198,8 +188,8 @@ class RegistrationDeskOrderViewSet(
         self.assert_in_scope([product.id for product in order.active_products])
         serializer = OrderTotalRefundSerializer(
             instance=order,
-            data={"totp": req.query_params.get("otp")},
-            context={"check_refundable_date": False},
+            data={},
+            context={"check_refundable_date": False, "check_totp": False},
         )
         serializer.is_valid(raise_exception=True)
         serializer.refund()
@@ -246,16 +236,6 @@ class RegistrationDeskOrderProductViewSet(
     @extend_schema(
         summary="주문 상품 부분 환불",
         tags=[OpenAPITag.EXT_REGISTRATION_DESK_API],
-        parameters=[
-            OpenApiParameter(
-                name="otp",
-                type=OpenApiTypes.STR,
-                location=OpenApiParameter.QUERY,
-                allow_blank=False,
-                required=True,
-                description="환불 승인자의 6자리 TOTP 코드",
-            ),
-        ],
         responses={
             status.HTTP_204_NO_CONTENT: None,
             status.HTTP_400_BAD_REQUEST: ValidationErrorResponseSerializer,
@@ -270,8 +250,8 @@ class RegistrationDeskOrderProductViewSet(
         self.assert_in_scope([order_product.id])
         serializer = OrderProductRefundSerializer(
             instance=order_product,
-            data={"totp": req.query_params.get("otp")},
-            context={"check_refundable_date": False},
+            data={},
+            context={"check_refundable_date": False, "check_totp": False},
         )
         serializer.is_valid(raise_exception=True)
         serializer.refund()

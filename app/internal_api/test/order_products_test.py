@@ -9,7 +9,6 @@ from rest_framework.status import (
     HTTP_403_FORBIDDEN,
 )
 from shop.order.models import OrderProductRelation, TicketInfo
-from shop.test.helpers import valid_refund_totp
 
 LIST_URL = reverse("v1:registration_desk:order-products-list")
 
@@ -169,21 +168,9 @@ def test_order_product_list_returns_empty_for_tampered_salt(staff_client, order_
 def test_order_product_refund_rejects_non_superuser(customer_client, order_factory, mock_portone_req_cancel_payment):
     opr = order_factory(status="completed").products.get()
 
-    response = customer_client.delete(f"{_refund_url(opr.id)}?otp={valid_refund_totp()}")
+    response = customer_client.delete(_refund_url(opr.id))
 
     assert response.status_code == HTTP_403_FORBIDDEN
-    mock_portone_req_cancel_payment.assert_not_called()
-
-
-@pytest.mark.django_db
-def test_order_product_refund_requires_valid_otp(
-    ticket_config, staff_client, order_factory, mock_portone_req_cancel_payment
-):
-    opr = order_factory(status="completed").products.get()
-
-    response = staff_client.delete(f"{_refund_url(opr.id)}?otp=000000")
-
-    assert response.status_code == HTTP_400_BAD_REQUEST
     mock_portone_req_cancel_payment.assert_not_called()
 
 
@@ -197,7 +184,7 @@ def test_order_product_refund_marks_only_that_product_refunded(
         order=order, product=ticket_product, price=ticket_product.price, status=target.status
     )
 
-    response = staff_client.delete(f"{_refund_url(target.id)}?otp={valid_refund_totp()}")
+    response = staff_client.delete(_refund_url(target.id))
 
     assert response.status_code == HTTP_204_NO_CONTENT
     mock_portone_req_cancel_payment.assert_called_once()
@@ -211,7 +198,7 @@ def test_order_product_refund_marks_only_that_product_refunded(
 def test_order_product_refund_rejects_used_product(
     ticket_config, staff_client, used_opr, mock_portone_req_cancel_payment
 ):
-    response = staff_client.delete(f"{_refund_url(used_opr.id)}?otp={valid_refund_totp()}")
+    response = staff_client.delete(_refund_url(used_opr.id))
 
     assert response.status_code == HTTP_400_BAD_REQUEST
     mock_portone_req_cancel_payment.assert_not_called()
