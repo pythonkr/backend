@@ -89,6 +89,15 @@ def test_orders_list_filters_by_keyword(staff_client, order_factory):
 
 
 @pytest.mark.django_db
+def test_orders_list_filters_by_user_unique_id(staff_client, order_factory):
+    orders = [order_factory(status="completed"), order_factory(status="completed")]
+
+    response = staff_client.get(ORDERS_URL, {"user_unique_id": str(orders[0].user.unique_id)})
+
+    assert {result["id"] for result in response.json()["results"]} == {str(order.id) for order in orders}
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize("keyword", ["김참가", "attendee@example.com", "010-9999-8888", "PSK"])
 def test_orders_list_filters_by_ticket_info(staff_client, order_factory, keyword):
     order = order_factory(status="completed")
