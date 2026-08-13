@@ -1,8 +1,11 @@
 import pytest
+from django.conf import settings
 from django.urls import reverse
 from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN, HTTP_405_METHOD_NOT_ALLOWED
+from rest_framework.test import APIClient
 
 SESSION_URL = reverse("v1:registration_desk:desk-session")
+LOGIN_URL = reverse("headless:browser:account:login")
 
 
 @pytest.mark.django_db
@@ -46,3 +49,22 @@ def test_session_sets_csrf_cookie_even_when_forbidden(anon_client, settings):
 @pytest.mark.django_db
 def test_session_does_not_handle_logout(staff_client):
     assert staff_client.delete(SESSION_URL).status_code == HTTP_405_METHOD_NOT_ALLOWED
+
+
+@pytest.mark.django_db
+def test_email_password_login_creates_registration_desk_session(staff_user):
+    staff_user.set_password("registration-desk-password")
+    staff_user.save()
+    client = APIClient(enforce_csrf_checks=True)
+    csrf_response = client.get(SESSION_URL)
+    csrf_token = csrf_response.cookies[settings.CSRF_COOKIE_NAME].value
+
+    login_response = client.post(
+        LOGIN_URL,
+        {"email": staff_user.email, "password": "registration-desk-password"},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert login_response.status_code == HTTP_200_OK
+    assert client.get(SESSION_URL).status_code == HTTP_200_OK
