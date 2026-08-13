@@ -432,16 +432,21 @@ EMAIL_TIMEOUT = env.float("EMAIL_TIMEOUT", default=30.0)
 # NHN Cloud Settings
 # https://docs.nhncloud.com/ko/Notification/KakaoTalk%20Bizmessage/ko/alimtalk-api-guide/
 # https://docs.nhncloud.com/ko/Notification/SMS/ko/api-guide/
+# 알림톡과 SMS는 NHN Cloud 상품이 달라 appKey/secretKey가 서로 다르다. 공통값은 서비스별 값이 없을 때의 기본값.
+_NHN_CLOUD_APP_KEY = env("NHN_CLOUD_APP_KEY", default="")
+_NHN_CLOUD_SECRET_KEY = env("NHN_CLOUD_SECRET_KEY", default="")
 NHN_CLOUD = types.SimpleNamespace(
-    app_key=env("NHN_CLOUD_APP_KEY", default=""),
-    secret_key=env("NHN_CLOUD_SECRET_KEY", default=""),
     kakao_alimtalk=types.SimpleNamespace(
+        app_key=env("NHN_CLOUD_KAKAO_ALIMTALK_APP_KEY", default=_NHN_CLOUD_APP_KEY),
+        secret_key=env("NHN_CLOUD_KAKAO_ALIMTALK_SECRET_KEY", default=_NHN_CLOUD_SECRET_KEY),
         base_url=env(
             "NHN_CLOUD_KAKAO_ALIMTALK_BASE_URL", default="https://kakaotalk-bizmessage.api.nhncloudservice.com"
         ),
         timeout=env.float("NHN_CLOUD_KAKAO_ALIMTALK_TIMEOUT", default=30.0),
     ),
     sms=types.SimpleNamespace(
+        app_key=env("NHN_CLOUD_SMS_APP_KEY", default=_NHN_CLOUD_APP_KEY),
+        secret_key=env("NHN_CLOUD_SMS_SECRET_KEY", default=_NHN_CLOUD_SECRET_KEY),
         base_url=env("NHN_CLOUD_SMS_BASE_URL", default="https://sms.api.nhncloudservice.com"),
         timeout=env.float("NHN_CLOUD_SMS_TIMEOUT", default=30.0),
     ),

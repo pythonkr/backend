@@ -19,10 +19,10 @@ class NHNCloudSMSClient(NotificationServiceInterface):
 
     def __init__(self) -> None:
         self.session = Client(
-            base_url=f"{settings.NHN_CLOUD.sms.base_url}/sms/v3.0/appKeys/{settings.NHN_CLOUD.app_key}",
+            base_url=f"{settings.NHN_CLOUD.sms.base_url}/sms/v3.0/appKeys/{settings.NHN_CLOUD.sms.app_key}",
             headers={
                 "Content-Type": "application/json;charset=UTF-8",
-                "X-Secret-Key": settings.NHN_CLOUD.secret_key,
+                "X-Secret-Key": settings.NHN_CLOUD.sms.secret_key,
             },
             timeout=settings.NHN_CLOUD.sms.timeout,
         )

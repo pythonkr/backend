@@ -14,10 +14,13 @@ class NHNCloudKakaoAlimTalkClient(NotificationServiceInterface):
 
     def __init__(self) -> None:
         self.session = Client(
-            base_url=f"{settings.NHN_CLOUD.kakao_alimtalk.base_url}/alimtalk/v2.3/appkeys/{settings.NHN_CLOUD.app_key}",
+            base_url=(
+                f"{settings.NHN_CLOUD.kakao_alimtalk.base_url}"
+                f"/alimtalk/v2.3/appkeys/{settings.NHN_CLOUD.kakao_alimtalk.app_key}"
+            ),
             headers={
                 "Content-Type": "application/json",
-                "X-Secret-Key": settings.NHN_CLOUD.secret_key,
+                "X-Secret-Key": settings.NHN_CLOUD.kakao_alimtalk.secret_key,
             },
             timeout=settings.NHN_CLOUD.kakao_alimtalk.timeout,
         )
