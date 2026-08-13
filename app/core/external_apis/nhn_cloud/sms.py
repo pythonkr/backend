@@ -40,8 +40,6 @@ class NHNCloudSMSClient(NotificationServiceInterface):
             "body": payload["body"],
             "recipientList": [{"recipientNo": data["send_to"]}],
         }
-        if data["template_code"]:
-            body["templateId"] = data["template_code"]
 
         if title := payload.get("title"):
             body["title"] = title

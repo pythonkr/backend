@@ -82,15 +82,9 @@ def test_send_message_long_mms_hits_sender_mms_endpoint_when_title_present(mock_
     )
 
 
-def test_send_message_template_code_passed_as_template_id_when_truthy(mock_session):
+def test_send_message_never_sends_template_id(mock_session):
+    # 내부 template_code는 NHN SMS 템플릿 ID가 아니므로 전달하면 -2110 (Template is not exist).
     nhn_cloud_sms_client.send_message(data=_params(template_code="TEMPLATE-1"))
-
-    sent_body = mock_session.post.call_args.kwargs["json"]
-    assert sent_body["templateId"] == "TEMPLATE-1"
-
-
-def test_send_message_template_id_omitted_when_template_code_empty(mock_session):
-    nhn_cloud_sms_client.send_message(data=_params(template_code=""))
 
     sent_body = mock_session.post.call_args.kwargs["json"]
     assert "templateId" not in sent_body
