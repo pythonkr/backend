@@ -58,6 +58,7 @@ def test_orders_list_exposes_ticket_info_and_product_category(staff_client, orde
     product = staff_client.get(ORDERS_URL, SEARCH).json()["results"][0]["products"][0]
 
     assert product["ticket_info"]["name"] == "김참가"
+    assert product["scancode_token"] == order.products.get().scancode_token
     assert product["is_ticket"] is True
     assert product["product"]["category"] == {"id": str(ticket_product.category_id), "name": "티켓"}
 

@@ -112,6 +112,7 @@ class RegistrationDeskOrderProductOptionDto(NestedModelSerializer):
 class RegistrationDeskOrderProductFieldsMixin(serializers.Serializer):
     """주문 검색과 주문 상품 조회가 공통으로 내려주는 읽기 전용 필드."""
 
+    scancode_token = serializers.CharField(read_only=True)
     is_ticket = serializers.BooleanField(source="product.category.is_ticket", read_only=True)
     not_refundable_reason = serializers.SerializerMethodField()
     product = RegistrationDeskProductDto(read_only=True)
@@ -135,6 +136,7 @@ class RegistrationDeskOrderProductDto(RegistrationDeskOrderProductFieldsMixin, N
     class Meta:
         fields = (
             "id",
+            "scancode_token",
             "is_ticket",
             "price",
             "donation_price",
@@ -268,6 +270,7 @@ class RegistrationDeskOrderProductSerializer(RegistrationDeskOrderProductFieldsM
         fields = (
             "id",
             "short_id",
+            "scancode_token",
             "is_ticket",
             "status",
             "price",

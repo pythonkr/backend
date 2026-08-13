@@ -62,6 +62,7 @@ def test_order_product_list_returns_detail_by_id(staff_client, order_factory, ti
     [body] = _results(response)
     assert body["id"] == str(opr.id)
     assert body["short_id"] == opr.short_id
+    assert body["scancode_token"] == opr.scancode_token
     assert body["is_ticket"] is True
     assert body["status"] == OrderProductRelation.OrderProductStatus.paid
     assert body["product"]["name"] == ticket_product.name
