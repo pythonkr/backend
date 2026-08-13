@@ -3,4 +3,24 @@
 <h4>
   {{ error_msg }}
 </h4>
+<small class="error-sub">{{ error_msg_sub }}</small>
+<hr />
+<p class="error-guide">{{ error_guide }}</p>
+<small class="error-sub">{{ error_guide_sub }}</small>
+{% endblock %}
+{% block notice %}
+<div class="notice">
+  <strong>{% if en %}Need help?{% else %}도움이 필요하신가요?{% endif %}</strong>
+  <ul>
+    {% if en %}
+      <li>Check that you opened the full link from your ticket email or the PyCon Korea website.</li>
+      <li>A QR code becomes invalid once the order is fully refunded.</li>
+      <li>You can look up your order at <a href="https://pycon.kr">PyCon Korea</a> after signing in.</li>
+    {% else %}
+      <li>티켓 안내 메일이나 파이콘 한국 홈페이지의 링크를 그대로 열었는지 확인해 주세요.</li>
+      <li>전체 환불된 주문의 QR 코드는 더 이상 사용할 수 없습니다.</li>
+      <li>주문 내역은 <a href="https://pycon.kr">파이콘 한국</a>에 로그인 후 조회할 수 있습니다.</li>
+    {% endif %}
+  </ul>
+</div>
 {% endblock %}

@@ -1,5 +1,5 @@
-<!DOCTYPE html>
-<html lang="ko-kr">
+{% is_english as en %}<!DOCTYPE html>
+<html lang="{% if en %}en{% else %}ko-kr{% endif %}">
 
 <head>
   <meta charSet="utf-8" />
@@ -232,6 +232,18 @@
     li::before {
       content: "- ";
     }
+
+    .error-sub {
+      margin-top: 0.35rem;
+      text-align: center;
+      color: #888;
+    }
+
+    .error-guide {
+      font-size: 0.85rem;
+      color: #333;
+      text-align: center;
+    }
   </style>
 </head>
 
@@ -246,6 +258,7 @@
     <aside>
       {% block content %}{% endblock %}
     </aside>
+    {% block notice %}
     <div class="notice">
       <strong>안내</strong>
       <ul>
@@ -254,6 +267,7 @@
         <li>자세한 주문 정보는 <a href="https://pycon.kr">파이콘 한국</a>의 구매 내역에서 조회할 수 있습니다.</li>
       </ul>
     </div>
+    {% endblock %}
   </section>
 </body>
 

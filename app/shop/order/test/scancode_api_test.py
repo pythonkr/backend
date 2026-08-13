@@ -2,7 +2,10 @@ import uuid
 
 import pytest
 import shortuuid
+from core.const.scancode import SCANCODE_ERROR_GUIDE, SCANCODE_MESSAGES
 from django.conf import settings
+from django.urls import reverse
+from django.utils.html import escape
 from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN, HTTP_404_NOT_FOUND
 from shop.order.models import Order
 from shop.test.helpers import ScanCodeApi
@@ -141,3 +144,43 @@ def test_scancode_token_rejected_after_old_salt_removed(anon_client, order_facto
 
     monkeypatch.setattr(settings.SHOP, "order_scancode_salts", ["new_salt"])
     assert ScanCodeApi(http_client=anon_client).list({"token": old_token}).status_code == HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_scancode_error_page_shows_both_languages_and_guide(anon_client, order_factory):
+    order = order_factory(status="completed")
+    tampered = order.scancode_token[:-1] + "A"
+
+    response = anon_client.get(reverse("v1:scancode-list"), {"token": tampered}, HTTP_ACCEPT_LANGUAGE="ko-KR,ko;q=0.9")
+    body = response.content.decode()
+    assert response.status_code == HTTP_404_NOT_FOUND
+    assert escape(SCANCODE_MESSAGES["order_not_found"]["ko"]) in body
+    assert escape(SCANCODE_MESSAGES["order_not_found"]["en"]) in body  # 보조 언어 병기.
+    assert escape(SCANCODE_ERROR_GUIDE["ko"]) in body
+
+
+@pytest.mark.django_db
+def test_scancode_error_page_is_english_for_english_client(anon_client, order_factory):
+    order = order_factory(status="completed")
+    tampered = order.scancode_token[:-1] + "A"
+
+    response = anon_client.get(reverse("v1:scancode-list"), {"token": tampered}, HTTP_ACCEPT_LANGUAGE="en-US,en;q=0.9")
+    body = response.content.decode()
+    assert '<html lang="en">' in body
+    assert f"<h4>\n  {escape(SCANCODE_MESSAGES['order_not_found']['en'])}\n</h4>" in body  # 영어가 주 문구.
+    assert escape(SCANCODE_ERROR_GUIDE["en"]) in body
+
+
+@pytest.mark.django_db
+def test_scancode_renders_html_even_when_client_asks_for_json(anon_client, order_factory):
+    # 일부 QR 스캐너 인앱 브라우저의 Accept 헤더 때문에 406 이 나가면 안 된다.
+    order = order_factory(status="completed")
+
+    ok = anon_client.get(reverse("v1:scancode-list"), {"token": order.scancode_token}, HTTP_ACCEPT="application/json")
+    assert ok.status_code == HTTP_200_OK
+    assert ok["Content-Type"].startswith("text/html")
+
+    tampered = order.scancode_token[:-1] + "A"
+    error = anon_client.get(reverse("v1:scancode-list"), {"token": tampered}, HTTP_ACCEPT="application/json")
+    assert error.status_code == HTTP_404_NOT_FOUND
+    assert SCANCODE_MESSAGES["order_not_found"]["ko"] in error.content.decode()

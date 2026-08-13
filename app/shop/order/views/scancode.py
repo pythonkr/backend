@@ -2,8 +2,11 @@ from collections.abc import Callable
 from re import compile
 from typing import Any
 
+from core.const.scancode import SCANCODE_ERROR_GUIDE, SCANCODE_MESSAGES
 from core.const.tag import OpenAPITag
+from core.negotiation import IgnoreClientContentNegotiation
 from core.openapi.schemas import build_html_responses
+from core.templatetags.i18n_extras import is_english
 from drf_spectacular.openapi import OpenApiParameter, OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rest_framework import permissions, renderers, request, response, status, viewsets
@@ -18,14 +21,20 @@ from user.models import UserExt
 
 
 class _ScanCodeError(Exception):
-    def __init__(self, msg: str, code: int) -> None:
-        super().__init__(msg, code)
-        self.msg = msg
+    def __init__(self, key: str, code: int) -> None:
+        super().__init__(key, code)
+        self.key = key
         self.code = code
 
     def to_response(self) -> response.Response:
+        lang, sub_lang = ("en", "ko") if is_english() else ("ko", "en")
         return response.Response(
-            data={"error_msg": self.msg},
+            data={
+                "error_msg": SCANCODE_MESSAGES[self.key][lang],
+                "error_msg_sub": SCANCODE_MESSAGES[self.key][sub_lang],
+                "error_guide": SCANCODE_ERROR_GUIDE[lang],
+                "error_guide_sub": SCANCODE_ERROR_GUIDE[sub_lang],
+            },
             status=self.code,
             template_name="scancode_error.html",
         )
@@ -33,14 +42,11 @@ class _ScanCodeError(Exception):
 
 def _render_user(token: str) -> response.Response:
     if not (user := UserExt.from_scancode_token(token)):
-        raise _ScanCodeError(msg="인증 정보를 찾을 수 없습니다.", code=status.HTTP_403_FORBIDDEN)
+        raise _ScanCodeError(key="user_not_found", code=status.HTTP_403_FORBIDDEN)
     # 환불된 주문도 응답에 포함(현장 스태프의 이력 확인용). 단 모두 refunded 면 게이트.
     orders = list(Order.objects.filter_purchased_by(user).filter_in_last_six_months())
     if not any(o.current_status != PaymentHistoryStatus.refunded for o in orders):
-        raise _ScanCodeError(
-            msg="최근 6개월 이내에 결제된 유효한 주문이 없습니다 (환불 완료 또는 주문 없음).",
-            code=status.HTTP_403_FORBIDDEN,
-        )
+        raise _ScanCodeError(key="user_no_valid_order", code=status.HTTP_403_FORBIDDEN)
     return response.Response(
         data={
             "user": UserScanCodeSerializer(instance=user).data,
@@ -53,9 +59,9 @@ def _render_user(token: str) -> response.Response:
 
 def _render_order(token: str) -> response.Response:
     if not (order := Order.from_scancode_token(token)):
-        raise _ScanCodeError(msg="주문을 찾을 수 없습니다.", code=status.HTTP_404_NOT_FOUND)
+        raise _ScanCodeError(key="order_not_found", code=status.HTTP_404_NOT_FOUND)
     if order.current_status == PaymentHistoryStatus.refunded:
-        raise _ScanCodeError(msg="전체 환불된 주문은 사용하실 수 없습니다.", code=status.HTTP_404_NOT_FOUND)
+        raise _ScanCodeError(key="order_refunded", code=status.HTTP_404_NOT_FOUND)
     return response.Response(
         data={"order": OrderScanCodeSerializer(instance=order).data},
         status=status.HTTP_200_OK,
@@ -65,7 +71,7 @@ def _render_order(token: str) -> response.Response:
 
 def _render_opr(token: str) -> response.Response:
     if not (opr := OrderProductRelation.from_scancode_token(token)):
-        raise _ScanCodeError(msg="티켓 정보를 찾을 수 없습니다.", code=status.HTTP_403_FORBIDDEN)
+        raise _ScanCodeError(key="opr_not_found", code=status.HTTP_403_FORBIDDEN)
     return response.Response(
         data={"order_product": OrderProductScanCodeSerializer(instance=opr).data},
         status=status.HTTP_200_OK,
@@ -87,6 +93,7 @@ class ScanCodeViewSet(viewsets.GenericViewSet):
     permission_classes = [permissions.AllowAny]
     authentication_classes: list = []
     renderer_classes = [renderers.TemplateHTMLRenderer]
+    content_negotiation_class = IgnoreClientContentNegotiation  # 스캐너 인앱 브라우저 Accept 로 406 이 나가지 않도록.
 
     @extend_schema(
         summary="QR 코드 페이지 (token 으로 dispatch)",
@@ -103,9 +110,9 @@ class ScanCodeViewSet(viewsets.GenericViewSet):
     def list(self, request: request.Request, *args: tuple[Any], **kwargs: dict[str, Any]) -> response.Response:
         try:
             if not (token := request.query_params.get("token")):
-                raise _ScanCodeError(msg="유효하지 않은 URL입니다.", code=status.HTTP_404_NOT_FOUND)
+                raise _ScanCodeError(key="no_token", code=status.HTTP_404_NOT_FOUND)
             if not (match := _SCANCODE_REGEX.match(token)):
-                raise _ScanCodeError(msg="유효하지 않은 토큰입니다.", code=status.HTTP_404_NOT_FOUND)
+                raise _ScanCodeError(key="invalid_token", code=status.HTTP_404_NOT_FOUND)
             return _DISPATCH[match["prefix"]](token)
         except _ScanCodeError as e:
             return e.to_response()
