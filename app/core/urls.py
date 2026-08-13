@@ -46,6 +46,8 @@ v1_apis: list[resolvers.URLPattern | resolvers.URLResolver] = [
 SCHEMA_CACHE_TIMEOUT = 60 * 60
 
 urlpatterns = [
+    # Well-Known URI
+    path(".well-known/", include("well_known.urls")),
     # Health Check
     path("readyz/", readyz),
     path("livez/", livez),

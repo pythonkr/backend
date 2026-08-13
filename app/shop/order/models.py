@@ -684,6 +684,29 @@ class CustomerInfo(BaseAbstractModel):
         ]
 
 
+class OrderProductRelationTag(BaseAbstractModel):
+    """주문상품 운영 태그. `code` 는 ROSA 의 템플릿 매핑 키라 변경하지 않는다."""
+
+    code = models.CharField(max_length=50)
+    name = models.CharField(max_length=100)
+    priority = models.IntegerField(default=0)
+
+    order_product_relations = models.ManyToManyField(OrderProductRelation, blank=True, related_name="tags")
+
+    class Meta:
+        ordering = ("priority", "code")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("code",),
+                condition=models.Q(deleted_at__isnull=True),
+                name="uq__order_product_relation_tag__code",
+            ),
+        ]
+
+    def __str__(self) -> str:  # pragma: no cover
+        return f"{self.name} ({self.code})"
+
+
 class TicketInfo(BaseAbstractModel):
     order_product_relation = models.OneToOneField(
         OrderProductRelation, on_delete=models.PROTECT, related_name="ticket_info"

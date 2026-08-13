@@ -14,6 +14,7 @@ from admin_api.views.event.sponsor import SponsorAdminViewSet, SponsorTagAdminVi
 from admin_api.views.event.timetable import EventPresentationTimetableAdminViewSet
 from admin_api.views.external_api.google_oauth2 import GoogleOAuth2AdminViewSet
 from admin_api.views.file import PublicFileAdminViewSet
+from admin_api.views.internal_api import RegistrationDeskConfigAdminViewSet
 from admin_api.views.mcp_token import McpTokenAdminViewSet
 from admin_api.views.merge import UserMergeAdminViewSet
 from admin_api.views.modification_audit import ModificationAuditAdminViewSet
@@ -30,7 +31,7 @@ from admin_api.views.shop.order_notifications import (
     OrderNotificationAdminViewSet,
     OrderProductNotificationAdminViewSet,
 )
-from admin_api.views.shop.orders import OrderAdminViewSet
+from admin_api.views.shop.orders import OrderAdminViewSet, OrderProductRelationTagAdminViewSet
 from admin_api.views.shop.products import (
     CategoryAdminViewSet,
     CategoryGroupAdminViewSet,
@@ -134,10 +135,18 @@ admin_shop_router.register("tag", TagAdminViewSet, basename="admin-shop-tag")
 admin_shop_router.register("categorygroup", CategoryGroupAdminViewSet, basename="admin-shop-category-group")
 admin_shop_router.register("optiongroup", OptionGroupAdminViewSet, basename="admin-shop-option-group")
 admin_shop_router.register("refund-authorizer", RefundAuthorizerAdminViewSet, basename="admin-shop-refund-authorizer")
+admin_shop_router.register(
+    "orderproductrelationtag", OrderProductRelationTagAdminViewSet, basename="admin-shop-order-product-relation-tag"
+)
 
 admin_document_router = routers.SimpleRouter()
 admin_document_router.register("documenttemplate", DocumentTemplateAdminViewSet, basename="admin-document-template")
 admin_document_router.register("issueddocument", IssuedDocumentAdminViewSet, basename="admin-document-issued")
+
+admin_internal_api_router = routers.SimpleRouter()
+admin_internal_api_router.register(
+    "registrationdeskconfig", RegistrationDeskConfigAdminViewSet, basename="admin-registration-desk-config"
+)
 
 admin_dashboard_router = routers.SimpleRouter()
 admin_dashboard_router.register("charts", DashboardChartAdminViewSet, basename="admin-dashboard-chart")
@@ -156,6 +165,7 @@ urlpatterns = [
     path("notification/", include(admin_notification_router.urls)),
     path("external_api/", include(admin_external_api_router.urls)),
     path("shop/", include(admin_shop_router.urls)),
+    path("internal_api/", include(admin_internal_api_router.urls)),
     path("document/", include(admin_document_router.urls)),
     path("dashboard/", include(admin_dashboard_router.urls)),
     path("allauth/", include(admin_allauth_router.urls)),

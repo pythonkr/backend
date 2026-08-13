@@ -120,9 +120,11 @@ class NestedModelSerializer(serializers.ModelSerializer):
     def update(self, instance: Model, validated_data: dict) -> Model:
         info: model_meta.FieldInfo = model_meta.get_field_info(instance.__class__)
         m2m_fields: list[tuple[str, typing.Any]] = []
+        # validated_data 의 키는 field name 이 아니라 source — `source=` 를 지정한 필드도 찾을 수 있어야 한다.
+        fields_by_source = {field.source: field for field in self.fields.values()}
 
         for field_name, value in validated_data.items():
-            if (field := self.fields[field_name]).read_only:
+            if (field := fields_by_source[field_name]).read_only:
                 continue
 
             if isinstance(field, serializers.BaseSerializer):

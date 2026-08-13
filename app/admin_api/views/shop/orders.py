@@ -5,8 +5,14 @@ from codecs import BOM_UTF8
 from logging import getLogger
 
 import pandas
+from admin_api.filtersets.shop.order_products import OrderProductRelationAdminFilterSet
 from admin_api.filtersets.shop.orders import OrderAdminFilterSet
-from admin_api.serializers.shop.orders import OrderAdminSerializer, OrderExportRequestSerializer
+from admin_api.serializers.shop.orders import (
+    OrderAdminSerializer,
+    OrderExportRequestSerializer,
+    OrderProductRelationTagAdminSerializer,
+    OrderProductRelationTagAssignResultSerializer,
+)
 from core.authz import IsSuperUser
 from core.const.tag import OpenAPITag
 from core.pagination import AdminPagination
@@ -21,7 +27,7 @@ from drf_standardized_errors.openapi_serializers import ValidationErrorResponseS
 from rest_framework import exceptions, mixins, parsers, request, response, status, viewsets
 from rest_framework.decorators import action
 from shop.order import exports, imports
-from shop.order.models import Order, OrderProductRelation
+from shop.order.models import Order, OrderProductRelation, OrderProductRelationTag
 from shop.payment_history.models import PURCHASED_STATUSES, REFUNDABLE_STATUSES, PaymentHistory
 from shop.product.models import Product
 from shop.serializers.refund import OrderProductRefundSerializer, OrderTotalRefundSerializer
@@ -33,8 +39,31 @@ ADMIN_METHODS = ["list", "retrieve", "partial_update"]
 
 # OrderProductRelation + nested Options prefetch — `Order.products` 용.
 _OPR_PREFETCH_QS = (
-    OrderProductRelation.objects.filter_active().select_related("product", "ticket_info").prefetch_active_options()
+    OrderProductRelation.objects.filter_active()
+    .select_related("product", "ticket_info")
+    .prefetch_active_options()
+    .prefetch_related(models.Prefetch("tags", queryset=OrderProductRelationTag.objects.filter_active()))
 )
+
+_TAGGABLE_ORDER_PRODUCT_QS = (
+    OrderProductRelation.objects.filter_active()
+    .filter(order__isnull=False)
+    .annotate(
+        order_current_status=PaymentHistory.objects.latest_per_order_field("status", outer_field="order_id"),
+        order_latest_imp_id=PaymentHistory.objects.latest_per_order_field("imp_id", outer_field="order_id"),
+        order_first_paid_at=(
+            PaymentHistory.objects.filter_active()
+            .filter(order_id=models.OuterRef("order_id"))
+            .order_by("created_at")
+            .values("created_at")[:1]
+        ),
+    )
+)
+
+_OPR_FILTER_PARAMETERS = [
+    OpenApiParameter(name=name, type=OpenApiTypes.STR, location=OpenApiParameter.QUERY)
+    for name in OrderProductRelationAdminFilterSet.Meta.fields
+]
 
 # `Order.payment_histories` 용 prefetch — 최신순.
 _PAYMENT_HISTORY_PREFETCH_QS = PaymentHistory.objects.filter_active().order_by("-created_at")
@@ -249,3 +278,55 @@ class OrderAdminViewSet(
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": f"attachment; filename={filename}"},
         )
+
+
+@extend_schema_view(
+    **{
+        m: extend_schema(tags=[OpenAPITag.ADMIN_SHOP_ORDER_PRODUCT_TAG])
+        for m in ["list", "retrieve", "create", "update", "partial_update", "destroy"]
+    }
+)
+class OrderProductRelationTagAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewSet):
+    pagination_class = AdminPagination
+    http_method_names = ["get", "post", "patch", "delete"]
+    serializer_class = OrderProductRelationTagAdminSerializer
+    permission_classes = [IsSuperUser]
+    queryset = OrderProductRelationTag.objects.filter_active().select_related_with_user()
+
+    def _target_order_product_ids(self, req: request.Request) -> list:
+        # 빈 값은 django-filter 가 무시하므로 `?id=` 같은 요청이 전체 태깅으로 이어지지 않도록 값까지 확인한다.
+        if not any(req.query_params.get(name, "").strip() for name in OrderProductRelationAdminFilterSet.base_filters):
+            joined = ", ".join(OrderProductRelationAdminFilterSet.base_filters)
+            raise exceptions.ValidationError(f"대상을 좁힐 조회 조건이 하나 이상 필요합니다: {joined}")
+        filterset = OrderProductRelationAdminFilterSet(
+            req.query_params, queryset=_TAGGABLE_ORDER_PRODUCT_QS, request=req
+        )
+        if not filterset.is_valid():
+            raise exceptions.ValidationError(filterset.errors)
+        return list(filterset.qs.values_list("id", flat=True))
+
+    @extend_schema(
+        summary="주문 상품에 태그 부착 (filterset 으로 대상 지정)",
+        tags=[OpenAPITag.ADMIN_SHOP_ORDER_PRODUCT_TAG],
+        parameters=_OPR_FILTER_PARAMETERS,
+        request=None,
+        responses={status.HTTP_200_OK: OrderProductRelationTagAssignResultSerializer},
+    )
+    @action(detail=True, methods=["post"])
+    def assign(self, request: request.Request, pk: str | None = None) -> response.Response:
+        target_ids = self._target_order_product_ids(request)
+        self.get_object().order_product_relations.add(*target_ids)
+        return response.Response({"affected": len(target_ids)})
+
+    @extend_schema(
+        summary="주문 상품에서 태그 해제 (filterset 으로 대상 지정)",
+        tags=[OpenAPITag.ADMIN_SHOP_ORDER_PRODUCT_TAG],
+        parameters=_OPR_FILTER_PARAMETERS,
+        request=None,
+        responses={status.HTTP_200_OK: OrderProductRelationTagAssignResultSerializer},
+    )
+    @action(detail=True, methods=["post"])
+    def unassign(self, request: request.Request, pk: str | None = None) -> response.Response:
+        target_ids = self._target_order_product_ids(request)
+        self.get_object().order_product_relations.remove(*target_ids)
+        return response.Response({"affected": len(target_ids)})

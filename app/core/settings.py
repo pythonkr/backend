@@ -157,6 +157,7 @@ INSTALLED_APPS = [
     "participant_portal_api",
     "external_api",
     "external_api.google_oauth2",
+    "well_known",
     # django-constance
     "constance",
 ]
