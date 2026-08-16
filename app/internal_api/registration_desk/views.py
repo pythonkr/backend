@@ -199,7 +199,11 @@ class RegistrationDeskOrderViewSet(
 @extend_schema_view(
     list=extend_schema(
         summary="주문 상품 조회",
-        description="`order_product_relation_id` 또는 `scancode` 중 정확히 하나를 전달해야 한다.",
+        description=(
+            "`order_product_relation_id` 또는 `scancode` 중 정확히 하나를 전달해야 한다. "
+            "2026-08-17 프로그램 등록에 한해 `scancode`와 `include_related_ticketinfo=true`를 함께 보내면 "
+            "같은 참가자 이메일의 스프린트/튜토리얼/딥다이브 티켓을 모두 반환한다."
+        ),
         tags=[OpenAPITag.EXT_REGISTRATION_DESK_API],
         responses={
             status.HTTP_200_OK: RegistrationDeskOrderProductSerializer(many=True),

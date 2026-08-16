@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 from django.urls import reverse
+from freezegun import freeze_time
 from rest_framework.status import (
     HTTP_200_OK,
     HTTP_204_NO_CONTENT,
@@ -143,6 +144,68 @@ def test_order_product_list_finds_by_scancode(staff_client, order_factory):
     [body] = _results(staff_client.get(LIST_URL, {"scancode": opr.scancode_token}))
 
     assert body["id"] == str(opr.id)
+
+
+@pytest.mark.django_db
+@freeze_time("2026-08-17 09:00:00+09:00")
+def test_order_product_scancode_can_include_same_participants_program_tickets(
+    staff_client, order_factory, ticket_product, ticket_config
+):
+    ticket_product.category.name = "튜토리얼"
+    ticket_product.category.save(update_fields={"name"})
+    first = order_factory(status="completed").products.get()
+    second = order_factory(status="completed").products.get()
+    other = order_factory(status="completed").products.get()
+    TicketInfo.objects.create(
+        order_product_relation=first,
+        name="김참가",
+        phone="010-9999-8888",
+        email=" Attendee@Example.com ",
+    )
+    TicketInfo.objects.create(
+        order_product_relation=second,
+        name="김참가",
+        phone="010-9999-8888",
+        email="attendee@example.com",
+    )
+    TicketInfo.objects.create(
+        order_product_relation=other,
+        name="다른 참가자",
+        phone="010-1111-2222",
+        email="other@example.com",
+    )
+
+    response = staff_client.get(
+        LIST_URL,
+        {"scancode": first.scancode_token, "include_related_ticketinfo": "true"},
+    )
+
+    assert response.status_code == HTTP_200_OK
+    assert {result["id"] for result in _results(response)} == {str(first.id), str(second.id)}
+    assert [result["id"] for result in _results(staff_client.get(LIST_URL, {"scancode": first.scancode_token}))] == [
+        str(first.id)
+    ]
+
+
+@pytest.mark.django_db
+@freeze_time("2026-08-18 09:00:00+09:00")
+def test_related_ticketinfo_scancode_falls_back_to_one_ticket_after_program_day(
+    staff_client, order_factory, ticket_product, ticket_config
+):
+    ticket_product.category.name = "튜토리얼"
+    ticket_product.category.save(update_fields={"name"})
+    first = order_factory(status="completed").products.get()
+    second = order_factory(status="completed").products.get()
+    common = {"name": "김참가", "phone": "010-9999-8888", "email": "attendee@example.com"}
+    TicketInfo.objects.create(order_product_relation=first, **common)
+    TicketInfo.objects.create(order_product_relation=second, **common)
+
+    response = staff_client.get(
+        LIST_URL,
+        {"scancode": first.scancode_token, "include_related_ticketinfo": "true"},
+    )
+
+    assert [result["id"] for result in _results(response)] == [str(first.id)]
 
 
 @pytest.mark.django_db
