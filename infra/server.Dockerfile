@@ -20,11 +20,15 @@ ENV PATH="${PATH}:/root/.local/bin:" \
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Install dependencies
+# fonts-nanum: WeasyPrint 은 PDF 마다 사용 폰트를 서브셋한다. 범-CJK 컬렉션인 fonts-noto-cjk(CFF, 글리프 6.5만개)는
+# 서브셋에만 참가확인서 1건당 ~13초가 걸려 gunicorn 30초 timeout 을 넘겼다. 한국어 전용 나눔바른고딕(글리프 2.5만개,
+# cmap 18,582자 — 현대 한글 전체 + 상용 한자 포함)은 같은 문서를 ~1.2초에 끝낸다.
+# noto-cjk 는 chromium(mdx_preview 스크린샷)과 나눔에 없는 글자의 폴백용으로 남겨둔다.
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 COPY --chown=nobody:nobody pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     apt-get update \
-    && apt-get install -y --no-install-recommends gcc curl libpq-dev libpango-1.0-0 libpangoft2-1.0-0 fonts-noto-cjk \
+    && apt-get install -y --no-install-recommends gcc curl libpq-dev libpango-1.0-0 libpangoft2-1.0-0 fonts-noto-cjk fonts-nanum \
     && rm -rf /var/lib/apt/lists/* \
     && uv sync --no-default-groups --group mcp --frozen
 
