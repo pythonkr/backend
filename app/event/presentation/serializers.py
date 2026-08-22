@@ -98,6 +98,7 @@ class PresentationSerializer(serializers.ModelSerializer):
             "description",
             "slideshow_url",
             "public_slideshow_file",
+            "public_slideshow_url",
             "image",
             "categories",
             "speakers",
