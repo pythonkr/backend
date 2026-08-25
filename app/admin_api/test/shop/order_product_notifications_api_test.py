@@ -129,6 +129,26 @@ def test_opr_notification_preview_falls_back_to_customer_info(api_client, opr_em
 
 
 @pytest.mark.django_db
+def test_opr_notification_preview_skips_participant_without_channel_recipient(
+    api_client, opr_email_template, ticket_opr
+):
+    # 참가자 정보는 있으나 해당 채널 수신처(email)가 비어 있으면 발송 대상에서 제외한다.
+    TicketInfo.objects.create(
+        order_product_relation=ticket_opr,
+        name="참가자",
+        phone="01099998888",
+        email="",
+    )
+
+    response = OrderProductNotificationsAdminApi(http_client=api_client).preview(
+        {"channel": "email", "template_id": str(opr_email_template.id)}
+    )
+
+    assert response.status_code == HTTP_200_OK
+    assert response.json()["recipients"] == []
+
+
+@pytest.mark.django_db
 def test_opr_notification_preview_includes_refunded_product(api_client, opr_email_template, two_ticket_order):
     refunded = two_ticket_order.products.first()
     refunded.status = OrderProductRelation.OrderProductStatus.refunded

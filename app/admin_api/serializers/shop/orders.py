@@ -293,16 +293,6 @@ class OrderProductRelationTagAdminSerializer(BaseAbstractSerializer, JsonSchemaS
         model = OrderProductRelationTag
         fields = COMMON_ADMIN_FIELDS + ("code", "name", "priority")
 
-    def validate_code(self, value: str) -> str:
-        duplicated = (
-            OrderProductRelationTag.objects.filter_active()
-            .filter(code=value)
-            .exclude(pk=self.instance.pk if self.instance else None)
-        )
-        if duplicated.exists():
-            raise serializers.ValidationError("이미 있는 코드입니다.")
-        return value
-
 
 class OrderProductRelationTagAssignResultSerializer(serializers.Serializer):
     affected = serializers.IntegerField()

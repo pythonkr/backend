@@ -98,6 +98,15 @@ def test_build_verify_display_maps_frozen_context():
 
 
 @pytest.mark.django_db
+def test_build_notification_context_falls_back_to_participant_info(ticket_opr):
+    # participant 를 넘기지 않으면 ticket_info/customer_info 를 스스로 찾는다.
+    context = ticket_opr.build_notification_context()
+
+    assert context["participant_name"] == ticket_opr.participant_info.name
+    assert context["participant_email"] == ticket_opr.participant_info.email
+
+
+@pytest.mark.django_db
 def test_is_document_downloadable_by_only_order_owner(used_ticket_opr, other_user):
     assert used_ticket_opr.is_document_downloadable_by(used_ticket_opr.order.user) is True
     assert used_ticket_opr.is_document_downloadable_by(other_user) is False
