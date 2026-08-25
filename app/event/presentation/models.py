@@ -116,8 +116,11 @@ class Presentation(BaseAbstractModel):
         on_delete=models.PROTECT,
         null=True,
         blank=True,
-        help_text="최종 외부 공개용 발표 자료",
+        help_text="최종 외부 공개용 발표 자료 (파일)",
         related_name="+",
+    )
+    public_slideshow_url = models.URLField(
+        null=True, blank=True, default="", help_text="최종 외부 공개용 발표 자료 (URL)"
     )
 
     categories = models.ManyToManyField(to="PresentationCategory", through="PresentationCategoryRelation")

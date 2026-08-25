@@ -11,6 +11,15 @@ from shop.order.models import Order
 from shop.test.helpers import ScanCodeApi
 
 
+def tamper(token: str) -> str:
+    """token 의 salt 마지막 글자를 다른 글자로 바꿔 검증을 깨뜨린다.
+
+    salt 는 32byte HMAC 의 base64 라 마지막 글자가 16종("048AEIMQUYcgkosw") 중 하나다.
+    무조건 "A" 로 바꾸면 원래 "A" 인 1/16 확률로 변조가 no-op 이 되어 테스트가 간헐 실패한다.
+    """
+    return token[:-1] + ("A" if token[-1] != "A" else "B")
+
+
 @pytest.mark.django_db
 def test_scancode_rejects_missing_token(anon_client):
     response = ScanCodeApi(http_client=anon_client).list()
@@ -72,7 +81,7 @@ def test_scancode_opr_token_with_invalid_salt_rejects(anon_client, order_factory
     completed_order = order_factory(status="completed")
     opr = completed_order.products.first()
     # token 의 salt 부분 변조 — from_scancode_token 이 None 반환 → 403.
-    tampered = opr.scancode_token[:-1] + ("A" if opr.scancode_token[-1] != "A" else "B")
+    tampered = tamper(opr.scancode_token)
     response = ScanCodeApi(http_client=anon_client).list({"token": tampered})
     assert response.status_code == HTTP_403_FORBIDDEN
 
@@ -149,7 +158,7 @@ def test_scancode_token_rejected_after_old_salt_removed(anon_client, order_facto
 @pytest.mark.django_db
 def test_scancode_error_page_shows_both_languages_and_guide(anon_client, order_factory):
     order = order_factory(status="completed")
-    tampered = order.scancode_token[:-1] + "A"
+    tampered = tamper(order.scancode_token)
 
     response = anon_client.get(reverse("v1:scancode-list"), {"token": tampered}, HTTP_ACCEPT_LANGUAGE="ko-KR,ko;q=0.9")
     body = response.content.decode()
@@ -162,7 +171,7 @@ def test_scancode_error_page_shows_both_languages_and_guide(anon_client, order_f
 @pytest.mark.django_db
 def test_scancode_error_page_is_english_for_english_client(anon_client, order_factory):
     order = order_factory(status="completed")
-    tampered = order.scancode_token[:-1] + "A"
+    tampered = tamper(order.scancode_token)
 
     response = anon_client.get(reverse("v1:scancode-list"), {"token": tampered}, HTTP_ACCEPT_LANGUAGE="en-US,en;q=0.9")
     body = response.content.decode()
@@ -180,7 +189,7 @@ def test_scancode_renders_html_even_when_client_asks_for_json(anon_client, order
     assert ok.status_code == HTTP_200_OK
     assert ok["Content-Type"].startswith("text/html")
 
-    tampered = order.scancode_token[:-1] + "A"
+    tampered = tamper(order.scancode_token)
     error = anon_client.get(reverse("v1:scancode-list"), {"token": tampered}, HTTP_ACCEPT="application/json")
     assert error.status_code == HTTP_404_NOT_FOUND
     assert SCANCODE_MESSAGES["order_not_found"]["ko"] in error.content.decode()
