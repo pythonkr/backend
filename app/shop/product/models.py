@@ -133,6 +133,22 @@ class ProductQuerySet(BaseAbstractModelQuerySet):
     def filter_visible_now(self) -> typing.Self:
         return self.filter_visible_at(now_aware())
 
+    def with_sold_count(self) -> typing.Self:
+        # 상품당 COUNT 쿼리를 날리는 Product.sold_count cached_property 를 annotation 으로 덮어쓴다
+        # (non-data descriptor 라 인스턴스 __dict__ 값이 우선). leftover_stock 도 이 값을 재사용.
+        from shop.order.models import OrderProductRelation
+
+        return self.annotate(
+            sold_count=models.Count(
+                "orderproductrelation",
+                filter=models.Q(
+                    orderproductrelation__deleted_at__isnull=True,
+                    orderproductrelation__single_product_cart__isnull=True,
+                    orderproductrelation__status__in=OrderProductRelation.PURCHASED_STOCK_STATUS,
+                ),
+            )
+        )
+
 
 class Product(BaseAbstractModel):
     class CurrentStatus(models.TextChoices):

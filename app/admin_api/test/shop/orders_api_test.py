@@ -5,7 +5,7 @@ from io import BytesIO
 import pandas
 import pytest
 import yaml
-from admin_api.serializers.shop.orders import OrderAdminSerializer
+from admin_api.serializers.shop.orders import OrderAdminSerializer, OrderListAdminSerializer
 from admin_api.test.helpers import OrdersAdminApi
 from admin_api.views.shop.orders import OrderAdminViewSet
 from core.const.shop_error_messages import NotRefundableErrorMessages
@@ -26,6 +26,13 @@ from shop.payment_history.models import PaymentHistory, PaymentHistoryStatus
 from user.models import UserExt
 
 
+def _expected_list_row(order_id) -> dict:
+    """목록 응답 한 행 — 뷰셋의 list 용 queryset/serializer 를 그대로 재현한다."""
+    viewset = OrderAdminViewSet()
+    viewset.action = "list"
+    return OrderListAdminSerializer(instance=viewset.get_queryset().get(id=order_id)).data
+
+
 @pytest.mark.parametrize("client_fixture", ["anon_client", "customer_client"])
 @pytest.mark.django_db
 def test_admin_list_rejects_non_superuser_client(request, client_fixture):
@@ -43,7 +50,7 @@ def test_admin_list_returns_only_orders_with_payment_history_and_products(api_cl
         "count": 1,
         "next": None,
         "previous": None,
-        "results": [OrderAdminSerializer(instance=OrderAdminViewSet.queryset.get(id=completed_order.id)).data],
+        "results": [_expected_list_row(completed_order.id)],
     }
 
 
@@ -59,8 +66,11 @@ def test_admin_list_includes_free_completed_order(api_client, order_factory):
     assert row["current_status"] == PaymentHistoryStatus.completed
     assert row["current_paid_price"] == 0
     assert row["latest_imp_id"] is None
-    assert row["payment_histories"][0]["price"] == 0
-    assert row["payment_histories"][0]["imp_id"] is None
+
+    # 결제이력 원본은 상세에서 확인 — 목록 응답에는 싣지 않는다.
+    detail = OrdersAdminApi(http_client=api_client).retrieve(order.id).json()
+    assert detail["payment_histories"][0]["price"] == 0
+    assert detail["payment_histories"][0]["imp_id"] is None
 
 
 @pytest.mark.django_db
@@ -88,7 +98,7 @@ def test_admin_list_filters_by_status_csv(api_client, order_factory):
         "count": 1,
         "next": None,
         "previous": None,
-        "results": [OrderAdminSerializer(instance=OrderAdminViewSet.queryset.get(id=refunded_order.id)).data],
+        "results": [_expected_list_row(refunded_order.id)],
     }
 
 
@@ -101,7 +111,7 @@ def test_admin_list_filters_by_product_id_distinct(api_client, ticket_product, o
         "count": 1,
         "next": None,
         "previous": None,
-        "results": [OrderAdminSerializer(instance=OrderAdminViewSet.queryset.get(id=completed_order.id)).data],
+        "results": [_expected_list_row(completed_order.id)],
     }
 
 
@@ -136,6 +146,28 @@ def test_admin_list_filters_by_active_opr_event(api_client, ticket_product, non_
     response = OrdersAdminApi(http_client=api_client).list({"event_id": str(event.id)})
     assert response.status_code == HTTP_200_OK
     assert {row["id"] for row in response.json()["results"]} == {str(in_event_order.id)}
+
+
+@pytest.mark.django_db
+def test_admin_list_omits_nested_detail_and_customer_info(api_client, order_factory):
+    order = order_factory(status="completed")
+    response = OrdersAdminApi(http_client=api_client).list()
+    assert response.status_code == HTTP_200_OK
+    [row] = [r for r in response.json()["results"] if r["id"] == str(order.id)]
+    assert not {"products", "payment_histories", "customer_info", "first_paid_price"} & set(row)
+    assert row["user"]["email"] == order.user.email
+
+
+@pytest.mark.django_db
+def test_admin_list_query_count_does_not_grow_with_orders(api_client, order_factory, django_assert_max_num_queries):
+    for _ in range(4):
+        order_factory(status="completed")
+
+    # 주문 수와 무관하게 count + page 두 쿼리만 — 주문상품/결제이력 prefetch 가 없다.
+    with django_assert_max_num_queries(2):
+        response = OrdersAdminApi(http_client=api_client).list()
+    assert response.status_code == HTTP_200_OK
+    assert len(response.json()["results"]) == 4
 
 
 @pytest.mark.django_db
@@ -584,5 +616,5 @@ def test_admin_list_filters_by_user_id(api_client, customer_user, other_user, ti
         "count": 1,
         "next": None,
         "previous": None,
-        "results": [OrderAdminSerializer(instance=OrderAdminViewSet.queryset.get(id=completed_order.id)).data],
+        "results": [_expected_list_row(completed_order.id)],
     }

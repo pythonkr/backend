@@ -41,6 +41,27 @@ def test_template_list_returns_active_templates(api_client, email_template):
 
 
 @pytest.mark.django_db
+def test_template_list_omits_body_but_keeps_variables(api_client, email_template):
+    response = api_client.get(reverse("v1:admin-notification-email-template-list"))
+    assert response.status_code == http.HTTPStatus.OK
+    [row] = [r for r in response.json()["results"] if r["id"] == str(email_template.id)]
+    assert "data" not in row
+    assert "editor_source" not in row
+    # 발송 다이얼로그가 목록 응답만으로 변수 입력 폼을 만든다 — data 를 빼도 유지되어야 한다.
+    assert row["template_variables"] == sorted(email_template.template_variables)
+    assert row["sent_from"] == email_template.sent_from
+
+
+@pytest.mark.django_db
+def test_template_retrieve_keeps_body(api_client, email_template):
+    response = api_client.get(
+        reverse("v1:admin-notification-email-template-detail", kwargs={"pk": str(email_template.id)})
+    )
+    assert response.status_code == http.HTTPStatus.OK
+    assert response.json()["data"] == email_template.data
+
+
+@pytest.mark.django_db
 def test_template_retrieve_includes_template_variables(api_client, email_template):
     response = api_client.get(reverse("v1:admin-notification-email-template-detail", kwargs={"pk": email_template.id}))
     assert response.status_code == http.HTTPStatus.OK
@@ -372,6 +393,44 @@ def test_history_list_returns_rows(api_client, email_history):
     assert response.status_code == http.HTTPStatus.OK
     ids = [row["id"] for row in response.json()["results"]]
     assert str(email_history.id) in ids
+
+
+@pytest.mark.django_db
+def test_history_list_omits_body_snapshot_and_recipients(api_client, email_history):
+    response = api_client.get(reverse("v1:admin-notification-email-history-list"))
+    assert response.status_code == http.HTTPStatus.OK
+    [row] = [r for r in response.json()["results"] if r["id"] == str(email_history.id)]
+    assert "template_data" not in row
+    assert "sent_to_list" not in row
+    assert row["sent_to_status_summary"] == {"created": 1, "sending": 0, "sent": 0, "failed": 0}
+
+
+@pytest.mark.django_db
+def test_history_retrieve_keeps_body_snapshot_and_recipients(api_client, email_history):
+    response = api_client.get(
+        reverse("v1:admin-notification-email-history-detail", kwargs={"pk": str(email_history.id)})
+    )
+    assert response.status_code == http.HTTPStatus.OK
+    body = response.json()
+    assert body["template_data"] == email_history.template_data
+    assert [s["recipient"] for s in body["sent_to_list"]] == ["to@example.com"]
+
+
+@pytest.mark.django_db
+def test_history_list_summary_counts_each_status_separately(api_client, email_template):
+    history = EmailNotificationHistory.objects.create_for_recipients(
+        template=email_template,
+        recipients=[{"recipient": f"{i}@x.com"} for i in range(3)],
+    )
+    sent_to_list = list(history.sent_to_list.order_by("recipient"))
+    sent_to_list[0].status = NotificationStatus.SENT
+    sent_to_list[1].status = NotificationStatus.FAILED
+    EmailNotificationHistory.sent_to_class.objects.bulk_update(sent_to_list[:2], ["status"])
+
+    response = api_client.get(reverse("v1:admin-notification-email-history-list"))
+    assert response.status_code == http.HTTPStatus.OK
+    [row] = [r for r in response.json()["results"] if r["id"] == str(history.id)]
+    assert row["sent_to_status_summary"] == {"created": 1, "sending": 0, "sent": 1, "failed": 1}
 
 
 @pytest.mark.django_db

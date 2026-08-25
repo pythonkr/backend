@@ -2,7 +2,7 @@ from enum import StrEnum, auto
 from json import loads as json_loads
 from logging import getLogger
 from traceback import format_exc
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, NotRequired, TypedDict, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, NotRequired, Self, TypedDict, TypeVar
 from uuid import uuid4
 
 from core.external_apis.__interface__ import NotificationServiceInterface, SendParameters
@@ -142,7 +142,22 @@ THistory = TypeVar("THistory", bound="NotificationHistoryBase")
 TTemplate = TypeVar("TTemplate", bound=NotificationTemplateBase)
 
 
+def _sent_to_summary_annotation_name(status: NotificationStatus) -> str:
+    return f"sent_to_count_{status.value.lower()}"
+
+
 class NotificationHistoryQuerySet(BaseAbstractModelQuerySet, Generic[THistory, TTemplate]):
+    def with_sent_to_status_summary(self) -> Self:
+        # 상태별 conditional aggregation — sent_to_list를 통째로 prefetch 하지 않고 요약만 얻는다.
+        return self.annotate(
+            **{
+                _sent_to_summary_annotation_name(status): models.Count(
+                    "sent_to_list", filter=models.Q(sent_to_list__status=status)
+                )
+                for status in NotificationStatus
+            }
+        )
+
     @transaction.atomic
     def create_for_recipients(self, *, template: TTemplate, recipients: list[Recipient]) -> THistory:
         # template은 항상 필수. templateless 발송 시 호출자가 unsaved 인스턴스를 구성해 전달.
@@ -184,8 +199,14 @@ class NotificationHistoryBase(BaseAbstractModel):
 
     @property
     def sent_to_status_summary(self) -> dict[str, int]:
-        # prefetch된 sent_to_list가 있으면 in-memory 집계 (list 엔드포인트에서 history 당 GROUP BY 회피),
-        # 없으면 GROUP BY 한 번으로 카운트.
+        # with_sent_to_status_summary() annotation이 있으면 그대로 사용 (list 엔드포인트),
+        # prefetch된 sent_to_list가 있으면 in-memory 집계, 둘 다 없으면 GROUP BY 한 번으로 카운트.
+        if all(hasattr(self, _sent_to_summary_annotation_name(status)) for status in NotificationStatus):
+            return {
+                status.value.lower(): getattr(self, _sent_to_summary_annotation_name(status))
+                for status in NotificationStatus
+            }
+
         prefetched = getattr(self, "_prefetched_objects_cache", {})
         if "sent_to_list" in prefetched:
             counts: dict[str, int] = {}

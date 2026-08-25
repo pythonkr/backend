@@ -114,6 +114,35 @@ class _NotiHistoryAdminSerializerBase(BaseAbstractSerializer, JsonSchemaSerializ
         self.instance.refresh_from_db()
 
 
+class _NotiHistoryListAdminSerializerBase(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
+    # 목록 전용 — 본문 스냅샷(template_data)과 수신자 전체(sent_to_list)를 빼고 상태 요약만 남긴다.
+    template_code = serializers.CharField(read_only=True)
+    sent_to_status_summary = _NotiHistoryAdminSerializerBase.SummarySerializer(read_only=True)
+
+    class Meta:
+        fields = read_only_fields = COMMON_ADMIN_FIELDS + (
+            "template",
+            "template_code",
+            "sent_from",
+            "sent_to_status_summary",
+        )
+
+
+class EmailNotificationHistoryListAdminSerializer(_NotiHistoryListAdminSerializerBase):
+    class Meta(_NotiHistoryListAdminSerializerBase.Meta):
+        model = EmailNotificationHistory
+
+
+class NHNCloudSMSNotificationHistoryListAdminSerializer(_NotiHistoryListAdminSerializerBase):
+    class Meta(_NotiHistoryListAdminSerializerBase.Meta):
+        model = NHNCloudSMSNotificationHistory
+
+
+class NHNCloudKakaoAlimTalkNotificationHistoryListAdminSerializer(_NotiHistoryListAdminSerializerBase):
+    class Meta(_NotiHistoryListAdminSerializerBase.Meta):
+        model = NHNCloudKakaoAlimTalkNotificationHistory
+
+
 class EmailNotificationHistoryAdminSerializer(_NotiHistoryAdminSerializerBase):
     template = serializers.PrimaryKeyRelatedField(
         queryset=EmailNotificationTemplate.objects.filter_active(),
@@ -202,6 +231,30 @@ class NHNCloudSMSNotificationTemplateAdminSerializer(_NotiTemplateAdminSerialize
     sent_from = serializers.CharField(max_length=13)
 
     class Meta(_NotiTemplateAdminSerializerBase.Meta):
+        model = NHNCloudSMSNotificationTemplate
+
+
+class _NotiTemplateListAdminSerializerBase(_NotiTemplateAdminSerializerBase):
+    # 목록 전용 — 본문(data)과 에디터 소스(editor_source)를 제외한다.
+    # template_variables 는 data 를 파싱해 만들므로 응답에서만 빠지고 조회 자체는 그대로다.
+    class Meta(_NotiTemplateAdminSerializerBase.Meta):
+        fields = read_only_fields = tuple(
+            f for f in _NotiTemplateAdminSerializerBase.Meta.fields if f not in ("data", "editor_source")
+        )
+
+
+class EmailNotificationTemplateListAdminSerializer(_NotiTemplateListAdminSerializerBase):
+    class Meta(_NotiTemplateListAdminSerializerBase.Meta):
+        model = EmailNotificationTemplate
+
+
+class NHNCloudKakaoAlimTalkNotificationTemplateListAdminSerializer(_NotiTemplateListAdminSerializerBase):
+    class Meta(_NotiTemplateListAdminSerializerBase.Meta):
+        model = NHNCloudKakaoAlimTalkNotificationTemplate
+
+
+class NHNCloudSMSNotificationTemplateListAdminSerializer(_NotiTemplateListAdminSerializerBase):
+    class Meta(_NotiTemplateListAdminSerializerBase.Meta):
         model = NHNCloudSMSNotificationTemplate
 
 

@@ -10,6 +10,7 @@ from admin_api.filtersets.shop.orders import OrderAdminFilterSet
 from admin_api.serializers.shop.orders import (
     OrderAdminSerializer,
     OrderExportRequestSerializer,
+    OrderListAdminSerializer,
     OrderProductRelationTagAdminSerializer,
     OrderProductRelationTagAssignResultSerializer,
 )
@@ -21,6 +22,7 @@ from core.viewset.json_schema_viewset import JsonSchemaMixin
 from core.viewset.selectables_viewset import SelectablesMixin
 from django.core.files import File
 from django.db import models, transaction
+from django.db.models.functions import Coalesce
 from django.http.response import HttpResponse, StreamingHttpResponse
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema, extend_schema_view
 from drf_standardized_errors.openapi_serializers import ValidationErrorResponseSerializer
@@ -97,10 +99,6 @@ class OrderAdminViewSet(
         Order.objects.filter_has_payment_histories()
         .filter(models.Exists(OrderProductRelation.objects.filter_active().filter(order=models.OuterRef("pk"))))
         .select_related_with_user("user", "customer_info")
-        .prefetch_related(
-            models.Prefetch("products", queryset=_OPR_PREFETCH_QS),
-            models.Prefetch("payment_histories", queryset=_PAYMENT_HISTORY_PREFETCH_QS),
-        )
         .annotate(
             current_status=PaymentHistory.objects.latest_per_order_field("status"),
             latest_imp_id=PaymentHistory.objects.latest_per_order_field("imp_id"),
@@ -110,6 +108,20 @@ class OrderAdminViewSet(
         )
         .order_by(models.F("first_paid_at").desc(nulls_last=True), "-created_at", "pk")
     )
+
+    def get_serializer_class(self) -> type:
+        return OrderListAdminSerializer if self.action == "list" else OrderAdminSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.action == "list":
+            # 목록은 결제 금액만 필요 — cached_property 를 덮어쓰는 annotation 으로 결제이력 prefetch 를 없앤다.
+            return qs.annotate(current_paid_price=Coalesce(models.F("latest_price"), 0))
+
+        return qs.prefetch_related(
+            models.Prefetch("products", queryset=_OPR_PREFETCH_QS),
+            models.Prefetch("payment_histories", queryset=_PAYMENT_HISTORY_PREFETCH_QS),
+        )
 
     @extend_schema(
         summary="주문 전체 환불",

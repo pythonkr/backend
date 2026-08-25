@@ -133,6 +133,26 @@ class OrderAdminSerializer(
         return order
 
 
+class OrderListAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
+    user = OrderAdminSerializer.SimpleUserSerializer(read_only=True)
+    current_paid_price = serializers.IntegerField(read_only=True)
+    current_status = serializers.CharField(read_only=True)
+    first_paid_at = serializers.DateTimeField(read_only=True)
+    latest_imp_id = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Order
+        fields = read_only_fields = COMMON_ADMIN_FIELDS + (
+            "name_ko",
+            "name_en",
+            "user",
+            "current_paid_price",
+            "current_status",
+            "first_paid_at",
+            "latest_imp_id",
+        )
+
+
 class OrderExportRequestSerializer(JsonSchemaSerializer, serializers.Serializer):
     include_refunded = serializers.BooleanField(default=False)
 

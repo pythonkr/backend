@@ -323,3 +323,24 @@ class ProductAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, seria
         if orderable.ends_after(visible):
             errors["orderable_ends_at"] = "판매 종료는 노출 종료 이전이어야 합니다."
         return errors
+
+
+class ProductListAdminSerializer(BaseAbstractSerializer, JsonSchemaSerializer, serializers.ModelSerializer):
+    # 목록 전용 — 옵션 그룹/태그 상세와 설명 본문을 제외한다. 편집 화면은 retrieve 응답을 쓴다.
+    leftover_stock = serializers.IntegerField(read_only=True, allow_null=True)
+    sold_count = serializers.IntegerField(read_only=True)
+    current_status = serializers.ChoiceField(choices=Product.CurrentStatus.choices, read_only=True)
+
+    class Meta:
+        model = Product
+        fields = read_only_fields = COMMON_ADMIN_FIELDS + (
+            "name_ko",
+            "name_en",
+            "price",
+            "stock",
+            "category",
+            "priority",
+            "leftover_stock",
+            "sold_count",
+            "current_status",
+        )

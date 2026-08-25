@@ -4,6 +4,7 @@ from admin_api.serializers.shop.products import (
     CategoryReadAdminSerializer,
     OptionGroupAdminSerializer,
     ProductAdminSerializer,
+    ProductListAdminSerializer,
     TagAdminSerializer,
 )
 from core.authz import IsSuperUser
@@ -14,7 +15,7 @@ from core.viewset.selectables_viewset import SelectablesMixin
 from django.db.models import Count, Prefetch, Q
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import viewsets
-from shop.product.models import Category, CategoryGroup, Option, OptionGroup, Product, ProductTagRelation, Tag
+from shop.product.models import Category, CategoryGroup, Option, OptionGroup, Product, Tag
 
 READONLY_METHODS = ["list", "retrieve"]
 CRUD_METHODS = READONLY_METHODS + ["create", "update", "partial_update", "destroy"]
@@ -64,8 +65,21 @@ class ProductAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewS
     queryset = (
         Product.objects.filter_active()
         .select_related_with_user("category", "category__group", "image")
-        .prefetch_related(
-            Prefetch("tags", queryset=ProductTagRelation.objects.filter_active().select_related("tag")),
+        .order_by("-created_at", "pk")
+    )
+
+    def get_serializer_class(self) -> type:
+        return ProductListAdminSerializer if self.action == "list" else ProductAdminSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.action == "list":
+            # 목록은 판매량만 필요 — 상품별 COUNT 쿼리 대신 annotation 하나로 끝낸다.
+            return qs.with_sold_count()
+
+        return qs.prefetch_related(
+            # tag_set 은 M2M — serializer 가 읽는 이름 그대로 prefetch 해야 tag_set/tag_set_detail 이 재조회되지 않는다.
+            Prefetch("tag_set", queryset=Tag.objects.filter_active().select_related_with_user()),
             Prefetch(
                 "option_groups",
                 queryset=OptionGroup.objects.filter_active()
@@ -75,8 +89,6 @@ class ProductAdminViewSet(JsonSchemaMixin, SelectablesMixin, viewsets.ModelViewS
                 ),
             ),
         )
-        .order_by("-created_at", "pk")
-    )
 
 
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_SHOP_PRODUCT]) for m in CRUD_METHODS})

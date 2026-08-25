@@ -3,11 +3,17 @@ from __future__ import annotations
 from admin_api.filtersets.notification import NotificationHistoryAdminFilterSet, NotificationTemplateAdminFilterSet
 from admin_api.serializers.notification import (
     EmailNotificationHistoryAdminSerializer,
+    EmailNotificationHistoryListAdminSerializer,
     EmailNotificationTemplateAdminSerializer,
+    EmailNotificationTemplateListAdminSerializer,
     NHNCloudKakaoAlimTalkNotificationHistoryAdminSerializer,
+    NHNCloudKakaoAlimTalkNotificationHistoryListAdminSerializer,
     NHNCloudKakaoAlimTalkNotificationTemplateAdminSerializer,
+    NHNCloudKakaoAlimTalkNotificationTemplateListAdminSerializer,
     NHNCloudSMSNotificationHistoryAdminSerializer,
+    NHNCloudSMSNotificationHistoryListAdminSerializer,
     NHNCloudSMSNotificationTemplateAdminSerializer,
+    NHNCloudSMSNotificationTemplateListAdminSerializer,
     NotificationHistoryRetryRequestAdminSerializer,
     NotificationTemplateRenderRequestAdminSerializer,
 )
@@ -45,6 +51,10 @@ HISTORY_METHODS = ["list", "retrieve", "create", "retry", "retry_sent_to", "rend
 class _NotiTemplateAdminActionMixin(JsonSchemaMixin, SelectablesMixin):
     permission_classes = [IsSuperUser]
     filterset_class = NotificationTemplateAdminFilterSet
+    list_serializer_class: type
+
+    def get_serializer_class(self) -> type:
+        return self.list_serializer_class if self.action == "list" else self.serializer_class
 
     @extend_schema(
         request=NotificationTemplateRenderRequestAdminSerializer,
@@ -66,6 +76,7 @@ class EmailNotificationTemplateAdminViewSet(_NotiTemplateAdminActionMixin, Model
     pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = EmailNotificationTemplateAdminSerializer
+    list_serializer_class = EmailNotificationTemplateListAdminSerializer
     queryset = (
         EmailNotificationTemplate.objects.filter_active().select_related_with_user().order_by("-created_at", "pk")
     )
@@ -75,6 +86,7 @@ class EmailNotificationTemplateAdminViewSet(_NotiTemplateAdminActionMixin, Model
 class NHNCloudKakaoAlimTalkNotificationTemplateAdminViewSet(_NotiTemplateAdminActionMixin, ReadOnlyModelViewSet):
     pagination_class = AdminPagination
     serializer_class = NHNCloudKakaoAlimTalkNotificationTemplateAdminSerializer
+    list_serializer_class = NHNCloudKakaoAlimTalkNotificationTemplateListAdminSerializer
     queryset = (
         NHNCloudKakaoAlimTalkNotificationTemplate.objects.filter_active()
         .select_related_with_user()
@@ -92,6 +104,7 @@ class NHNCloudSMSNotificationTemplateAdminViewSet(_NotiTemplateAdminActionMixin,
     pagination_class = AdminPagination
     http_method_names = ["get", "post", "patch", "delete"]
     serializer_class = NHNCloudSMSNotificationTemplateAdminSerializer
+    list_serializer_class = NHNCloudSMSNotificationTemplateListAdminSerializer
     queryset = (
         NHNCloudSMSNotificationTemplate.objects.filter_active().select_related_with_user().order_by("-created_at", "pk")
     )
@@ -106,6 +119,15 @@ class _NotiHistoryAdminViewSetBase(
     pagination_class = AdminPagination
     permission_classes = [IsSuperUser]
     filterset_class = NotificationHistoryAdminFilterSet
+    list_serializer_class: type
+
+    def get_serializer_class(self) -> type:
+        return self.list_serializer_class if self.action == "list" else self.serializer_class
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        # 목록은 수신자 전체를 직렬화하지 않으므로 prefetch 대신 상태 요약 annotation 만 얹는다.
+        return qs.with_sent_to_status_summary() if self.action == "list" else qs.prefetch_related("sent_to_list")
 
     @action(detail=True, methods=["post"], url_path="retry")
     def retry(self, request: Request, *args: tuple, **kwargs: dict) -> Response:
@@ -141,10 +163,10 @@ class _NotiHistoryAdminViewSetBase(
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_NOTI_EMAIL]) for m in HISTORY_METHODS})
 class EmailNotificationHistoryAdminViewSet(_NotiHistoryAdminViewSetBase):
     serializer_class = EmailNotificationHistoryAdminSerializer
+    list_serializer_class = EmailNotificationHistoryListAdminSerializer
     queryset = (
         EmailNotificationHistory.objects.filter_active()
         .select_related_with_user("template")
-        .prefetch_related("sent_to_list")
         .order_by("-created_at", "pk")
     )
 
@@ -152,10 +174,10 @@ class EmailNotificationHistoryAdminViewSet(_NotiHistoryAdminViewSetBase):
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_NOTI_KAKAO_ALIMTALK]) for m in HISTORY_METHODS})
 class NHNCloudKakaoAlimTalkNotificationHistoryAdminViewSet(_NotiHistoryAdminViewSetBase):
     serializer_class = NHNCloudKakaoAlimTalkNotificationHistoryAdminSerializer
+    list_serializer_class = NHNCloudKakaoAlimTalkNotificationHistoryListAdminSerializer
     queryset = (
         NHNCloudKakaoAlimTalkNotificationHistory.objects.filter_active()
         .select_related_with_user("template")
-        .prefetch_related("sent_to_list")
         .order_by("-created_at", "pk")
     )
 
@@ -163,9 +185,9 @@ class NHNCloudKakaoAlimTalkNotificationHistoryAdminViewSet(_NotiHistoryAdminView
 @extend_schema_view(**{m: extend_schema(tags=[OpenAPITag.ADMIN_NOTI_SMS]) for m in HISTORY_METHODS})
 class NHNCloudSMSNotificationHistoryAdminViewSet(_NotiHistoryAdminViewSetBase):
     serializer_class = NHNCloudSMSNotificationHistoryAdminSerializer
+    list_serializer_class = NHNCloudSMSNotificationHistoryListAdminSerializer
     queryset = (
         NHNCloudSMSNotificationHistory.objects.filter_active()
         .select_related_with_user("template")
-        .prefetch_related("sent_to_list")
         .order_by("-created_at", "pk")
     )

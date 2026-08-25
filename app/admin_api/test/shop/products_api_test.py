@@ -239,6 +239,61 @@ def test_admin_product_delete_soft_deletes(api_client, ticket_product):
 
 
 @pytest.mark.django_db
+def test_admin_product_list_omits_nested_detail_fields(api_client, ticket_product, option_group):
+    response = ProductsAdminApi(http_client=api_client).list()
+    assert response.status_code == HTTP_200_OK
+    [row] = [p for p in response.json()["results"] if p["id"] == str(ticket_product.id)]
+    assert not {"option_groups", "tag_set", "tag_set_detail", "description_ko", "description_en"} & set(row)
+    assert row["current_status"] == Product.CurrentStatus.ACTIVE
+
+
+@pytest.mark.django_db
+def test_admin_product_list_reports_sold_count_from_annotation(api_client, ticket_product, order_factory):
+    order_factory(status="completed")
+    order_factory(status="completed")
+    order_factory(status="cart")  # 미결제 장바구니는 판매 수량에서 제외.
+
+    response = ProductsAdminApi(http_client=api_client).list()
+    assert response.status_code == HTTP_200_OK
+    [row] = [p for p in response.json()["results"] if p["id"] == str(ticket_product.id)]
+    assert row["sold_count"] == 2
+    assert row["leftover_stock"] == (ticket_product.stock - 2 if ticket_product.stock else None)
+
+
+@pytest.mark.django_db
+def test_admin_product_list_query_count_does_not_grow_with_products(
+    api_client, ticket_product, django_assert_max_num_queries
+):
+    for i in range(5):
+        Product.objects.create(
+            category=ticket_product.category,
+            name=f"bulk-{i}",
+            price=100,
+            stock=10,
+            visible_starts_at=FAR_PAST,
+            visible_ends_at=FAR_FUTURE,
+            orderable_starts_at=FAR_PAST,
+            orderable_ends_at=FAR_FUTURE,
+            refundable_ends_at=FAR_FUTURE,
+        )
+
+    # 상품 수와 무관하게 count + page 두 쿼리만 — sold_count 가 annotation 이라 상품별 COUNT 가 없다.
+    with django_assert_max_num_queries(2):
+        response = ProductsAdminApi(http_client=api_client).list()
+    assert response.status_code == HTTP_200_OK
+    assert len(response.json()["results"]) == 6
+
+
+@pytest.mark.django_db
+def test_admin_product_retrieve_keeps_nested_detail_fields(api_client, ticket_product, option_group):
+    response = ProductsAdminApi(http_client=api_client).retrieve(ticket_product.id)
+    assert response.status_code == HTTP_200_OK
+    body = response.json()
+    assert [og["id"] for og in body["option_groups"]] == [str(option_group.id)]
+    assert "tag_set_detail" in body
+
+
+@pytest.mark.django_db
 def test_admin_product_list_filters_by_category(api_client, ticket_product):
     Product.objects.create(
         category=Category.objects.create(
