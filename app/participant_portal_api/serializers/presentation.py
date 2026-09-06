@@ -74,11 +74,22 @@ class PresentationPortalSerializer(ModificationAuditCreationPortalSerializer, se
             .first()
         )
 
+    def get_active_speaker_ids(self, instance) -> set[str] | None:
+        if (active_speakers := getattr(instance, "active_speakers", None)) is None:
+            return None
+        return {str(speaker.id) for speaker in active_speakers}
+
     def to_representation(self, instance):
         result = super().to_representation(instance)
 
         if (current_user := get_current_user()) and (speakers := result.get("speakers")):
-            result["speakers"] = [s for s in speakers if s["user"]["id"] == current_user.pk]
+            active_speaker_ids = self.get_active_speaker_ids(instance)
+            result["speakers"] = [
+                s
+                for s in speakers
+                if s["user"]["id"] == current_user.pk
+                and (active_speaker_ids is None or str(s["id"]) in active_speaker_ids)
+            ]
         else:
             result["speakers"] = []
 
