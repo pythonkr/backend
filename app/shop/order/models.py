@@ -478,9 +478,7 @@ class OrderProductRelation(ScanCodeMixin, IssuableMixin, BaseAbstractModel):
     def participant_info(self) -> TicketInfo | CustomerInfo | None:
         return self.ticket_info_or_none or self.customer_info_or_none
 
-    def build_notification_context(self, participant: TicketInfo | CustomerInfo | None = None) -> dict:
-        if participant is None:
-            participant = self.participant_info
+    def build_notification_context(self, participant: TicketInfo | CustomerInfo | None) -> dict:
         name = (getattr(participant, "name", "")) or ""
         organization = (getattr(participant, "organization", "")) or ""
         event = self.product.category.event

@@ -48,6 +48,8 @@ jobs:
 
       - uses: astral-sh/setup-uv@v5
         with:
+          # 러너 기본 파이썬(3.12.3)은 RFC 2047 헤더 폴딩 버그가 있다. 배포 이미지(python:3.12-slim)와 맞춘다.
+          python-version: '3.12'
           enable-cache: true
           ignore-nothing-to-cache: true
 
@@ -92,6 +94,8 @@ jobs:
 
       - uses: astral-sh/setup-uv@v5
         with:
+          # 러너 기본 파이썬(3.12.3)은 RFC 2047 헤더 폴딩 버그가 있다. 배포 이미지(python:3.12-slim)와 맞춘다.
+          python-version: '3.12'
           enable-cache: true
           ignore-nothing-to-cache: true
 

@@ -117,6 +117,24 @@ def test_opr_notification_preview_prefers_ticket_info_over_customer_info(api_cli
 
 
 @pytest.mark.django_db
+def test_opr_notification_preview_skips_participant_without_channel_contact(api_client, opr_email_template, ticket_opr):
+    # 참가자 정보가 있으면 주문자로 되돌아가지 않는다 — 엉뚱한 사람에게 티켓 QR 이 가면 안 된다.
+    TicketInfo.objects.create(
+        order_product_relation=ticket_opr,
+        name="참가자",
+        phone="01099998888",
+        email="",
+    )
+
+    response = OrderProductNotificationsAdminApi(http_client=api_client).preview(
+        {"channel": "email", "template_id": str(opr_email_template.id)}
+    )
+
+    assert response.status_code == HTTP_200_OK
+    assert response.json()["recipients"] == []
+
+
+@pytest.mark.django_db
 def test_opr_notification_preview_falls_back_to_customer_info(api_client, opr_email_template, ticket_opr):
     response = OrderProductNotificationsAdminApi(http_client=api_client).preview(
         {"channel": "email", "template_id": str(opr_email_template.id)}

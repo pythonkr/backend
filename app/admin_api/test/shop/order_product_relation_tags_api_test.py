@@ -112,6 +112,16 @@ def test_order_detail_exposes_tags(api_client, speaker_tag, order_factory):
 
 
 @pytest.mark.django_db
+def test_assign_rejects_invalid_filter_value(api_client, speaker_tag, order_factory):
+    order_factory(status="completed")
+
+    response = api_client.post(f"{_assign_url(speaker_tag.id)}?first_paid_at_after=어제")
+
+    assert response.status_code == HTTP_400_BAD_REQUEST
+    assert speaker_tag.order_product_relations.count() == 0
+
+
+@pytest.mark.django_db
 def test_assign_rejects_blank_filter_value(api_client, speaker_tag, order_factory):
     # django-filter 는 빈 값을 무시하므로 `?id=` 가 전체 태깅이 되면 안 된다.
     order_factory(status="completed")
