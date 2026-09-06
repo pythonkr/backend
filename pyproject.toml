@@ -3,7 +3,8 @@ name = "backend"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = "==3.12.*"
+# 3.12.4 미만은 RFC 2047 헤더 폴딩에서 인접 encoded-word 사이 공백을 잃어 긴 한글 메일 제목이 깨진다.
+requires-python = ">=3.12.4,<3.13"
 dependencies = [
     "argon2-cffi>=25.1.0",
     "celery[redis]>=5.6.3",
