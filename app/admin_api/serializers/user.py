@@ -1,4 +1,3 @@
-import contextlib
 import functools
 import typing
 
@@ -67,18 +66,20 @@ class UserAdminSerializer(JsonSchemaSerializer, NestedFieldModelSerializer):
             ),
         }
 
-    def _dooray_me(self, token: str) -> DoorayMember | None:
+    def _dooray_me(self, token: str) -> DoorayMember | DoorayError:
         cache = self.__dict__.setdefault("_dooray_me_cache", {})
         if token not in cache:
-            cache[token] = None
-            with contextlib.suppress(DoorayError):
+            try:
                 cache[token] = nhn_cloud_dooray_client.members_me(token)
+            except DoorayError as e:
+                cache[token] = e
         return cache[token]
 
     def get_dooray_account_info(self, obj: UserExt) -> DoorayMember | None:
         if not obj.dooray_api_key or self.context.get("skip_dooray_connection_check"):
             return None
-        return self._dooray_me(obj.dooray_api_key)
+        me = self._dooray_me(obj.dooray_api_key)
+        return None if isinstance(me, DoorayError) else me
 
     def validate(self, attrs: dict) -> dict:
         # social_accounts=[] 는 마지막 SA cascade 를 트리거해 같은 user 의 EA 전체를 삭제함.
@@ -114,7 +115,10 @@ class UserAdminSerializer(JsonSchemaSerializer, NestedFieldModelSerializer):
             return None
         if not ((current := get_current_user()) and self.instance.pk == current.pk):
             raise serializers.ValidationError("본인 계정에만 Dooray 토큰을 등록할 수 있습니다.")
-        if not (me := self._dooray_me(value)):
+        me = self._dooray_me(value)
+        if isinstance(me, DoorayError) and (me.status_code is None or me.status_code >= 500):
+            raise serializers.ValidationError("Dooray 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.")
+        if isinstance(me, DoorayError) or not me:
             raise serializers.ValidationError("유효하지 않거나 폐기된 Dooray 토큰입니다.")
         if (me.get("externalEmailAddress") or "").lower() not in self.instance.emails:
             raise serializers.ValidationError("Dooray 토큰의 이메일이 본인 계정 이메일과 일치하지 않습니다.")

@@ -1,4 +1,5 @@
 import httpx
+import pytest
 from core.external_apis.nhn_cloud.dooray import DoorayError, nhn_cloud_dooray_client
 from django.urls import reverse
 from rest_framework.test import APIClient
@@ -51,6 +52,21 @@ def test_register_rejects_invalid_token(api_client, superuser, monkeypatch):
     resp = api_client.patch(_detail_url(superuser.pk), {"dooray_api_key": "bad"}, format="json")
 
     assert resp.status_code == 400
+    assert "유효하지 않거나 폐기된" in resp.json()["errors"][0]["detail"]
+
+
+@pytest.mark.parametrize("error", [DoorayError(), DoorayError(httpx.Response(503))], ids=["transport", "5xx"])
+def test_register_reports_dooray_unavailable(api_client, superuser, monkeypatch, error):
+    def _raise(_token):
+        raise error
+
+    monkeypatch.setattr(nhn_cloud_dooray_client, "members_me", _raise)
+
+    resp = api_client.patch(_detail_url(superuser.pk), {"dooray_api_key": "tok"}, format="json")
+
+    assert resp.status_code == 400
+    assert "Dooray 서버에 연결할 수 없습니다" in resp.json()["errors"][0]["detail"]
+    assert UserExt.objects.get(pk=superuser.pk).dooray_api_key is None
 
 
 def test_cannot_register_on_other_users_record(api_client, superuser, monkeypatch, db):
