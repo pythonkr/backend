@@ -16,6 +16,13 @@ def _me_returns(email: str):
     return lambda _token: {"name": "홍길동", "externalEmailAddress": email, "id": "member-1"}
 
 
+def _disconnected_session() -> httpx.Client:
+    def _handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.RemoteProtocolError("Server disconnected without sending a response.", request=request)
+
+    return httpx.Client(base_url=nhn_cloud_dooray_client.session.base_url, transport=httpx.MockTransport(_handler))
+
+
 def test_register_via_patch_validates_and_encrypts(api_client, superuser, monkeypatch):
     monkeypatch.setattr(nhn_cloud_dooray_client, "members_me", _me_returns(superuser.email))
 
@@ -94,6 +101,17 @@ def test_me_masks_token_and_exposes_account_info(api_client, superuser, monkeypa
     assert after["dooray_account_info"]["externalEmailAddress"] == superuser.email
 
 
+def test_me_survives_dooray_transport_error(api_client, superuser, monkeypatch):
+    superuser.dooray_api_key = "tok"
+    superuser.save(update_fields=["dooray_api_key"])
+    monkeypatch.setattr(nhn_cloud_dooray_client, "session", _disconnected_session())
+
+    resp = api_client.get(ME_URL)
+
+    assert resp.status_code == 200, resp.content
+    assert resp.json()["dooray_account_info"] is None
+
+
 def test_list_does_not_call_dooray(api_client, superuser):
     # members_me 를 mock 하지 않음 — list 가 라이브 호출하면 SocketBlockedError 로 실패한다.
     superuser.dooray_api_key = "tok"
@@ -163,3 +181,14 @@ def test_proxy_passes_through_dooray_error(superuser, monkeypatch):
 
     assert resp.status_code == 404  # Dooray 오류 상태·본문 그대로 통과
     assert resp.json()["header"]["resultMessage"] == "없음"
+
+
+def test_proxy_returns_502_on_transport_error(api_client, superuser, monkeypatch):
+    superuser.dooray_api_key = "tok-123"
+    superuser.save(update_fields=["dooray_api_key"])
+    monkeypatch.setattr(nhn_cloud_dooray_client, "session", _disconnected_session())
+
+    resp = api_client.get(_proxy_url("project/v1/projects"))
+
+    assert resp.status_code == 502
+    assert "Server disconnected" in resp.json()["detail"]

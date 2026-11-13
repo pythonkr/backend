@@ -3,7 +3,7 @@ from typing import TypedDict
 
 from core.external_apis.__interface__ import HttpMethod
 from django.conf import settings
-from httpx import Client, HTTPStatusError, Response
+from httpx import Client, HTTPError, HTTPStatusError, Response
 
 
 class DoorayMemberOrganization(TypedDict):
@@ -27,10 +27,11 @@ class DoorayMember(TypedDict, total=False):
 
 
 class DoorayError(Exception):
-    def __init__(self, response: Response) -> None:
+    # response=None: 응답을 받지 못한 실패(연결 끊김·타임아웃 등)
+    def __init__(self, response: Response | None = None) -> None:
         self.response = response
-        self.status_code = response.status_code
-        super().__init__(f"Dooray API error {response.status_code}")
+        self.status_code = response.status_code if response is not None else None
+        super().__init__(f"Dooray API error {self.status_code}" if response is not None else "Dooray API unreachable")
 
 
 class NHNCloudDoorayClient:
@@ -48,17 +49,18 @@ class NHNCloudDoorayClient:
         params: dict | None = None,
         json: object | None = None,
     ) -> Response:
-        resp = self.session.request(
-            method,
-            path,
-            params=params,
-            json=json,
-            headers={"Authorization": f"dooray-api {token}"},
-        )
         try:
-            return resp.raise_for_status()
+            return self.session.request(
+                method,
+                path,
+                params=params,
+                json=json,
+                headers={"Authorization": f"dooray-api {token}"},
+            ).raise_for_status()
         except HTTPStatusError as exc:
-            raise DoorayError(resp) from exc
+            raise DoorayError(exc.response) from exc
+        except HTTPError as exc:
+            raise DoorayError() from exc
 
     def members_me(self, token: str) -> DoorayMember:
         return self.forward(token, "GET", "/common/v1/members/me").json().get("result", {})

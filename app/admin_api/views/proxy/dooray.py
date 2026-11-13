@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 
-import httpx
 from core.authz import IsSuperUser
 from core.external_apis.nhn_cloud.dooray import DoorayError, nhn_cloud_dooray_client
 from rest_framework import request as drf_request
@@ -38,12 +37,12 @@ class DoorayProxyView(APIView):
                 json=request.data if request.method in ("POST", "PUT", "PATCH") and request.data else None,
             )
         except DoorayError as e:
+            if e.response is None:
+                return response.Response(
+                    data={"detail": f"Dooray 요청 실패: {e.__cause__}"},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
             resp = e.response  # Dooray 4xx/5xx 는 그대로 통과
-        except httpx.HTTPError as e:
-            return response.Response(
-                data={"detail": f"Dooray 요청 실패: {e}"},
-                status=status.HTTP_502_BAD_GATEWAY,
-            )
 
         try:
             data = resp.json() if resp.content else None
